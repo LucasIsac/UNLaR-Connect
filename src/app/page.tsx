@@ -28,7 +28,7 @@ export default function Home() {
 
           <div className="flex items-center gap-4">
             <Link 
-              href="/login" 
+              href="/dashboard" 
               className="text-sm font-semibold hover:text-foreground transition-colors text-muted-foreground"
             >
               Ingresá
@@ -60,7 +60,7 @@ export default function Home() {
 
         <div className="flex flex-col sm:flex-row gap-4 items-center justify-center mb-20 w-full sm:w-auto">
           <Link 
-            href="/login" 
+            href="/dashboard" 
             className="w-full sm:w-auto px-8 py-4 rounded-full bg-gradient-to-r from-primary to-primary/90 text-primary-foreground font-semibold hover:opacity-95 transition-all shadow-lg shadow-primary/25 hover:shadow-primary/35 hover:scale-[1.02] active:scale-[0.98]"
           >
             Empezá ahora, es gratis

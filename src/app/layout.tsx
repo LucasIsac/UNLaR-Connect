@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { Inter, Outfit } from "next/font/google";
+import { Inter, Montserrat } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/ui/ThemeProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -8,7 +9,7 @@ const inter = Inter({
   display: "swap",
 });
 
-const outfit = Outfit({
+const montserrat = Montserrat({
   subsets: ["latin"],
   variable: "--font-heading",
   display: "swap",
@@ -25,9 +26,33 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={`${inter.variable} ${outfit.variable} dark`}>
+    <html lang="es" className={`${inter.variable} ${montserrat.variable}`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const savedTheme = localStorage.getItem('theme');
+                  if (savedTheme === 'light') {
+                    document.documentElement.classList.add('light');
+                    document.documentElement.classList.remove('dark');
+                  } else {
+                    document.documentElement.classList.add('dark');
+                    document.documentElement.classList.remove('light');
+                  }
+                } catch (e) {
+                  document.documentElement.classList.add('dark');
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className="font-sans antialiased custom-scrollbar">
-        {children}
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
