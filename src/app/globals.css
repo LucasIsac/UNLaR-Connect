@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 224 71% 4%;
+    --foreground: 210 20% 98%;
+    
+    --card: 224 71% 6%;
+    --card-foreground: 210 20% 98%;
+    
+    --popover: 224 71% 4%;
+    --popover-foreground: 210 20% 98%;
+    
+    --primary: 262 83% 58%;
+    --primary-foreground: 210 20% 98%;
+    
+    --secondary: 172 66% 50%;
+    --secondary-foreground: 224 71% 4%;
+    
+    --muted: 215 27.9% 16.9%;
+    --muted-foreground: 217.9 10.6% 64.9%;
+    
+    --accent: 262 50% 18%;
+    --accent-foreground: 210 20% 98%;
+    
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 20% 98%;
+    
+    --border: 215 27.9% 16.9%;
+    --input: 215 27.9% 16.9%;
+    --ring: 262 83% 58%;
+    
+    --radius: 0.75rem;
+  }
+
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 224 71% 4%;
+    
+    --card: 0 0% 100%;
+    --card-foreground: 224 71% 4%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71% 4%;
+    
+    --primary: 262 83% 58%;
+    --primary-foreground: 210 20% 98%;
+    
+    --secondary: 172 66% 50%;
+    --secondary-foreground: 224 71% 4%;
+    
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
+    
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 262 83% 58%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 20% 98%;
+    
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 262 83% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+@layer utilities {
+  /* Glassmorphism glass card effect */
+  .bg-glass {
+    background: rgba(10, 10, 16, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  
+  .bg-glass-light {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  /* Custom glow effect */
+  .glow-primary {
+    box-shadow: 0 0 40px -5px rgba(139, 92, 246, 0.2);
+  }
+  
+  .glow-secondary {
+    box-shadow: 0 0 40px -5px rgba(20, 184, 166, 0.2);
+  }
+
+  /* Scrollbar overrides */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 9999px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.5);
+  }
+}
