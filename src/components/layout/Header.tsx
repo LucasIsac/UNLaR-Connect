@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Menu, Search, Bell, Award } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
 
@@ -9,9 +10,28 @@ type HeaderProps = {
 
 export default function Header({ onMenuToggle }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-20 flex w-full items-center justify-between px-6 md:px-10 h-16 bg-background/50 backdrop-blur-xl border-b border-border/40 shadow-sm transition-colors duration-300">
-      {/* Left: Mobile hamburger menu toggle & Search Bar */}
-      <div className="flex flex-1 items-center gap-4">
+    <header className="fixed top-0 left-0 w-full z-45 flex items-center justify-between px-6 md:px-10 h-16 bg-background/50 backdrop-blur-xl border-b border-border/40 shadow-sm transition-colors duration-300">
+      {/* Left: Brand Logo (desktop) & Mobile toggle & Search Bar */}
+      <div className="flex flex-1 items-center gap-6">
+        {/* Desktop Brand Logo */}
+        <Link href="/dashboard" className="hidden md:flex items-center gap-3 shrink-0 group">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.svg"
+            alt="UNLaR-Connect"
+            className="w-8 h-8 transition-transform duration-300 group-hover:scale-105"
+          />
+          <div className="flex flex-col text-left">
+            <span className="font-heading font-black text-sm tracking-tight leading-none text-foreground">
+              UNLaR<span className="text-accent font-bold">-Connect</span>
+            </span>
+            <span className="text-[10px] text-muted-foreground font-semibold leading-none mt-0.5">
+              Ing. en Sistemas
+            </span>
+          </div>
+        </Link>
+
+        {/* Mobile menu toggle */}
         <button
           onClick={onMenuToggle}
           className="p-2 -ml-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30 md:hidden transition-colors"
