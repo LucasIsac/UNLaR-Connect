@@ -72,16 +72,20 @@
   * {
     @apply border-border;
   }
+  html {
+    /* Lenis smooth scroll */
+    scroll-behavior: auto !important;
+  }
   body {
     @apply bg-background text-foreground font-sans antialiased transition-colors duration-300;
-    /* Custom dots grid pattern (node-link design system style) */
-    background-image: radial-gradient(rgba(245, 158, 11, 0.035) 1.2px, transparent 1.2px);
-    background-size: 24px 24px;
+    /* Background pattern handled by canvas on landing, dot-grid on dashboard */
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
-  
-  .dark body {
+
+  /* Dashboard pages keep the dot-grid */
+  .dashboard-bg {
     background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1.2px, transparent 1.2px);
+    background-size: 24px 24px;
   }
 }
 
@@ -149,3 +153,47 @@
     -webkit-text-fill-color: transparent;
   }
 }
+
+/* Landing page - amber pulse keyframe */
+@keyframes amber-pulse-ring {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.1; transform: scale(2.2); }
+}
+
+/* Framer Motion - suppress FOUC on SSR rendered pages */
+[data-framer-appear-id] {
+  opacity: 1 !important;
+}
+
+/* High-performance CSS keyframe fade-in-up for hydration-independent initial renders */
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes scrollPulse {
+  0%, 100% {
+    transform: scaleY(0.5);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 0.8;
+  }
+}
+
+.animate-scroll-pulse {
+  transform-origin: top;
+  animation: scrollPulse 2s infinite ease-in-out;
+}
+
