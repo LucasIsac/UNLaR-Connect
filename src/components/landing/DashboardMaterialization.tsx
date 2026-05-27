@@ -138,9 +138,8 @@ export default function DashboardMaterialization() {
             {/* Brand */}
             <div className="px-5 py-5 border-b border-border/10">
               <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-accent/20 border border-accent/30 flex items-center justify-center">
-                  <span className="text-accent font-heading font-black text-xs">UC</span>
-                </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/logo.svg" alt="UNLaR-Connect" className="w-7 h-7" />
                 <div>
                   <p className="font-heading font-black text-xs text-foreground leading-none">
                     UNLaR<span className="text-accent">-Connect</span>

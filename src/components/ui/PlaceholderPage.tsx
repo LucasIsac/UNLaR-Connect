@@ -38,10 +38,8 @@ export default function PlaceholderPage({
         <header className="mx-auto max-w-6xl w-full rounded-2xl bg-background/50 backdrop-blur-2xl border border-white/5 shadow-2xl shadow-black/50 pointer-events-auto flex items-center justify-between px-6 py-3">
           {/* Brand */}
           <Link href={CONFIG.routes.home} className="flex items-center gap-3 group cursor-pointer">
-            <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-accent/20 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300 ease-out" />
-              <span className="font-heading font-black text-accent text-sm relative z-10">UC</span>
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.svg" alt="UNLaR-Connect" className="w-9 h-9 transition-transform duration-300 group-hover:scale-110" />
             <span className="font-heading font-black text-lg tracking-tight">
               UNLaR<span className="text-accent group-hover:text-accent/80 transition-colors">-Connect</span>
             </span>

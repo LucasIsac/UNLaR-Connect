@@ -11,9 +11,8 @@ export default function Footer() {
           {/* Brand Column */}
           <div className="md:col-span-1 flex flex-col gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
-                <span className="font-heading font-black text-accent text-xs">UC</span>
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.svg" alt="UNLaR-Connect" className="w-8 h-8" />
               <span className="font-heading font-black text-base tracking-tight">
                 UNLaR<span className="text-accent">-Connect</span>
               </span>

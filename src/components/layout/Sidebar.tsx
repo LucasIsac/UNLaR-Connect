@@ -55,9 +55,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Brand Logo & Department */}
       <div className="flex items-center justify-between pb-6 border-b border-border/40 mb-6">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary to-secondary flex items-center justify-center font-heading font-black text-primary-foreground text-sm shadow-md shadow-primary/10">
-            UC
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="UNLaR-Connect" className="w-9 h-9" />
           <div>
             <span className="font-heading font-black text-base tracking-tight block">
               UNLaR<span className="text-accent font-bold">-Connect</span>
