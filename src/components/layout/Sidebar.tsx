@@ -114,7 +114,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Upload Apunte Call to Action */}
       <div className="pt-4 border-t border-border/40 mt-auto">
-        <button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold py-3 px-4 rounded-xl transition-colors duration-200 flex justify-center items-center gap-2 shadow-lg shadow-accent/10">
+        <button 
+          onClick={() => {
+            if (onClose) onClose();
+            window.dispatchEvent(new CustomEvent("open-upload-apunte-modal"));
+          }}
+          className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold py-3 px-4 rounded-xl transition-colors duration-200 flex justify-center items-center gap-2 shadow-lg shadow-accent/10"
+        >
           <Plus className="w-4 h-4" />
           <span>Subí tu Apunte</span>
         </button>

@@ -6,7 +6,10 @@ import {
   DbTutoringSession, 
   DbPost, 
   DbBadge, 
-  DbSubject 
+  DbSubject,
+  DbTutorAvailability,
+  DbPostReply,
+  DbDocument
 } from "@/types/database";
 
 // Custom return types for Server Actions
@@ -150,6 +153,52 @@ const MOCK_POSTS: ForumPostExtended[] = [
   }
 ];
 
+// 2. Extra Mock Data for Modals Phase
+let mockAvailability: DbTutorAvailability[] = [
+  {
+    id: 1,
+    tutor_id: MOCK_USER_ID,
+    day_of_week: 1, // Lunes
+    start_time: "18:30",
+    end_time: "20:00"
+  },
+  {
+    id: 2,
+    tutor_id: MOCK_USER_ID,
+    day_of_week: 3, // Miércoles
+    start_time: "16:00",
+    end_time: "18:00"
+  }
+];
+
+let mockReplies: Record<string, DbPostReply[]> = {
+  "post-1": [
+    {
+      id: "reply-1",
+      post_id: "post-1",
+      user_id: "user-carlos",
+      content: "¡Hola Ale! Sí, recordá que tenés que verificar primero que la función sea continua en el intervalo cerrado [a, b] y derivable en el abierto (a, b). En el punto de quiebre de la función partida, tenés que comprobar que los límites laterales coincidan.",
+      upvotes: 5,
+      is_accepted: true,
+      created_at: new Date(Date.now() - 2 * 3600000).toISOString() // 2 hours ago
+    }
+  ],
+  "post-2": [
+    {
+      id: "reply-2",
+      post_id: "post-2",
+      user_id: "user-juan",
+      content: "Che, estudiale a fondo el tema de Semáforos y Monitores. Siempre toman un ejercicio práctico de concurrencia y sincronización de procesos en el examen.",
+      upvotes: 3,
+      is_accepted: false,
+      created_at: new Date(Date.now() - 1 * 3600000).toISOString()
+    }
+  ],
+  "post-3": []
+};
+
+let mockDocuments: DbDocument[] = [];
+
 /**
  * Fetch core statistics, level, XP, and badges earned by the user.
  */
@@ -290,3 +339,137 @@ export async function updateSessionStatus(
     return { success: false, error: "Hubo un problema al procesar tu solicitud." };
   }
 }
+
+/**
+ * Fetch active tutor availability schedule slots
+ */
+export async function fetchTutorAvailability(): Promise<DbTutorAvailability[]> {
+  await new Promise(resolve => setTimeout(resolve, 400));
+  return mockAvailability;
+}
+
+/**
+ * Save active tutor availability calendar slots
+ */
+export async function saveTutorAvailability(
+  availabilityList: DbTutorAvailability[]
+): Promise<{ success: boolean; data?: DbTutorAvailability[]; error?: string }> {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Validate inputs
+    mockAvailability = availabilityList.map((slot, index) => ({
+      ...slot,
+      id: slot.id || index + 1,
+      tutor_id: MOCK_USER_ID
+    }));
+
+    // In a live Supabase environment, we would do:
+    // await supabase.from('tutor_availability').delete().eq('tutor_id', MOCK_USER_ID);
+    // await supabase.from('tutor_availability').insert(availabilityList);
+
+    return { success: true, data: mockAvailability };
+  } catch (error) {
+    console.error("Error saving tutor availability:", error);
+    return { success: false, error: "Hubo un problema al actualizar tu agenda." };
+  }
+}
+
+/**
+ * Fetch all replies/comments associated with a forum post
+ */
+export async function fetchPostReplies(postId: string): Promise<DbPostReply[]> {
+  await new Promise(resolve => setTimeout(resolve, 400));
+  return mockReplies[postId] || [];
+}
+
+/**
+ * Submit a new reply comment to a forum post
+ */
+export async function addPostReply(
+  postId: string,
+  content: string
+): Promise<{ success: boolean; data?: DbPostReply[]; error?: string }> {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    if (!content.trim()) {
+      return { success: false, error: "El comentario no puede estar vacío." };
+    }
+
+    const newReply: DbPostReply = {
+      id: `reply-${Date.now()}`,
+      post_id: postId,
+      user_id: MOCK_USER_ID,
+      content: content.trim(),
+      upvotes: 0,
+      is_accepted: false,
+      created_at: new Date().toISOString()
+    };
+
+    if (!mockReplies[postId]) {
+      mockReplies[postId] = [];
+    }
+    
+    // Append to local state
+    mockReplies[postId].push(newReply);
+
+    // Increment repliesCount on the matching post
+    const postIndex = MOCK_POSTS.findIndex(p => p.id === postId);
+    if (postIndex !== -1) {
+      MOCK_POSTS[postIndex].repliesCount += 1;
+    }
+
+    // Supabase equivalent query:
+    // await supabase.from('post_replies').insert(newReply);
+
+    return { success: true, data: mockReplies[postId] };
+  } catch (error) {
+    console.error("Error adding post reply:", error);
+    return { success: false, error: "Hubo un problema al enviar tu comentario." };
+  }
+}
+
+/**
+ * Upload a document metadata entry (mock document registration)
+ */
+export async function uploadApunte(
+  title: string,
+  subjectId: number,
+  fileType: string
+): Promise<{ success: boolean; data?: DbDocument; error?: string }> {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 600));
+
+    if (!title.trim()) {
+      return { success: false, error: "El título del apunte es obligatorio." };
+    }
+
+    const newDoc: DbDocument = {
+      id: `doc-${Date.now()}`,
+      user_id: MOCK_USER_ID,
+      subject_id: subjectId,
+      title: title.trim(),
+      document_type: fileType,
+      storage_url: `https://supabase-storage.unlarconnect/apuntes/${title.toLowerCase().replace(/\s+/g, '-')}.${fileType}`,
+      uploaded_at: new Date().toISOString(),
+      upvotes: 0
+    };
+
+    mockDocuments.push(newDoc);
+
+    // Award XP points to user for uploading a document (gamification match)
+    MOCK_USER.points += 50; // Award 50 points
+
+    // Supabase equivalent queries:
+    // await supabase.storage.from('apuntes').upload(filePath, file);
+    // await supabase.from('documents').insert(newDoc);
+    // await supabase.from('users').update({ points: points + 50 }).eq('id', MOCK_USER_ID);
+
+    return { success: true, data: newDoc };
+  } catch (error) {
+    console.error("Error uploading apunte:", error);
+    return { success: false, error: "Hubo un problema al registrar tu apunte." };
+  }
+}
+

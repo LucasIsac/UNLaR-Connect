@@ -16,7 +16,12 @@ import {
   X,
   FileText,
   Calendar,
-  AlertTriangle
+  AlertTriangle,
+  Upload,
+  UserCheck,
+  Save,
+  Send,
+  Plus
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -25,10 +30,16 @@ import {
   fetchUpcomingSessions, 
   fetchRecentForumPosts, 
   updateSessionStatus,
+  fetchTutorAvailability,
+  saveTutorAvailability,
+  fetchPostReplies,
+  addPostReply,
+  uploadApunte,
   DashboardStats,
   UpcomingSessionExtended,
   ForumPostExtended
 } from "@/actions/dashboard";
+import { DbTutorAvailability, DbPostReply } from "@/types/database";
 
 // ==========================================
 // 💡 CLIENT-SIDE MOCK FEEDS
@@ -112,7 +123,7 @@ const CLIENT_MOCK_POSTS: ForumPostExtended[] = [
     created_at: new Date(Date.now() - 3 * 3600000).toISOString(),
     subjectName: "Análisis Matemático II",
     postTypeName: "Duda Académica",
-    repliesCount: 8
+    repliesCount: 1
   },
   {
     id: "post-2",
@@ -126,7 +137,7 @@ const CLIENT_MOCK_POSTS: ForumPostExtended[] = [
     created_at: new Date(Date.now() - 5 * 3600000).toISOString(),
     subjectName: "Sistemas Operativos",
     postTypeName: "Consejo de Cursada",
-    repliesCount: 5
+    repliesCount: 1
   },
   {
     id: "post-3",
@@ -150,6 +161,20 @@ export default function DashboardPage() {
   const [posts, setPosts] = useState<ForumPostExtended[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+
+  // Modal Control States
+  const [activeModal, setActiveModal] = useState<'availability' | 'upload' | 'post-details' | 'badge-rules' | null>(null);
+  const [selectedPost, setSelectedPost] = useState<ForumPostExtended | null>(null);
+  const [selectedBadge, setSelectedBadge] = useState<any | null>(null);
+  
+  // Modal Data states
+  const [availability, setAvailability] = useState<DbTutorAvailability[]>([]);
+  const [replies, setReplies] = useState<DbPostReply[]>([]);
+  const [newReplyText, setNewReplyText] = useState("");
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [uploadSubjectId, setUploadSubjectId] = useState(1);
+  const [dragOver, setDragOver] = useState(false);
+  const [showToast, setShowToast] = useState<string | null>(null);
 
   // Toggle this flag to swap between client-side mocks and Server Actions (Supabase)
   const USE_CLIENT_MOCKS = true;
@@ -208,6 +233,144 @@ export default function DashboardPage() {
     loadData();
   }, [USE_CLIENT_MOCKS]);
 
+  // Decoupled Sidebar modal activation listener
+  useEffect(() => {
+    const handleOpenUpload = () => {
+      setActiveModal("upload");
+    };
+    window.addEventListener("open-upload-apunte-modal", handleOpenUpload);
+    return () => {
+      window.removeEventListener("open-upload-apunte-modal", handleOpenUpload);
+    };
+  }, []);
+
+  // Show dynamic self-clearing toast alerts
+  const triggerToast = (msg: string) => {
+    setShowToast(msg);
+    setTimeout(() => {
+      setShowToast(null);
+    }, 3000);
+  };
+
+  // 1. Availability Modal Actions
+  const handleOpenAvailability = async () => {
+    try {
+      const data = await fetchTutorAvailability();
+      setAvailability(data);
+      setActiveModal("availability");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const toggleDayAvailability = (dayNum: number) => {
+    const exists = availability.find(a => a.day_of_week === dayNum);
+    if (exists) {
+      setAvailability(prev => prev.filter(a => a.day_of_week !== dayNum));
+    } else {
+      setAvailability(prev => [
+        ...prev, 
+        { id: 0, tutor_id: "123e4567-e89b-12d3-a456-426614174000", day_of_week: dayNum, start_time: "18:00", end_time: "20:00" }
+      ]);
+    }
+  };
+
+  const handleTimeChange = (dayNum: number, field: 'start_time' | 'end_time', val: string) => {
+    setAvailability(prev => prev.map(a => {
+      if (a.day_of_week === dayNum) {
+        return { ...a, [field]: val };
+      }
+      return a;
+    }));
+  };
+
+  const handleSaveAvailability = async () => {
+    setActionInProgress("availability-save");
+    try {
+      const res = await saveTutorAvailability(availability);
+      if (res.success && res.data) {
+        setAvailability(res.data);
+        setActiveModal(null);
+        triggerToast("¡Agenda de tutorías actualizada al toque!");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  // 2. Forum Replies Actions
+  const handleOpenPostDetails = async (post: ForumPostExtended) => {
+    setSelectedPost(post);
+    setReplies([]);
+    setActiveModal("post-details");
+    try {
+      const repliesData = await fetchPostReplies(post.id);
+      setReplies(repliesData);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAddReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newReplyText.trim() || !selectedPost) return;
+
+    setActionInProgress("add-reply");
+    try {
+      const res = await addPostReply(selectedPost.id, newReplyText);
+      if (res.success && res.data) {
+        setReplies(res.data);
+        setNewReplyText("");
+        
+        // Dynamically increment counter on index list
+        setPosts(prev => prev.map(p => {
+          if (p.id === selectedPost.id) {
+            return { ...p, repliesCount: p.repliesCount + 1 };
+          }
+          return p;
+        }));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  // 3. Upload Apunte Actions
+  const handleUploadDoc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadTitle.trim()) return;
+
+    setActionInProgress("upload-doc");
+    try {
+      const res = await uploadApunte(uploadTitle, uploadSubjectId, "pdf");
+      if (res.success && res.data) {
+        // Award dynamic points locally
+        if (stats) {
+          const newPoints = stats.user.points + 50;
+          setStats({
+            ...stats,
+            user: {
+              ...stats.user,
+              points: newPoints
+            },
+            xpPercentage: (newPoints / 3000) * 100
+          });
+        }
+        setUploadTitle("");
+        setActiveModal(null);
+        triggerToast("¡Apunte subido! Sumaste 50 puntos de Karma 🚀");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
   // Handle tutoring session acceptance / rejection with optimistic state updates
   const handleSessionAction = async (sessionId: string, newStatus: 'confirmed' | 'canceled') => {
     setActionInProgress(sessionId);
@@ -217,6 +380,7 @@ export default function DashboardPage() {
     if (newStatus === 'canceled') {
       // Instantly slide out
       setSessions(prev => prev.filter(s => s.id !== sessionId));
+      triggerToast("Clase rechazada.");
     } else {
       // Instantly set as confirmed
       setSessions(prev => prev.map(s => {
@@ -229,10 +393,10 @@ export default function DashboardPage() {
         }
         return s;
       }));
+      triggerToast("¡Clase confirmada! Agendada en tu calendario.");
     }
 
     if (USE_CLIENT_MOCKS) {
-      // Simulating a brief Server latency on the client
       setTimeout(() => {
         setActionInProgress(null);
       }, 500);
@@ -272,7 +436,6 @@ export default function DashboardPage() {
     } else if (start.toDateString() === tomorrow.toDateString()) {
       return `Mañana ${startHourStr}`;
     } else {
-      // Standard local format
       return `${start.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })} a las ${startHourStr}`;
     }
   };
@@ -333,13 +496,29 @@ export default function DashboardPage() {
 
   const user = stats?.user || { name: "Alejandro", points: 0, tutor_rating: 0, total_reviews: 0 };
   const karmaLevel = stats?.karmaLevel || 1;
-  const currentXP = stats?.currentXP || 0;
-  const nextLevelXP = stats?.nextLevelXP || 1000;
+  const currentXP = stats?.user.points || 0;
+  const nextLevelXP = stats?.nextLevelXP || 3000;
   const xpPercentage = stats?.xpPercentage || 0;
   const notificationsCount = stats?.notificationsCount || 0;
 
   return (
     <DashboardLayout>
+      {/* Toast Notification Container */}
+      <AnimatePresence>
+        {showToast && (
+          <motion.div 
+            className="fixed bottom-6 right-6 z-50 bg-primary-container text-obsidian border border-accent/20 px-5 py-3 rounded-2xl shadow-xl shadow-accent/10 flex items-center gap-3 font-semibold text-sm"
+            initial={{ opacity: 0, y: 30, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          >
+            <Sparkles className="w-5 h-5 animate-pulse" />
+            <span>{showToast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <motion.div 
         className="space-y-10"
         variants={containerVariants}
@@ -384,7 +563,6 @@ export default function DashboardPage() {
             <div className="w-full bg-muted/65 dark:bg-muted/40 h-2.5 rounded-full mb-6 overflow-hidden border border-border/20">
               <motion.div 
                 className="h-full bg-accent rounded-full shadow-[0_0_12px_rgba(245,158,11,0.5)]" 
-                initial={{ width: 0 }}
                 animate={{ width: `${xpPercentage}%` }}
                 transition={{ duration: 1.2, ease: "easeOut" }}
               />
@@ -400,10 +578,13 @@ export default function DashboardPage() {
                   const isLocked = currentXP < badge.required_points;
                   
                   return (
-                    <div 
+                    <button 
                       key={badge.id}
-                      className={`flex flex-col items-center gap-1.5 group cursor-pointer transition-all duration-200 ${isLocked ? 'opacity-40' : 'opacity-100 hover:scale-105'}`}
-                      title={badge.description}
+                      onClick={() => {
+                        setSelectedBadge(badge);
+                        setActiveModal("badge-rules");
+                      }}
+                      className={`flex flex-col items-center gap-1.5 group transition-all duration-200 focus:outline-none ${isLocked ? 'opacity-40 hover:opacity-60' : 'opacity-100 hover:scale-105'}`}
                     >
                       <div className={`w-11 h-11 rounded-xl flex items-center justify-center border transition-all duration-300 ${
                         isLocked 
@@ -419,7 +600,7 @@ export default function DashboardPage() {
                           <span key={idx} className="block">{word}</span>
                         ))}
                       </span>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -440,7 +621,10 @@ export default function DashboardPage() {
             </div>
 
             {/* High contrast, Solid border/transparent background secondary button (no gradient) */}
-            <button className="mt-6 w-full h-11 border border-border hover:border-accent bg-card/25 hover:bg-card/50 text-cream-bone font-semibold text-sm rounded-xl transition-all duration-300 flex justify-center items-center gap-2 active:scale-98">
+            <button 
+              onClick={handleOpenAvailability}
+              className="mt-6 w-full h-11 border border-border hover:border-accent bg-card/25 hover:bg-card/50 text-cream-bone font-semibold text-sm rounded-xl transition-all duration-300 flex justify-center items-center gap-2 active:scale-98"
+            >
               <span>Ver mis disponibilidades</span>
               <ArrowRight className="w-4 h-4" />
             </button>
@@ -468,7 +652,7 @@ export default function DashboardPage() {
                     <p className="text-sm text-muted-foreground font-medium">No tenés tutorías programadas por ahora.</p>
                   </motion.div>
                 ) : (
-                  sessions.map((session, index) => {
+                  sessions.map((session) => {
                     const isPending = session.status === 'pending';
                     const isConfirmed = session.status === 'confirmed';
 
@@ -569,19 +753,20 @@ export default function DashboardPage() {
                 <MessageSquare className="w-5 h-5 text-secondary" />
                 <span>Actividad en el Foro</span>
               </h3>
-              <Link 
-                href="/dashboard/foros" 
-                className="text-xs font-bold text-accent hover:text-accent/80 transition-colors flex items-center gap-1 group"
+              <button 
+                onClick={() => handleOpenPostDetails(posts[0])}
+                className="text-xs font-bold text-accent hover:text-accent/80 transition-colors flex items-center gap-1 group focus:outline-none"
               >
-                <span>Ver todo</span>
+                <span>Ver posts</span>
                 <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
+              </button>
             </div>
 
             <div className="space-y-4">
               {posts.map((post) => (
                 <div 
                   key={post.id} 
+                  onClick={() => handleOpenPostDetails(post)}
                   className="bg-glass rounded-2xl p-4 hover:bg-card/30 hover:border-accent/25 transition-all duration-300 cursor-pointer group"
                 >
                   <div className="flex justify-between items-start gap-4">
@@ -623,6 +808,290 @@ export default function DashboardPage() {
           </div>
         </motion.section>
       </motion.div>
+
+      {/* ==========================================
+          ⭐ HIGH FIDELITY OVERLAY MODALS
+          Frosted glassmorphism panels with entry zoom effects
+          ========================================== */}
+      <AnimatePresence>
+        {activeModal && (
+          <motion.div 
+            className="fixed inset-0 z-50 bg-background/70 backdrop-blur-md flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setActiveModal(null)}
+          >
+            {/* Modal Box */}
+            <motion.div 
+              className="bg-card/95 border border-border/40 w-full max-w-xl rounded-3xl p-6 shadow-2xl relative overflow-hidden flex flex-col max-h-[85vh] custom-scrollbar focus:outline-none"
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close Button */}
+              <button 
+                onClick={() => setActiveModal(null)}
+                className="absolute top-4 right-4 p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors focus:outline-none"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* 1. Tutor Availability Calendar Modal */}
+              {activeModal === 'availability' && (
+                <div className="space-y-6 flex-1 flex flex-col overflow-y-auto pr-1">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center text-accent">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-heading text-lg font-bold text-cream-bone">Agenda tus Tutorías</h3>
+                      <p className="text-xs text-muted-foreground">Configurá tus días y bloques horarios disponibles para dar clases.</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 py-2 flex-grow">
+                    {["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"].map((dayName, idx) => {
+                      const dayNum = idx + 1; // 1 to 5
+                      const activeSlot = availability.find(a => a.day_of_week === dayNum);
+                      
+                      return (
+                        <div key={dayNum} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-muted/30 border border-border/10 rounded-2xl hover:border-accent/15 transition-all">
+                          <label className="flex items-center gap-3 cursor-pointer select-none">
+                            <input 
+                              type="checkbox" 
+                              checked={!!activeSlot}
+                              onChange={() => toggleDayAvailability(dayNum)}
+                              className="w-4 h-4 rounded text-accent bg-card border-border/40 focus:ring-accent"
+                            />
+                            <span className={`font-semibold text-sm ${activeSlot ? 'text-cream-bone' : 'text-muted-foreground'}`}>{dayName}</span>
+                          </label>
+
+                          {activeSlot && (
+                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                              <input 
+                                type="time" 
+                                value={activeSlot.start_time.substring(0, 5)}
+                                onChange={(e) => handleTimeChange(dayNum, 'start_time', e.target.value)}
+                                className="bg-card border border-border/40 rounded-lg px-2.5 py-1 text-xs text-cream-bone focus:outline-none focus:border-accent"
+                              />
+                              <span className="text-xs text-muted-foreground">a</span>
+                              <input 
+                                type="time" 
+                                value={activeSlot.end_time.substring(0, 5)}
+                                onChange={(e) => handleTimeChange(dayNum, 'end_time', e.target.value)}
+                                className="bg-card border border-border/40 rounded-lg px-2.5 py-1 text-xs text-cream-bone focus:outline-none focus:border-accent"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <button 
+                    onClick={handleSaveAvailability}
+                    disabled={actionInProgress === "availability-save"}
+                    className="w-full h-11 bg-accent hover:bg-accent/90 disabled:opacity-50 text-accent-foreground font-semibold text-sm rounded-xl flex items-center justify-center gap-2 transition-all"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{actionInProgress === "availability-save" ? 'Guardando...' : 'Actualizar Agenda'}</span>
+                  </button>
+                </div>
+              )}
+
+              {/* 2. Forum Post Details & Replies Modal */}
+              {activeModal === 'post-details' && selectedPost && (
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <div className="pb-4 border-b border-border/40">
+                    <span className="px-2 py-0.5 bg-secondary-container/10 border border-secondary-container/20 text-secondary text-[10px] font-bold rounded">
+                      {selectedPost.postTypeName}
+                    </span>
+                    <h3 className="font-heading text-lg font-bold text-cream-bone mt-2 leading-snug">
+                      {selectedPost.title}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-2 leading-relaxed bg-muted/20 border border-border/10 p-3.5 rounded-2xl">
+                      {selectedPost.content}
+                    </p>
+                  </div>
+
+                  {/* Replies List container */}
+                  <div className="flex-1 overflow-y-auto custom-scrollbar my-4 space-y-4 max-h-[30vh] pr-1">
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Respuestas</h4>
+                    
+                    {replies.length === 0 ? (
+                      <p className="text-xs text-muted-foreground font-medium text-center py-4">No hay respuestas escritas aún. ¡Sé el primero!</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {replies.map((reply) => (
+                          <div key={reply.id} className="p-3 bg-muted/25 border border-border/10 rounded-2xl space-y-1">
+                            <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground">
+                              <span>Compañero Anónimo</span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {new Date(reply.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="text-xs text-cream-bone leading-relaxed">{reply.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add Reply Input Form */}
+                  <form onSubmit={handleAddReply} className="flex gap-2 pt-2 border-t border-border/40">
+                    <input 
+                      type="text" 
+                      placeholder="Escribí tu respuesta..."
+                      value={newReplyText}
+                      onChange={(e) => setNewReplyText(e.target.value)}
+                      className="flex-1 bg-muted/40 border border-border/40 rounded-xl px-4 py-2 text-sm text-cream-bone placeholder-muted-foreground focus:outline-none focus:border-accent"
+                    />
+                    <button 
+                      type="submit"
+                      disabled={actionInProgress === "add-reply" || !newReplyText.trim()}
+                      className="h-10 w-10 shrink-0 bg-accent hover:bg-accent/90 disabled:opacity-50 text-accent-foreground rounded-xl flex items-center justify-center transition-all focus:outline-none active:scale-95"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* 3. Upload Apunte Document Modal */}
+              {activeModal === 'upload' && (
+                <form onSubmit={handleUploadDoc} className="space-y-6 flex-1 flex flex-col overflow-y-auto pr-1">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center text-accent">
+                      <Upload className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-heading text-lg font-bold text-cream-bone">Subí tu Apunte</h3>
+                      <p className="text-xs text-muted-foreground">Compartí tus conocimientos con la comunidad y ganá puntos de Karma.</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 py-2">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Título del archivo</label>
+                      <input 
+                        type="text" 
+                        placeholder="Ej: Resumen de Límites y Derivadas"
+                        value={uploadTitle}
+                        onChange={(e) => setUploadTitle(e.target.value)}
+                        required
+                        className="w-full bg-muted/30 border border-border/40 focus:border-accent rounded-xl px-4 py-2.5 text-sm text-cream-bone focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Materia relacionada</label>
+                      <select 
+                        value={uploadSubjectId}
+                        onChange={(e) => setUploadSubjectId(Number(e.target.value))}
+                        className="w-full bg-muted/40 border border-border/40 focus:border-accent rounded-xl px-4 py-2.5 text-sm text-cream-bone focus:outline-none"
+                      >
+                        <option value={1} className="bg-card">Análisis Matemático II</option>
+                        <option value={2} className="bg-card">Programación II</option>
+                        <option value={3} className="bg-card">Sistemas Operativos</option>
+                        <option value={4} className="bg-card">Álgebra</option>
+                      </select>
+                    </div>
+
+                    {/* Drag and Drop Zone Mock */}
+                    <div 
+                      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                      onDragLeave={() => setDragOver(false)}
+                      onDrop={(e) => { e.preventDefault(); setDragOver(false); setUploadTitle(e.dataTransfer.files[0]?.name.split('.')[0] || ""); }}
+                      className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer ${
+                        dragOver 
+                          ? 'border-accent bg-accent/5' 
+                          : 'border-border/40 bg-muted/20 hover:bg-muted/30 hover:border-accent/30'
+                      }`}
+                    >
+                      <Upload className="w-8 h-8 text-accent/60 mx-auto mb-2" />
+                      <p className="text-xs font-semibold text-cream-bone">Arrastrá tu PDF acá o hacé clic para buscar</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">Soporta PDF o Imágenes (Máx. 15MB)</p>
+                    </div>
+                  </div>
+
+                  <button 
+                    type="submit"
+                    disabled={actionInProgress === "upload-doc" || !uploadTitle.trim()}
+                    className="w-full h-11 bg-accent hover:bg-accent/90 disabled:opacity-50 text-accent-foreground font-semibold text-sm rounded-xl flex items-center justify-center gap-2 transition-all focus:outline-none active:scale-95"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>{actionInProgress === "upload-doc" ? 'Subiendo...' : 'Registrar Apunte'}</span>
+                  </button>
+                </form>
+              )}
+
+              {/* 4. Gamification Badge rules Modal */}
+              {activeModal === 'badge-rules' && selectedBadge && (
+                <div className="space-y-6 flex-1 flex flex-col overflow-y-auto pr-1 items-center text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shadow-xl shadow-accent/5">
+                    {selectedBadge.icon_name === 'forum' && <MessageSquare className="w-8 h-8" />}
+                    {selectedBadge.icon_name === 'handshake' && <Sparkles className="w-8 h-8" />}
+                    {selectedBadge.icon_name === 'menu_book' && <FileText className="w-8 h-8" />}
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="font-heading text-xl font-bold text-cream-bone">{selectedBadge.name}</h3>
+                    <span className={`px-2 py-0.5 text-[10px] font-bold border rounded-md uppercase tracking-wider ${
+                      currentXP >= selectedBadge.required_points 
+                        ? 'bg-green-500/10 border-green-500/20 text-green-400' 
+                        : 'bg-card/10 border-border/20 text-muted-foreground'
+                    }`}>
+                      {currentXP >= selectedBadge.required_points ? 'Desbloqueada' : 'Bloqueada'}
+                    </span>
+                  </div>
+
+                  <p className="text-sm text-muted-foreground leading-relaxed max-w-sm">
+                    {selectedBadge.description}
+                  </p>
+
+                  {/* Progress stats */}
+                  <div className="w-full p-4 bg-muted/20 border border-border/10 rounded-2xl text-left space-y-3">
+                    <div className="flex justify-between text-xs font-bold">
+                      <span className="text-muted-foreground uppercase tracking-wider">Requisito de Puntos</span>
+                      <span className="text-cream-bone">{selectedBadge.required_points} XP</span>
+                    </div>
+
+                    <div className="w-full bg-muted/65 dark:bg-muted/40 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          currentXP >= selectedBadge.required_points ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : 'bg-accent'
+                        }`} 
+                        style={{ width: `${Math.min((currentXP / selectedBadge.required_points) * 100, 100)}%` }}
+                      />
+                    </div>
+
+                    <div className="text-[11px] font-semibold text-muted-foreground text-center">
+                      {currentXP >= selectedBadge.required_points ? (
+                        <span className="text-green-400 flex items-center justify-center gap-1 font-bold">
+                          <Check className="w-3.5 h-3.5" /> ¡Logro alcanzado con éxito!
+                        </span>
+                      ) : (
+                        <span>Te faltan <strong className="text-accent">{selectedBadge.required_points - currentXP} XP</strong> para desbloquear esta insignia.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => setActiveModal(null)}
+                    className="w-full h-11 border border-border hover:border-accent bg-card/20 text-cream-bone font-semibold text-sm rounded-xl transition-all"
+                  >
+                    Entendido
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </DashboardLayout>
   );
 }
