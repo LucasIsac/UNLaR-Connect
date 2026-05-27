@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { FolderOpen, MessageSquare, Bot } from "lucide-react";
+import { useTheme } from "@/components/ui/ThemeProvider";
 
 const features = [
   {
@@ -32,6 +33,8 @@ const features = [
 ];
 
 export default function FeatureShowcase() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const ref = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState(false);
 
@@ -97,7 +100,11 @@ export default function FeatureShowcase() {
               {/* Ambient glow blob inside card */}
               <div
                 className="absolute -top-8 -right-8 w-32 h-32 rounded-full blur-3xl pointer-events-none transition-all duration-500 group-hover:scale-125"
-                style={{ background: feature.glowColor }}
+                style={{ 
+                  background: i === 1
+                    ? (isDark ? "rgba(255,183,125,0.06)" : "rgba(118,52,14,0.22)")
+                    : (isDark ? "rgba(245,158,11,0.06)" : "rgba(97,59,0,0.22)")
+                }}
               />
 
               {/* Icon */}

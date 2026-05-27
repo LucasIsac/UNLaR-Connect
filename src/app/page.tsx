@@ -8,6 +8,7 @@ import FeatureShowcase from "@/components/landing/FeatureShowcase";
 import FinalCTA from "@/components/landing/FinalCTA";
 import Footer from "@/components/layout/Footer";
 import { CONFIG } from "@/lib/constants";
+import ThemeToggle from "@/components/ui/ThemeToggle";
 
 // Canvas loaded client-side only (no SSR needed for canvas)
 const NodeCanvas = dynamic(() => import("@/components/landing/NodeCanvas"), {
@@ -31,7 +32,7 @@ export default function Home() {
 
       {/* Sticky Floating Navbar */}
       <div className="fixed top-0 z-50 w-full p-4 pointer-events-none">
-        <header className="mx-auto max-w-6xl w-full rounded-2xl bg-background/50 backdrop-blur-2xl border border-white/5 shadow-2xl shadow-black/50 pointer-events-auto flex items-center justify-between px-6 py-3">
+        <header className="mx-auto max-w-6xl w-full rounded-2xl bg-background/50 backdrop-blur-2xl border border-border/10 dark:border-white/5 shadow-2xl shadow-[0_4px_20px_rgba(120,53,15,0.05)] dark:shadow-black/50 pointer-events-auto flex items-center justify-between px-6 py-3">
           {/* Brand */}
           <Link href={CONFIG.routes.home} className="flex items-center gap-3 group cursor-pointer">
             <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center relative overflow-hidden">
@@ -62,6 +63,7 @@ export default function Home() {
 
           {/* Auth actions */}
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Link
               href={CONFIG.routes.dashboard}
               className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors px-3 py-2"

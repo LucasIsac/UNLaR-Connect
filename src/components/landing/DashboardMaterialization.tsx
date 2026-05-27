@@ -22,6 +22,7 @@ import {
   Clock,
   ArrowRight,
 } from "lucide-react";
+import { useTheme } from "@/components/ui/ThemeProvider";
 
 // Static replica nav items
 const navItems = [
@@ -36,6 +37,8 @@ export default function DashboardMaterialization() {
   // The outer container is tall to create scroll space
   const containerRef = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState(false);
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -100,10 +103,12 @@ export default function DashboardMaterialization() {
 
         {/* Dashboard mock frame */}
         <motion.div
-          className="relative w-full max-w-5xl h-[70vh] max-h-[620px] rounded-2xl overflow-hidden border border-border/20"
+          className="relative w-full max-w-5xl h-[70vh] max-h-[620px] rounded-2xl overflow-hidden border border-border/20 transition-colors duration-300"
           style={{
-            background: "rgba(12, 10, 9, 0.95)",
-            boxShadow: "0 0 80px rgba(245,158,11,0.04), 0 40px 80px rgba(0,0,0,0.5)",
+            background: isDark ? "rgba(12, 10, 9, 0.95)" : "rgba(251, 249, 245, 0.95)",
+            boxShadow: isDark 
+              ? "0 0 80px rgba(245,158,11,0.04), 0 40px 80px rgba(0,0,0,0.5)" 
+              : "0 0 80px rgba(245,158,11,0.02), 0 40px 80px rgba(120,53,15,0.05)",
           }}
           initial={{ opacity: 0, scale: 0.97 }}
           animate={isInView ? { opacity: 1, scale: 1 } : {}}
@@ -111,25 +116,27 @@ export default function DashboardMaterialization() {
         >
           {/* Dot grid background inside mock */}
           <div
-            className="absolute inset-0 pointer-events-none"
+            className="absolute inset-0 pointer-events-none transition-all duration-300"
             style={{
-              backgroundImage: "radial-gradient(rgba(255,255,255,0.025) 1px, transparent 1px)",
+              backgroundImage: isDark 
+                ? "radial-gradient(rgba(255,255,255,0.025) 1px, transparent 1px)" 
+                : "radial-gradient(rgba(120,53,15,0.04) 1px, transparent 1px)",
               backgroundSize: "24px 24px",
             }}
           />
 
           {/* SIDEBAR */}
           <motion.aside
-            className="absolute left-0 top-0 h-full w-56 z-20 flex flex-col border-r border-white/5"
+            className="absolute left-0 top-0 h-full w-56 z-20 flex flex-col border-r border-border/10 transition-colors duration-300"
             style={{
               x: sidebarX,
               opacity: sidebarOpacity,
-              background: "rgba(21, 19, 18, 0.9)",
+              background: isDark ? "rgba(21, 19, 18, 0.9)" : "rgba(245, 243, 239, 0.9)",
               backdropFilter: "blur(12px)",
             }}
           >
             {/* Brand */}
-            <div className="px-5 py-5 border-b border-white/5">
+            <div className="px-5 py-5 border-b border-border/10">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-accent/20 border border-accent/30 flex items-center justify-center">
                   <span className="text-accent font-heading font-black text-xs">UC</span>
@@ -153,7 +160,7 @@ export default function DashboardMaterialization() {
                       className={`px-3 py-2.5 flex items-center gap-2.5 rounded-lg text-xs font-medium ${
                         item.active
                           ? "bg-accent/10 text-accent border-r-2 border-accent"
-                          : "text-muted-foreground"
+                          : "text-muted-foreground hover:bg-muted/10 transition-colors duration-200"
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5 shrink-0" />
@@ -165,8 +172,8 @@ export default function DashboardMaterialization() {
             </ul>
 
             {/* Upload CTA */}
-            <div className="p-3 border-t border-white/5">
-              <div className="w-full bg-accent text-accent-foreground font-bold text-[10px] py-2.5 px-3 rounded-lg flex items-center gap-1.5">
+            <div className="p-3 border-t border-border/10">
+              <div className="w-full bg-accent text-accent-foreground font-bold text-[10px] py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 shadow-md shadow-accent/5">
                 <Plus className="w-3 h-3" />
                 <span>Subí tu Apunte</span>
               </div>
@@ -175,16 +182,16 @@ export default function DashboardMaterialization() {
 
           {/* HEADER */}
           <motion.header
-            className="absolute top-0 right-0 left-56 h-12 z-20 flex items-center justify-between px-6 border-b border-white/5"
+            className="absolute top-0 right-0 left-56 h-12 z-20 flex items-center justify-between px-6 border-b border-border/10 transition-colors duration-300"
             style={{
               y: headerY,
               opacity: headerOpacity,
-              background: "rgba(12, 10, 9, 0.7)",
+              background: isDark ? "rgba(12, 10, 9, 0.7)" : "rgba(251, 249, 245, 0.7)",
               backdropFilter: "blur(16px)",
             }}
           >
             {/* Search */}
-            <div className="flex items-center gap-2 bg-white/5 border border-white/8 rounded-full px-3 py-1.5 w-64">
+            <div className="flex items-center gap-2 bg-card/40 border border-border/30 rounded-full px-3 py-1.5 w-64">
               <Search className="w-3 h-3 text-muted-foreground" />
               <span className="text-[11px] text-muted-foreground/60">Buscá apuntes, materias...</span>
             </div>
@@ -234,8 +241,10 @@ export default function DashboardMaterialization() {
                 style={{
                   opacity: card1Opacity,
                   y: card1Y,
-                  background: "linear-gradient(135deg, rgba(245,158,11,0.07) 0%, rgba(226,119,95,0.05) 100%)",
-                  border: "1px solid rgba(245,158,11,0.1)",
+                  background: isDark
+                    ? "linear-gradient(135deg, rgba(245,158,11,0.07) 0%, rgba(226,119,95,0.05) 100%)"
+                    : "linear-gradient(135deg, rgba(245,158,11,0.05) 0%, rgba(226,119,95,0.03) 100%)",
+                  border: "1px solid rgba(245,158,11,0.12)",
                 }}
               >
                 <div className="flex items-center gap-2 mb-4">
@@ -246,9 +255,9 @@ export default function DashboardMaterialization() {
                   <span className="font-heading text-3xl font-extrabold text-accent">Nvl. 12</span>
                   <span className="text-[10px] text-muted-foreground">2.450 / 3.000 XP</span>
                 </div>
-                <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden mb-4">
+                <div className="w-full bg-muted/60 dark:bg-white/5 rounded-full h-2 overflow-hidden mb-4">
                   <div
-                    className="h-full rounded-full bg-accent"
+                    className="h-full rounded-full bg-accent animate-pulse-slow"
                     style={{ width: "81%", boxShadow: "0 0 8px rgba(245,158,11,0.4)" }}
                   />
                 </div>
@@ -260,7 +269,7 @@ export default function DashboardMaterialization() {
                   ].map(({ icon: Icon, color }, i) => (
                     <div
                       key={i}
-                      className="w-7 h-7 rounded-lg bg-card border border-border/40 flex items-center justify-center"
+                      className="w-7 h-7 rounded-lg bg-card/60 border border-border/40 flex items-center justify-center"
                     >
                       <Icon className={`w-3 h-3 ${color}`} />
                     </div>
@@ -270,18 +279,18 @@ export default function DashboardMaterialization() {
 
               {/* Suggested Subjects */}
               <motion.div
-                className="col-span-7 rounded-2xl p-5"
+                className="col-span-7 rounded-2xl p-5 transition-all duration-300"
                 style={{
                   opacity: card2Opacity,
                   y: card2Y,
-                  background: "rgba(28,25,23,0.6)",
-                  border: "1px solid rgba(255,255,255,0.05)",
+                  background: isDark ? "rgba(28,25,23,0.6)" : "rgba(255,255,255,0.65)",
+                  border: isDark ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(120,53,15,0.06)",
                   backdropFilter: "blur(12px)",
                 }}
               >
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-xs font-bold text-foreground">Materias Sugeridas</span>
-                  <span className="text-[10px] text-accent font-semibold">Ver todas</span>
+                  <span className="text-[10px] text-accent font-semibold cursor-pointer">Ver todas</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {[
@@ -290,7 +299,7 @@ export default function DashboardMaterialization() {
                   ].map((subj) => (
                     <div
                       key={subj.name}
-                      className="bg-white/4 border border-white/5 rounded-xl p-3"
+                      className="bg-card/30 border border-border/20 rounded-xl p-3 hover:border-accent/30 transition-colors"
                     >
                       <div className="flex justify-between items-center mb-2">
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${subj.tagColor}`}>
@@ -306,12 +315,12 @@ export default function DashboardMaterialization() {
 
               {/* Activity Feed */}
               <motion.div
-                className="col-span-12 rounded-2xl p-5"
+                className="col-span-12 rounded-2xl p-5 transition-all duration-300"
                 style={{
                   opacity: card3Opacity,
                   y: card3Y,
-                  background: "rgba(28,25,23,0.6)",
-                  border: "1px solid rgba(255,255,255,0.05)",
+                  background: isDark ? "rgba(28,25,23,0.6)" : "rgba(255,255,255,0.65)",
+                  border: isDark ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(120,53,15,0.06)",
                   backdropFilter: "blur(12px)",
                 }}
               >

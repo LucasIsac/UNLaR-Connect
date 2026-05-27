@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useTheme } from "@/components/ui/ThemeProvider";
 
 export default function FinalCTA() {
   const ref = useRef<HTMLDivElement>(null);
@@ -26,6 +27,9 @@ export default function FinalCTA() {
     return () => observer.disconnect();
   }, []);
 
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
   return (
     <section
       ref={ref}
@@ -33,7 +37,9 @@ export default function FinalCTA() {
     >
       {/* Background glow */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="w-[600px] h-[600px] rounded-full bg-accent/5 blur-[120px]" />
+        <div className={`w-[600px] h-[600px] rounded-full blur-[120px] transition-colors duration-300 ${
+          isDark ? 'bg-accent/5' : 'bg-primary/10'
+        }`} />
       </div>
 
       {/* Content */}

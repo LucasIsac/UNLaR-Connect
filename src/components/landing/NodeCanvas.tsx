@@ -54,6 +54,12 @@ export default function NodeCanvas() {
     function tick() {
       ctx!.clearRect(0, 0, width, height);
 
+      // Check current theme state dynamically
+      const isDark = document.documentElement.classList.contains("dark");
+      const COLOR = isDark ? "245, 158, 11" : "97, 59, 0"; // Dark: Vibrant Amber | Light: Deep Amber (#613b00)
+      const particleAlphaMultiplier = isDark ? 1.0 : 3.0;
+      const lineAlphaMultiplier = isDark ? 1.0 : 4.0;
+
       // Update & draw particles
       for (const p of particles) {
         // Mouse repulsion
@@ -81,7 +87,7 @@ export default function NodeCanvas() {
 
         ctx!.beginPath();
         ctx!.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx!.fillStyle = `rgba(${AMBER}, ${p.alpha})`;
+        ctx!.fillStyle = `rgba(${COLOR}, ${Math.min(p.alpha * particleAlphaMultiplier, 0.9)})`;
         ctx!.fill();
       }
 
@@ -93,9 +99,9 @@ export default function NodeCanvas() {
           const dy = particles[i].y - particles[j].y;
           const d = Math.sqrt(dx * dx + dy * dy);
           if (d < MAX_DIST) {
-            const lineAlpha = (1 - d / MAX_DIST) * 0.12;
+            const lineAlpha = (1 - d / MAX_DIST) * 0.12 * lineAlphaMultiplier;
             ctx!.beginPath();
-            ctx!.strokeStyle = `rgba(${AMBER}, ${lineAlpha})`;
+            ctx!.strokeStyle = `rgba(${COLOR}, ${lineAlpha})`;
             ctx!.lineWidth = 0.5;
             ctx!.moveTo(particles[i].x, particles[i].y);
             ctx!.lineTo(particles[j].x, particles[j].y);
