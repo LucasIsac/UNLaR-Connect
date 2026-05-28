@@ -1,6 +1,33 @@
 "use client";
 
-import { ReactLenis } from "@studio-freight/react-lenis";
+import { useEffect } from "react";
+import { ReactLenis, useLenis } from "lenis/react";
+
+function LenisResizeObserver() {
+  const lenis = useLenis();
+
+  useEffect(() => {
+    if (!lenis) return;
+
+    // Trigger initial resize in case layout completed before mounting
+    lenis.resize();
+
+    // Observe body size changes (e.g. dynamic component loads, client-side renders)
+    const resizeObserver = new ResizeObserver(() => {
+      lenis.resize();
+    });
+
+    if (document.body) {
+      resizeObserver.observe(document.body);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [lenis]);
+
+  return null;
+}
 
 export default function SmoothScroll({
   children,
@@ -16,8 +43,8 @@ export default function SmoothScroll({
         touchMultiplier: 2,
       }}
     >
+      <LenisResizeObserver />
       {children}
     </ReactLenis>
   );
 }
-
