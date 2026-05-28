@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <!-- Brand Gradients -->
+    <linearGradient id="teal-green" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F766E" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+    <linearGradient id="green-amber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+    <linearGradient id="amber-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+  </defs>
+
+  <!-- Dome Network Grid (Background) -->
+  <g opacity="0.15">
+    <path d="M 230,260 C 230,120 310,80 400,80 C 490,80 570,120 570,260" fill="none" stroke="#0F766E" stroke-width="3" />
+    <path d="M 270,260 C 270,150 330,110 400,110 C 470,110 530,150 530,260" fill="none" stroke="#0F766E" stroke-width="1.5" />
+    <!-- Network Lines -->
+    <line x1="400" y1="80" x2="400" y2="260" stroke="#0F766E" stroke-width="1.5" />
+    <line x1="280" y1="140" x2="520" y2="140" stroke="#0F766E" stroke-width="1.5" />
+    <line x1="310" y1="100" x2="490" y2="220" stroke="#0F766E" stroke-width="1.5" />
+    <line x1="490" y1="100" x2="310" y2="220" stroke="#0F766E" stroke-width="1.5" />
+    <!-- Network Nodes -->
+    <circle cx="400" cy="80" r="5" fill="#0F766E" />
+    <circle cx="310" cy="100" r="4" fill="#0F766E" />
+    <circle cx="490" cy="100" r="4" fill="#0F766E" />
+    <circle cx="350" cy="140" r="4" fill="#0F766E" />
+    <circle cx="450" cy="140" r="4" fill="#0F766E" />
+  </g>
+
+  <!-- Left Figure (Teal/Green) -->
+  <g>
+    <!-- Head -->
+    <circle cx="290" cy="170" r="22" fill="url(#teal-green)" />
+    <!-- Body/Arm -->
+    <path d="M 230,260 C 230,220 250,200 290,200 C 320,200 360,195 385,185 C 388,188 388,192 385,195 C 340,215 310,220 290,220 C 265,220 255,235 250,260 Z" fill="url(#teal-green)" />
+  </g>
+
+  <!-- Right Figure (Green/Amber) -->
+  <g>
+    <!-- Head -->
+    <circle cx="510" cy="170" r="22" fill="url(#green-amber)" />
+    <!-- Body/Arm -->
+    <path d="M 570,260 C 570,220 550,200 510,200 C 480,200 440,195 415,185 C 412,188 412,192 415,195 C 460,215 490,220 510,220 C 535,220 545,235 550,260 Z" fill="url(#green-amber)" />
+  </g>
+
+  <!-- Central Star -->
+  <path d="M 400,165 L 405,176 L 417,177 L 408,185 L 411,197 L 400,190 L 389,197 L 392,185 L 383,177 L 395,176 Z" fill="url(#amber-glow)" />
+
+  <!-- Icons Floating in Dome -->
+  <!-- Graduation Cap (Right) -->
+  <path d="M 455,105 L 475,98 L 495,105 L 475,112 Z M 463,108 L 463,115 C 463,119 475,121 475,121 C 475,121 487,119 487,115 L 487,108" fill="none" stroke="#10B981" stroke-width="2" stroke-linejoin="round" opacity="0.6"/>
+  <!-- Lightbulb (Left) -->
+  <path d="M 320,115 C 320,108 326,103 332,103 C 338,103 344,108 344,115 C 344,120 340,123 338,126 L 338,129 L 326,129 L 326,126 C 324,123 320,120 320,115 Z" fill="none" stroke="#0F766E" stroke-width="2" stroke-linejoin="round" opacity="0.6"/>
+
+  <!-- Open Book (Base) -->
+  <g>
+    <!-- Outer Cover Shadow/Base -->
+    <path d="M 280,285 C 340,260 380,275 400,285 C 420,275 460,260 520,285 L 515,295 C 460,270 420,285 400,295 C 380,285 340,270 285,295 Z" fill="#E2E8F0" />
+    <!-- Left Page -->
+    <path d="M 285,280 C 340,255 385,270 400,280 L 400,240 C 385,230 340,215 285,240 Z" fill="url(#teal-green)" />
+    <!-- Right Page -->
+    <path d="M 515,280 C 460,255 415,270 400,280 L 400,240 C 415,230 460,215 515,240 Z" fill="url(#green-amber)" />
+  </g>
+
+  <!-- Typography -->
+  <text x="400" y="375" font-family="'Montserrat', sans-serif" font-size="44" font-weight="800" fill="#0F172A" letter-spacing="-0.02em" text-anchor="middle">TUTOR CONNECT</text>
+  <text x="400" y="410" font-family="'Montserrat', sans-serif" font-size="14" font-weight="600" fill="#64748B" letter-spacing="0.3em" text-anchor="middle">TUTORÍAS • ESTUDIO • MATCHMAKING</text>
+</svg>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <!-- Define a single symmetric branch of the logo -->
+    <g id="branch">
+      <!-- Node (Circle) -->
+      <circle cx="0" cy="-56" r="14" fill="#F59E0B" />
+      <!-- Connecting stem and outward-sweeping curve -->
+      <path d="M -11.5,-48 L -19,-40 C -28,-28 -48,-11 -40,7" 
+            fill="none" 
+            stroke="#F59E0B" 
+            stroke-width="11" 
+            stroke-linecap="round" 
+            stroke-linejoin="round" />
+    </g>
+  </defs>
+
+  <!-- Center group for rotating the branches around the center (100, 105) -->
+  <g transform="translate(100, 105)">
+    <!-- Top Branch -->
+    <use href="#branch" />
+    <!-- Bottom-Right Branch (rotated 120° clockwise) -->
+    <use href="#branch" transform="rotate(120)" />
+    <!-- Bottom-Left Branch (rotated 240° clockwise) -->
+    <use href="#branch" transform="rotate(240)" />
+  </g>
+</svg>
