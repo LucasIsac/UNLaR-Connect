@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { generateCampusPointData } from "@/lib/buildingGeometry";
+import { generateCampusPointData, CAMPUS_NODES } from "@/lib/buildingGeometry";
 
 // CUSTOMIZABLE PARAMETERS FOR THE 3D SCENE
 const CONFIG = {
@@ -190,7 +190,7 @@ export default function ThreeHeroCanvas() {
     const nodeMaterials: THREE.MeshBasicMaterial[] = [];
     const nodeMeshes: THREE.Mesh[] = [];
 
-    campusData.nodes.forEach((node) => {
+    CAMPUS_NODES.forEach((node) => {
       // By default created as transparent basic materials (mutated dynamically by the observer)
       const mat = new THREE.MeshBasicMaterial({
         color: 0xf59e0b,
@@ -207,19 +207,20 @@ export default function ThreeHeroCanvas() {
 
     // Subtly connect the key nodes with thin elegant lines
     const lineIndices: [number, number][] = [
-      [0, 1], // Hall Atrio (Rectorado Entrance) -> Spine Mid
-      [1, 2], // Spine Mid -> Pabellón A
-      [1, 3], // Spine Mid -> Pabellón B
-      [1, 4], // Spine Mid -> Pabellón C
-      [1, 5], // Spine Mid -> Pabellón D
-      [3, 6], // Pabellón B -> Biblioteca AI
-      [4, 6], // Pabellón C -> Biblioteca AI
+      [0, 1], // Rectorado -> Pabellon A
+      [0, 2], // Rectorado -> Pabellon B
+      [0, 3], // Rectorado -> Pabellon C
+      [0, 4], // Rectorado -> Pabellon D
+      [1, 2], // Pabellon A -> B
+      [2, 5], // Pabellon B -> Biblioteca AI
+      [3, 5], // Pabellon C -> Biblioteca AI
+      [3, 4], // Pabellon C -> D
     ];
 
     const linePositions: number[] = [];
     lineIndices.forEach(([i1, i2]) => {
-      const n1 = campusData.nodes[i1];
-      const n2 = campusData.nodes[i2];
+      const n1 = CAMPUS_NODES[i1];
+      const n2 = CAMPUS_NODES[i2];
       linePositions.push(n1.x, n1.y, n1.z);
       linePositions.push(n2.x, n2.y, n2.z);
     });
@@ -255,7 +256,7 @@ export default function ThreeHeroCanvas() {
 
       // Update connection nodes
       nodeMeshes.forEach((mesh, idx) => {
-        const isServer = campusData.nodes[idx].type === "server";
+        const isServer = CAMPUS_NODES[idx].type === "server";
         if (isDark) {
           (mesh.material as THREE.MeshBasicMaterial).color.setHex(isServer ? 0xe2775f : 0xf59e0b);
         } else {
@@ -346,7 +347,7 @@ export default function ThreeHeroCanvas() {
         mesh.scale.set(pulse, pulse, pulse);
         
         // Pulse glow effect (Server node pulses in cycles)
-        if (campusData.nodes[index].type === "server") {
+        if (CAMPUS_NODES[index].type === "server") {
           const serverPulse = 0.65 + Math.sin(elapsedTime * 4.5) * 0.35;
           nodeMaterials[index].opacity = Math.max(0, serverPulse * (1 - scrollProgress * 1.6));
         }

@@ -1,19 +1,20 @@
 /**
  * UNLaR-Connect Campus 3D Footprint Geometry & Point Sampling System
  * 
- * This file models the actual layout of the Universidad Nacional de La Rioja (UNLaR)
- * campus based on the official isometric map:
+ * This file defines the mathematical layout for the stylized 3D representation
+ * of the Universidad Nacional de La Rioja (UNLaR) campus. 
  * 
- * Architectural Layout Features:
- * 1. Rectorado (Admin. Central): A grand 3-story front-right block.
- * 2. Glass Foyer Atrium: A prominent, vertical glass tower section at the center of the Rectorado.
- * 3. Main Spine Corridor: A long backbone corridor extending vertically.
- * 4. Pabellones A, B, C, D: Four long parallel modules extending perpendicularly to the left from the spine.
- * 5. Library / Museum Cluster: A courtyard block complex on the left of the lower spine.
+ * Architecture Layout:
+ * 1. Rectorado (Main Admin Block): Large front block at the center.
+ * 2. Central Corridor Spine: A long connecting corridor linking all study pavilions.
+ * 3. Pabellones A, B, C, D: Four long parallel blocks representing classrooms.
+ * 4. Cúpula / Biblioteca (Library Dome): A central circular building.
  * 
- * DYNAMIC AUTOCENTERING:
- * The sampler automatically computes the bounding box of all coordinates
- * and centers the final 3D point cloud at (0, 0, 0).
+ * SOURCING / GEOMETRY REPLACEMENT DIRECTIONS:
+ * To replace these procedurally generated coordinates with exact GIS footprints or
+ * an OpenStreetMap Overpass JSON extraction, edit the `CAMPUS_LAYOUT` structure below.
+ * The `polygon` array represents 2D (x, z) coordinate vertices in meters relative
+ * to the campus center, and `height` represents the vertical height in meters.
  */
 
 export interface Footprint {
@@ -24,123 +25,103 @@ export interface Footprint {
   elevation?: number;          // optional initial elevation above ground
 }
 
-// Map Orientation:
+// Coordinate System mapping:
 // x: Left (-) to Right (+)
-// z: Back/North (-) to Front/South (+ / Main Entrance)
+// z: Behind (- / Pabellones) to Front (+ / Rectorado)
 // y: Vertical height (ground is y = 0)
 export const CAMPUS_LAYOUT: Footprint[] = [
-  // 1. Rectorado - Principal administrative building at the front-right (Av. Luis M. De La Fuente entrance)
+  // 1. Rectorado - Principal administrative building at the front
   {
-    id: "rectorado_base",
+    id: "rectorado",
     name: "Rectorado (Admin. Central)",
     polygon: [
-      [8, 24],
-      [22, 24],
-      [22, 38],
-      [8, 38]
+      [-25, 4],
+      [25, 4],
+      [25, 18],
+      [-25, 18]
     ],
-    height: 11.2 // 3 stories
+    height: 11
   },
-  // 2. Glass Foyer Atrium - Prominent glazed vertical tower in the center of the Rectorado
+  // 2. Central Corridor Spine - Corridor connecting all study halls
   {
-    id: "rectorado_atrium",
-    name: "Hall de Vidrio (Atrio)",
+    id: "corridor_spine",
+    name: "Corredor Central",
     polygon: [
-      [12.5, 33.5],
-      [17.5, 33.5],
-      [17.5, 38.5],
-      [12.5, 38.5]
+      [-55, -2],
+      [55, -2],
+      [55, 2],
+      [-55, 2]
     ],
-    height: 14.5, // Rises above the main roofline
-    elevation: 0
+    height: 3.8
   },
-  // 3. Main Spine Corridor - Long administrative and transition corridor running back (North)
-  {
-    id: "admin_spine",
-    name: "Spine Administrativa (Corredor)",
-    polygon: [
-      [10, -35],
-      [16, -35],
-      [16, 24],
-      [10, 24]
-    ],
-    height: 7.8 // 2 stories connecting wings
-  },
-  // 4. Pabellón A (Módulo Áulico) - Perpendicular wing 1 extending left
+  // 3. Pabellón Académico A - Leftmost pavilion
   {
     id: "pabellon_a",
     name: "Pabellón A",
     polygon: [
-      [-30, -20],
-      [10, -20],
-      [10, -14],
-      [-30, -14]
+      [-48, -32],
+      [-40, -32],
+      [-40, -2],
+      [-48, -2]
     ],
     height: 7.5
   },
-  // 5. Pabellón B (Módulo Áulico) - Perpendicular wing 2 extending left
+  // 4. Pabellón Académico B - Center-left pavilion
   {
     id: "pabellon_b",
     name: "Pabellón B",
     polygon: [
-      [-30, -8],
-      [10, -8],
-      [10, -2],
-      [-30, -2]
+      [-20, -32],
+      [-12, -32],
+      [-12, -2],
+      [-20, -2]
     ],
     height: 7.5
   },
-  // 6. Pabellón C (Módulo Áulico) - Perpendicular wing 3 extending left
+  // 5. Pabellón Académico C - Center-right pavilion
   {
     id: "pabellon_c",
     name: "Pabellón C",
     polygon: [
-      [-30, 4],
-      [10, 4],
-      [10, 10],
-      [-30, 10]
+      [12, -32],
+      [20, -32],
+      [20, -2],
+      [12, -2]
     ],
     height: 7.5
   },
-  // 7. Pabellón D (Módulo Áulico) - Perpendicular wing 4 extending left
+  // 6. Pabellón Académico D - Rightmost pavilion
   {
     id: "pabellon_d",
     name: "Pabellón D",
     polygon: [
-      [-30, 16],
-      [10, 16],
-      [10, 22],
-      [-30, 22]
+      [40, -32],
+      [48, -32],
+      [48, -2],
+      [40, -2]
     ],
     height: 7.5
   },
-  // 8. Biblioteca Central & Alumnos - Left-side courtyard block
+  // 7. Dome / Biblioteca - Central circular library dome in the inner courtyard
+  // We model a circular building by approximating a 16-sided regular polygon
   {
-    id: "biblioteca_block",
-    name: "Biblioteca Central (Edificio 9)",
-    polygon: [
-      [-26, -5],
-      [-10, -5],
-      [-10, 7],
-      [-26, 7]
-    ],
-    height: 6.8
-  },
-  // 9. Museo de Ciencias & Microcine - Outer block (Label 7/8 on map)
-  {
-    id: "museo_microcine",
-    name: "Museo & Microcine",
-    polygon: [
-      [-10, 2],
-      [4, 2],
-      [4, 14],
-      [-10, 14]
-    ],
-    height: 5.8
+    id: "biblioteca_dome",
+    name: "Biblioteca Central (Cúpula)",
+    polygon: Array.from({ length: 16 }, (_, i) => {
+      const angle = (i / 16) * Math.PI * 2;
+      const radius = 9.5;
+      const cx = 0;
+      const cz = -17; // Set inside the courtyard between pavilions B & C
+      return [
+        cx + radius * Math.cos(angle),
+        cz + radius * Math.sin(angle)
+      ] as [number, number];
+    }),
+    height: 13.5
   }
 ];
 
-// Campus connection hubs matching logical network routers in academic areas
+// Special interest nodes representing campus connections (routers, community points)
 export interface CampusNode {
   id: string;
   name: string;
@@ -151,38 +132,22 @@ export interface CampusNode {
 }
 
 export const CAMPUS_NODES: CampusNode[] = [
-  { id: "node_rectorado", name: "Hall Atrio Central", x: 15, y: 5.5, z: 35, type: "foyer" },
-  { id: "node_spine_mid", name: "Spine Administrativa", x: 13, y: 4, z: 2, type: "node" },
-  { id: "node_pab_a", name: "Módulo A", x: -10, y: 2, z: -17, type: "node" },
-  { id: "node_pab_b", name: "Módulo B", x: -10, y: 2, z: -5, type: "node" },
-  { id: "node_pab_c", name: "Módulo C", x: -10, y: 2, z: 7, type: "node" },
-  { id: "node_pab_d", name: "Módulo D", x: -10, y: 2, z: 19, type: "node" },
-  { id: "node_biblioteca", name: "Biblioteca Servidor AI", x: -18, y: 3.4, z: 1, type: "server" }
+  { id: "node_rectorado", name: "Foyer Rectorado", x: 0, y: 5.5, z: 11, type: "foyer" },
+  { id: "node_pab_a", name: "Acceso Pabellón A", x: -44, y: 2, z: -2, type: "node" },
+  { id: "node_pab_b", name: "Acceso Pabellón B", x: -16, y: 2, z: -2, type: "node" },
+  { id: "node_pab_c", name: "Acceso Pabellón C", x: 16, y: 2, z: -2, type: "node" },
+  { id: "node_pab_d", name: "Acceso Pabellón D", x: 44, y: 2, z: -2, type: "node" },
+  { id: "node_biblioteca", name: "Cúpula Central AI", x: 0, y: 6.8, z: -17, type: "server" }
 ];
 
 /**
  * Procedural point-cloud generator.
- * Employs edge sampling and wall/roof dot fills to outline the real UNLaR architecture.
- * Automatically aligns the entire dataset centered at (0, 0, 0) inside WebGL coordinates.
+ * Combines structural wireframe-like lines along edges and corners with random surface sampling.
+ * This guarantees a high-fidelity visual footprint outline that makes the building recognizable
+ * mainly by its silhouette while keeping performance extremely lightweight.
  */
 export function generateCampusPointData(densityMultiplier: number = 1.0) {
   const points: { x: number; y: number; z: number; r: number; g: number; b: number; size: number }[] = [];
-
-  // 1. CALCULATE AUTOMATIC GEOMETRIC CENTER
-  let minX = Infinity, maxX = -Infinity;
-  let minZ = Infinity, maxZ = -Infinity;
-
-  CAMPUS_LAYOUT.forEach((b) => {
-    b.polygon.forEach(([vx, vz]) => {
-      if (vx < minX) minX = vx;
-      if (vx > maxX) maxX = vx;
-      if (vz < minZ) minZ = vz;
-      if (vz > maxZ) maxZ = vz;
-    });
-  });
-
-  const centerX = (minX + maxX) / 2;
-  const centerZ = (minZ + maxZ) / 2;
 
   // Brand Colors (normalized RGB values [0 - 1]):
   // Warm Amber (#F59E0B) -> [0.96, 0.62, 0.04]
@@ -194,9 +159,10 @@ export function generateCampusPointData(densityMultiplier: number = 1.0) {
   function getPointColor(x: number, y: number, z: number, height: number, elevation: number) {
     const relativeHeight = y / (height + elevation);
     const distFromCenter = Math.sqrt(x * x + z * z);
-    const maxDist = 55; // Approximate radius of campus
+    const maxDist = 65; // Approximate radius of entire campus
 
-    const colorBlend = Math.min(1, Math.max(0, (distFromCenter / maxDist) * 0.75 - relativeHeight * 0.2));
+    // Blend ratio: center & top of buildings are brighter Amber; outer/lower parts shift to warm Terracotta
+    const colorBlend = Math.min(1, Math.max(0, (distFromCenter / maxDist) * 0.7 - relativeHeight * 0.3));
     
     const r = colorAmber.r * (1 - colorBlend) + colorTerracotta.r * colorBlend;
     const g = colorAmber.g * (1 - colorBlend) + colorTerracotta.g * colorBlend;
@@ -213,15 +179,14 @@ export function generateCampusPointData(densityMultiplier: number = 1.0) {
     const numVertices = poly.length;
 
     // Adjust sampling densities based on multiplier
-    const verticalEdgeDensity = 3.6 * densityMultiplier; // Points per meter on vertical corners
+    const verticalEdgeDensity = 3.5 * densityMultiplier; // Points per meter on vertical corners
     const outlineDensity = 1.8 * densityMultiplier;      // Points per meter on polygon outlines (base/roof)
     const surfaceDensity = 0.04 * densityMultiplier;     // Points per square meter on walls/roofs
 
-    // 1. SAMPLE VERTICAL CORNERS
+    // 1. SAMPLE VERTICAL CORNERS/RIBS
+    // Renders high-legibility vertical lines at each polygon vertex
     for (let i = 0; i < numVertices; i++) {
-      const [rawVx, rawVz] = poly[i];
-      const vx = rawVx - centerX;
-      const vz = rawVz - centerZ;
+      const [vx, vz] = poly[i];
       const edgePoints = Math.max(5, Math.floor(h * verticalEdgeDensity));
       
       for (let j = 0; j <= edgePoints; j++) {
@@ -233,20 +198,16 @@ export function generateCampusPointData(densityMultiplier: number = 1.0) {
           y,
           z: vz,
           ...col,
-          size: building.id.includes("atrium") ? 1.6 : 1.3 // Make atrium glass tower stand out!
+          size: 1.4 // Make corners slightly more defined
         });
       }
     }
 
-    // 2. SAMPLE HORIZONTAL OUTLINES
+    // 2. SAMPLE HORIZONTAL OUTLINES (Base & Roof outlines)
+    // Draw glowing contour rings along the floor and roof levels
     for (let i = 0; i < numVertices; i++) {
-      const [rawX1, rawZ1] = poly[i];
-      const [rawX2, rawZ2] = poly[(i + 1) % numVertices];
-      
-      const x1 = rawX1 - centerX;
-      const z1 = rawZ1 - centerZ;
-      const x2 = rawX2 - centerX;
-      const z2 = rawZ2 - centerZ;
+      const [x1, z1] = poly[i];
+      const [x2, z2] = poly[(i + 1) % numVertices];
       
       const dx = x2 - x1;
       const dz = z2 - z1;
@@ -258,7 +219,7 @@ export function generateCampusPointData(densityMultiplier: number = 1.0) {
         const currX = x1 + dx * t;
         const currZ = z1 + dz * t;
 
-        // Ground Ring
+        // Ground/Base Ring
         const colBase = getPointColor(currX, elev, currZ, h, elev);
         points.push({
           x: currX,
@@ -280,15 +241,11 @@ export function generateCampusPointData(densityMultiplier: number = 1.0) {
       }
     }
 
-    // 3. SAMPLE WALLS
+    // 3. SAMPLE WALLS (Random dots scattered inside vertical rectangle faces)
+    // Provides volumetric depth to the vertical silhouettes
     for (let i = 0; i < numVertices; i++) {
-      const [rawX1, rawZ1] = poly[i];
-      const [rawX2, rawZ2] = poly[(i + 1) % numVertices];
-      
-      const x1 = rawX1 - centerX;
-      const z1 = rawZ1 - centerZ;
-      const x2 = rawX2 - centerX;
-      const z2 = rawZ2 - centerZ;
+      const [x1, z1] = poly[i];
+      const [x2, z2] = poly[(i + 1) % numVertices];
       
       const dx = x2 - x1;
       const dz = z2 - z1;
@@ -313,18 +270,21 @@ export function generateCampusPointData(densityMultiplier: number = 1.0) {
       }
     }
 
-    // 4. SAMPLE ROOFS
-    let minX_b = Infinity, maxX_b = -Infinity;
-    let minZ_b = Infinity, maxZ_b = -Infinity;
+    // 4. SAMPLE ROOFS (Scattered dots inside polygon roofs)
+    // Provides solid ceiling volume for camera overhead perspectives
+    // For simple boxes, we can easily find bounds and reject points outside the shape
+    let minX = Infinity, maxX = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
     for (const [vx, vz] of poly) {
-      if (vx < minX_b) minX_b = vx;
-      if (vx > maxX_b) maxX_b = vx;
-      if (vz < minZ_b) minZ_b = vz;
-      if (vz > maxZ_b) maxZ_b = vz;
+      if (vx < minX) minX = vx;
+      if (vx > maxX) maxX = vx;
+      if (vz < minZ) minZ = vz;
+      if (vz > maxZ) maxZ = vz;
     }
 
-    const bboxArea = (maxX_b - minX_b) * (maxZ_b - minZ_b);
-    
+    const bboxArea = (maxX - minX) * (maxZ - minZ);
+    // Since some polygons might not be perfect axis-aligned boxes (like our 16-sided circle), 
+    // we use a simple ray-casting/bounding verification to check if a point lies inside the polygon.
     function isInsidePolygon(point: [number, number], vs: [number, number][]) {
       const x = point[0], z = point[1];
       let inside = false;
@@ -342,19 +302,18 @@ export function generateCampusPointData(densityMultiplier: number = 1.0) {
     let attempts = 0;
     let gathered = 0;
     
+    // Safety limit to prevent infinite loops in weird polygons
     while (gathered < numRoofPoints && attempts < numRoofPoints * 3) {
       attempts++;
-      const randX = minX_b + Math.random() * (maxX_b - minX_b);
-      const randZ = minZ_b + Math.random() * (maxZ_b - minZ_b);
+      const randX = minX + Math.random() * (maxX - minX);
+      const randZ = minZ + Math.random() * (maxZ - minZ);
 
       if (isInsidePolygon([randX, randZ], poly)) {
-        const currX = randX - centerX;
-        const currZ = randZ - centerZ;
-        const col = getPointColor(currX, elev + h, currZ, h, elev);
+        const col = getPointColor(randX, elev + h, randZ, h, elev);
         points.push({
-          x: currX,
+          x: randX,
           y: elev + h,
-          z: currZ,
+          z: randZ,
           ...col,
           size: 0.8
         });
@@ -363,7 +322,7 @@ export function generateCampusPointData(densityMultiplier: number = 1.0) {
     }
   }
 
-  // Convert points to GPU Float32 arrays
+  // Convert the array into Flat32Arrays which Three.js uses to update GPU buffers extremely fast
   const count = points.length;
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
@@ -371,6 +330,7 @@ export function generateCampusPointData(densityMultiplier: number = 1.0) {
 
   for (let i = 0; i < count; i++) {
     const p = points[i];
+    
     positions[i * 3] = p.x;
     positions[i * 3 + 1] = p.y;
     positions[i * 3 + 2] = p.z;
@@ -382,18 +342,11 @@ export function generateCampusPointData(densityMultiplier: number = 1.0) {
     sizes[i] = p.size;
   }
 
-  // Center node markers exactly using calculated center bounds
-  const centeredNodes = CAMPUS_NODES.map((node) => ({
-    ...node,
-    x: node.x - centerX,
-    z: node.z - centerZ
-  }));
-
   return {
     positions,
     colors,
     sizes,
     count,
-    nodes: centeredNodes
+    nodes: CAMPUS_NODES
   };
 }
