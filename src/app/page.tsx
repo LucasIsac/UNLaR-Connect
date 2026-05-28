@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import SmoothScroll from "@/components/ui/SmoothScroll";
-import HeroVoid from "@/components/landing/HeroVoid";
+import UniConnectHero from "@/components/landing/UniConnectHero";
 import FeatureShowcase from "@/components/landing/FeatureShowcase";
 import FinalCTA from "@/components/landing/FinalCTA";
 import Footer from "@/components/layout/Footer";
@@ -84,9 +84,9 @@ export default function Home() {
 
 
       {/* Page content - all sections */}
-      <main className="relative pt-24">
-        {/* Section 1+2: The Void + Hero Headline */}
-        <HeroVoid />
+      <main className="relative">
+        {/* Section 1+2: 3D Point Cloud Hero + Headline */}
+        <UniConnectHero />
 
         {/* Section 3: Feature Cards */}
         <FeatureShowcase />
