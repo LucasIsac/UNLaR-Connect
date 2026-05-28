@@ -1,244 +1,323 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useEffect, useState } from "react";
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
+import { FolderOpen, MessageSquare, Bot, ArrowRight, BookOpen, Layers } from "lucide-react";
 import { useTheme } from "@/components/ui/ThemeProvider";
-import DashboardMock from "./mocks/DashboardMock";
+import ResourcesMock from "./mocks/ResourcesMock";
 import ForumMock from "./mocks/ForumMock";
 import ChatbotMock from "./mocks/ChatbotMock";
 
-const screens = [
-  {
-    key: "dashboard",
-    shortLabel: "dashboard",
-    title: "Así se ve el",
-    accentWord: "dashboard",
-    accentClass: "text-accent border-accent/30",
-    description: "Tu panel central con nivel de karma, materias sugeridas y actividad en tiempo real para estar al día con la facu.",
-    mockup: DashboardMock,
-  },
-  {
-    key: "foro",
-    shortLabel: "foro",
-    title: "Así se ve el",
-    accentWord: "foro",
-    accentClass: "text-secondary border-secondary/30",
-    description: "Sacate las dudas de clase, debatí ejercicios con tus compañeros y ganá karma aportando respuestas clave.",
-    mockup: ForumMock,
-  },
-  {
-    key: "asistente",
-    shortLabel: "asistente IA",
-    title: "Así se ve el",
-    accentWord: "asistente IA",
-    accentClass: "text-accent bg-gradient-to-r from-accent to-terracotta-soft bg-clip-text text-transparent border-accent/30",
-    description: "Chateá al toque con tus apuntes. El tutor RAG te responde usando tus propios PDFs y te dice en qué página está la respuesta.",
-    mockup: ChatbotMock,
-  },
-];
-
 export default function ScreenShowcase() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isInView, setIsInView] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.01 }
+    );
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Set up scroll tracking for desktop sticky scroll triggers
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ["start start", "end end"],
   });
 
-  // Track the scroll to change the active screen index
+  // Dynamically map scroll progress to active index
   useMotionValueEvent(scrollYProgress, "change", (latest) => {
-    if (latest < 0.33) {
-      if (activeIndex !== 0) setActiveIndex(0);
-    } else if (latest < 0.66) {
-      if (activeIndex !== 1) setActiveIndex(1);
+    // 3 sections spanning from 0 to 1
+    if (latest < 0.35) {
+      setActiveIndex(0);
+    } else if (latest < 0.68) {
+      setActiveIndex(1);
     } else {
-      if (activeIndex !== 2) setActiveIndex(2);
+      setActiveIndex(2);
     }
   });
 
-  const activeScreen = screens[activeIndex];
+  const features = [
+    {
+      title: "Banco de Apuntes",
+      tagline: "Filtrado inteligente P2P",
+      description:
+        "Subí y buscá apuntes de tus materias. Filtramos de manera inteligente para que encontrés lo que necesitás al toque, segmentado por carrera, materia y año. Sumá puntos colaborando.",
+      icon: FolderOpen,
+      colorClass: "text-accent border-accent/20",
+      glowColor: "rgba(245, 158, 11, 0.08)",
+      mockup: ResourcesMock,
+    },
+    {
+      title: "Foros Estudiantiles",
+      tagline: "Resolución colaborativa",
+      description:
+        "¿No entendés un tema? Creá un post en el foro de tu materia o coordiná una tutoría directa con un compañero avanzado que la tenga clara. Aprendé en comunidad de forma simple.",
+      icon: MessageSquare,
+      colorClass: "text-secondary border-secondary/20",
+      glowColor: "rgba(255, 183, 125, 0.08)",
+      mockup: ForumMock,
+    },
+    {
+      title: "Asistente de IA",
+      tagline: "Chatbot RAG instantáneo",
+      description:
+        "Chateá directamente con tus PDFs subidos. Nuestro sistema de Inteligencia Artificial responde tus dudas en segundos usando los apuntes reales de tu carrera. Explicaciones precisas al instante.",
+      icon: Bot,
+      colorClass: "text-accent border-accent/20",
+      glowColor: "rgba(245, 158, 11, 0.08)",
+      mockup: ChatbotMock,
+    },
+  ];
+
+  const activeFeature = features[activeIndex];
+  const MockupComponent = activeFeature.mockup;
 
   return (
     <section
       ref={containerRef}
-      className="relative w-full"
-      style={{ height: "400vh" }} // Tall container for premium scroll feel
+      id="features"
+      className="relative z-10 w-full"
+      style={{ height: "320vh" }} // tall height on desktop gives space for sticky scroll triggers
     >
-      {/* Sticky Inner Wrapper */}
-      <div className="sticky top-0 h-screen w-full overflow-hidden flex items-center justify-center px-6">
-        
-        {/* Decorative Grid Lines Background */}
-        <div
-          className="absolute inset-0 pointer-events-none opacity-20"
-          style={{
-            backgroundImage: isDark
-              ? "radial-gradient(rgba(245,158,11,0.06) 1px, transparent 1px)"
-              : "radial-gradient(rgba(226,119,95,0.08) 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-          }}
-        />
+      {/* BACKGROUND GRAPHIC DETAILS */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <div className="sticky top-0 h-screen w-full overflow-hidden">
+          <div
+            className="absolute top-1/4 right-1/4 w-[500px] h-[500px] rounded-full blur-[140px] pointer-events-none transition-all duration-1000 -z-10 opacity-30"
+            style={{
+              background: activeFeature.glowColor,
+            }}
+          />
+        </div>
+      </div>
 
-        {/* Outer Split Container */}
-        <div className="relative z-10 max-w-6xl w-full grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 items-center">
+      {/* STICKY CONTENT WRAPPER */}
+      <div className="sticky top-0 h-screen w-full overflow-hidden flex items-center">
+        <div className="max-w-6xl mx-auto w-full px-6 flex flex-col justify-center h-full pt-28 pb-14">
           
-          {/* LEFT PANEL: Sticky Scroll-Driven Text Morphing (Col span 5) */}
-          <div className="col-span-1 md:col-span-5 flex flex-col justify-center text-left min-h-[220px] md:min-h-0">
-            {/* Section label */}
-            <span className="text-xs font-bold text-accent/70 tracking-[0.2em] uppercase mb-4 block">
-              Explorá la plataforma
-            </span>
-
-            {/* Title Morpher */}
-            <div className="h-[75px] md:h-[110px] overflow-hidden relative mb-4">
-              <AnimatePresence mode="wait">
-                <motion.h2
-                  key={activeScreen.key}
-                  className="font-heading text-3xl md:text-4.5xl font-black tracking-tight leading-[1.1] absolute inset-x-0"
-                  initial={{ opacity: 0, y: 35, filter: "blur(6px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, y: -35, filter: "blur(6px)" }}
-                  transition={{ duration: 0.55, ease: [0.25, 1, 0.5, 1] }}
-                >
-                  {activeScreen.title}{" "}
-                  <span className="relative inline-block mt-1">
-                    {/* Outline Vector Highlight */}
-                    <span className="relative z-10 font-black">
-                      {activeScreen.accentWord}
-                    </span>
-                    <span
-                      className={`absolute -bottom-1 -left-1 -right-1 h-3 rounded-md bg-accent/10 border-b border-r -rotate-1 z-0 ${
-                        activeIndex === 1 ? "border-secondary/20 bg-secondary/5" : "border-accent/20"
-                      }`}
-                    />
-                  </span>
-                  .
-                </motion.h2>
-              </AnimatePresence>
-            </div>
-
-            {/* Description Morpher */}
-            <div className="min-h-[70px] md:min-h-[100px] relative">
-              <AnimatePresence mode="wait">
-                <motion.p
-                  key={activeScreen.key}
-                  className="text-sm md:text-base text-muted-foreground leading-relaxed absolute inset-x-0"
-                  initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, y: -20, filter: "blur(4px)" }}
-                  transition={{ duration: 0.5, ease: "easeOut", delay: 0.05 }}
-                >
-                  {activeScreen.description}
-                </motion.p>
-              </AnimatePresence>
-            </div>
-
-            {/* Interactive Dot Navigator indicators */}
-            <div className="flex gap-2.5 mt-8 md:mt-12">
-              {screens.map((screen, idx) => (
-                <button
-                  key={screen.key}
-                  onClick={() => {
-                    const scrollPercent = idx === 0 ? 0.1 : idx === 1 ? 0.5 : 0.9;
-                    if (containerRef.current) {
-                      const element = containerRef.current;
-                      const rect = element.getBoundingClientRect();
-                      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-                      const targetScroll = scrollTop + rect.top + (element.offsetHeight * scrollPercent);
-                      window.scrollTo({ top: targetScroll, behavior: "smooth" });
-                    }
-                  }}
-                  className="group flex items-center gap-2 focus:outline-none"
-                  aria-label={`Ir a pantalla de ${screen.shortLabel}`}
-                >
-                  <div
-                    className={`h-2.5 rounded-full transition-all duration-500 ${
-                      activeIndex === idx
-                        ? `w-8 ${idx === 1 ? "bg-secondary" : "bg-accent"}`
-                        : "w-2.5 bg-muted hover:bg-muted-foreground"
-                    }`}
-                  />
-                  <span
-                    className={`text-[10px] font-bold uppercase tracking-wider transition-opacity duration-300 ${
-                      activeIndex === idx ? "opacity-100 text-foreground" : "opacity-0 group-hover:opacity-60 text-muted-foreground"
-                    }`}
-                  >
-                    {screen.shortLabel}
-                  </span>
-                </button>
-              ))}
-            </div>
+          {/* HEADER SECTION (Top-aligned inside sticky box) */}
+          <div className="mb-6 md:mb-8 shrink-0 text-center md:text-left">
+            <motion.p
+              className="text-[10px] font-black text-accent/80 tracking-[0.25em] uppercase mb-3 block"
+              initial={{ opacity: 0 }}
+              animate={isInView ? { opacity: 1 } : {}}
+              transition={{ duration: 0.5 }}
+            >
+              Todo en un solo lugar
+            </motion.p>
+            
+            <h2 className="font-heading text-2xl sm:text-4xl font-black tracking-tight leading-tight flex flex-wrap items-center justify-center md:justify-start gap-x-2.5 gap-y-1">
+              <span>Así funciona la plataforma</span>
+              <span className="relative px-3.5 py-1 text-accent select-none inline-block">
+                <span className="absolute inset-0 bg-accent/5 dark:bg-accent/10 border border-accent/15 rounded-xl -z-10" />
+                por dentro.
+              </span>
+            </h2>
           </div>
 
-          {/* RIGHT PANEL: Glowing Cross-fading Preview Mockups (Col span 7) */}
-          <div className="col-span-1 md:col-span-7 flex justify-center items-center">
+          {/* SPLIT LAYOUT CONTAINER */}
+          <div className="grid grid-cols-12 gap-8 md:gap-12 items-center flex-grow overflow-hidden h-[70vh] max-h-[610px]">
             
-            {/* Framed Device Wrapper */}
-            <div
-              className={`relative w-full max-w-[620px] aspect-[16/10] md:h-[50vh] md:max-h-[480px] rounded-3xl p-1 bg-glass border transition-all duration-700 overflow-hidden shadow-2xl ${
-                activeIndex === 0
-                  ? "border-accent/15 shadow-accent/5 hover:border-accent/30"
-                  : activeIndex === 1
-                  ? "border-secondary/15 shadow-secondary/5 hover:border-secondary/30"
-                  : "border-accent/20 shadow-accent/5 hover:border-accent/35"
-              }`}
-              style={{
-                boxShadow: activeIndex === 1
-                  ? (isDark ? "0 0 60px rgba(255,183,125,0.03), 0 30px 60px rgba(0,0,0,0.55)" : "0 0 60px rgba(255,183,125,0.01), 0 30px 60px rgba(118,52,14,0.04)")
-                  : (isDark ? "0 0 60px rgba(245,158,11,0.03), 0 30px 60px rgba(0,0,0,0.55)" : "0 0 60px rgba(245,158,11,0.01), 0 30px 60px rgba(97,59,0,0.04)")
-              }}
-            >
-              {/* Stacked mocks for seamless fading */}
-              <div className="relative w-full h-full rounded-[20px] overflow-hidden">
+            {/* LEFT COLUMN: FEATURES STORYLINE & PROGRESS INDICATOR */}
+            <div className="col-span-12 md:col-span-4 flex gap-6 h-full items-center pl-3.5">
+              
+              {/* Vertical Node-Link Progress Indicator (Desktop only) */}
+              <div className="relative h-[85%] hidden md:flex flex-col items-center shrink-0 w-10">
+                <div className="absolute top-4 bottom-4 w-[1.5px] bg-border/25 rounded" />
                 
-                {/* 1. Dashboard Mock */}
-                <div
-                  className="absolute inset-0 w-full h-full transition-all duration-700 ease-in-out"
-                  style={{
-                    opacity: activeIndex === 0 ? 1 : 0,
-                    transform: `scale(${activeIndex === 0 ? 1 : 0.975}) translateZ(0)`,
-                    visibility: activeIndex === 0 ? "visible" : "hidden",
-                    pointerEvents: activeIndex === 0 ? "auto" : "none",
+                {/* Scroll progress path overlay */}
+                <motion.div 
+                  className="absolute top-4 w-[1.5px] bg-accent origin-top rounded"
+                  style={{ 
+                    scaleY: scrollYProgress,
+                    height: "calc(100% - 32px)"
                   }}
-                >
-                  <DashboardMock />
+                />
+
+                {features.map((feat, idx) => {
+                  const Icon = feat.icon;
+                  const isActive = activeIndex === idx;
+                  
+                  return (
+                    <motion.div
+                      key={feat.title}
+                      className="absolute z-10 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer"
+                      style={{
+                        top: `${idx * 50}%`,
+                        y: "-50%"
+                      }}
+                      onClick={() => {
+                        if (containerRef.current) {
+                          // Scroll smoothly to this section segment
+                          const containerTop = containerRef.current.offsetTop;
+                          const segmentHeight = containerRef.current.offsetHeight / 3;
+                          window.scrollTo({
+                            top: containerTop + idx * segmentHeight + 50,
+                            behavior: "smooth"
+                          });
+                        }
+                      }}
+                      animate={{
+                        backgroundColor: isActive ? (isDark ? "#1d1b1a" : "#eae8e4") : (isDark ? "#151312" : "#fbf9f5"),
+                        borderColor: isActive ? "#f59e0b" : "rgba(245,158,11,0.2)",
+                        borderWidth: "1.5px",
+                        boxShadow: isActive ? "0 0 12px rgba(245,158,11,0.3)" : "none",
+                      }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <Icon className={`w-3 h-3 ${isActive ? "text-accent" : "text-muted-foreground/60"}`} />
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* Descriptions container */}
+              <div className="flex-1 flex flex-col gap-6 justify-center">
+                {features.map((feat, idx) => {
+                  const isActive = activeIndex === idx;
+                  
+                  return (
+                    <motion.div
+                      key={feat.title}
+                      className="flex flex-col text-left cursor-pointer"
+                      onClick={() => {
+                        if (containerRef.current) {
+                          const containerTop = containerRef.current.offsetTop;
+                          const segmentHeight = containerRef.current.offsetHeight / 3;
+                          window.scrollTo({
+                            top: containerTop + idx * segmentHeight + 50,
+                            behavior: "smooth"
+                          });
+                        }
+                      }}
+                      animate={{
+                        opacity: isActive ? 1.0 : 0.35,
+                        scale: isActive ? 1.02 : 0.98,
+                        x: isActive ? 4 : 0,
+                      }}
+                      transition={{ type: "spring", stiffness: 250, damping: 22 }}
+                    >
+                      <span className="text-[10px] font-black uppercase text-accent/80 tracking-wider mb-1">
+                        {feat.tagline}
+                      </span>
+                      <h3 className="font-heading font-black text-lg md:text-xl text-foreground mb-2 flex items-center gap-2">
+                        <span>{feat.title}</span>
+                        {isActive && (
+                          <motion.span 
+                            layoutId="accentDot" 
+                            className="w-1.5 h-1.5 rounded-full bg-accent"
+                          />
+                        )}
+                      </h3>
+                      <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
+                        {feat.description}
+                      </p>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: SCREEN MOCK CONTAINER */}
+            <div className="col-span-12 md:col-span-8 flex flex-col items-center justify-center h-full">
+              {/* Interactive Quick-Tab Selector (Header above mockup frame) */}
+              <div className="flex gap-1.5 mb-4 px-2 py-1 rounded-xl bg-card/45 border border-border/10 shrink-0">
+                {features.map((feat, idx) => {
+                  const isActive = activeIndex === idx;
+                  
+                  return (
+                    <button
+                      key={feat.title}
+                      onClick={() => {
+                        if (containerRef.current) {
+                          const containerTop = containerRef.current.offsetTop;
+                          const segmentHeight = containerRef.current.offsetHeight / 3;
+                          window.scrollTo({
+                            top: containerTop + idx * segmentHeight + 50,
+                            behavior: "smooth"
+                          });
+                        }
+                      }}
+                      className={`text-[9px] font-bold uppercase tracking-wider px-3.5 py-1.5 rounded-lg transition-all ${
+                        isActive
+                          ? "bg-accent/15 border border-accent/25 text-accent"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {feat.title}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Main screen mock frame */}
+              <div
+                className="relative w-full h-[90%] max-h-[540px] rounded-2xl overflow-hidden border border-border/15 transition-all duration-500 bg-card/35 backdrop-blur-md shadow-2xl flex flex-col"
+                style={{
+                  boxShadow: isDark
+                    ? "0 0 60px rgba(245,158,11,0.02), 0 30px 60px rgba(0,0,0,0.5)"
+                    : "0 0 60px rgba(245,158,11,0.01), 0 30px 60px rgba(120,53,15,0.05)",
+                }}
+              >
+                {/* Dot grid inside mock */}
+                <div
+                  className="absolute inset-0 pointer-events-none transition-all duration-300 -z-10"
+                  style={{
+                    backgroundImage: isDark
+                      ? "radial-gradient(rgba(255,255,255,0.015) 1px, transparent 1px)"
+                      : "radial-gradient(rgba(120,53,15,0.03) 1px, transparent 1px)",
+                    backgroundSize: "24px 24px",
+                  }}
+                />
+
+                {/* Topbar frame replica (Simulates a real application header) */}
+                <div className="h-8 border-b border-border/10 flex items-center px-4 justify-between bg-card/60 backdrop-blur-md shrink-0 select-none">
+                  <div className="flex gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500/40" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/40" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-green-500/40" />
+                  </div>
+                  <div className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest pl-6">
+                    UNLaR-Connect Web Client
+                  </div>
+                  <div className="w-8" />
                 </div>
 
-                {/* 2. Forum Mock */}
-                <div
-                  className="absolute inset-0 w-full h-full transition-all duration-700 ease-in-out"
-                  style={{
-                    opacity: activeIndex === 1 ? 1 : 0,
-                    transform: `scale(${activeIndex === 1 ? 1 : 0.975}) translateZ(0)`,
-                    visibility: activeIndex === 1 ? "visible" : "hidden",
-                    pointerEvents: activeIndex === 1 ? "auto" : "none",
-                  }}
-                >
-                  <ForumMock />
+                {/* Dynamic Screen Mock switcher */}
+                <div className="flex-1 overflow-hidden relative">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={activeIndex}
+                      className="absolute inset-0 w-full h-full"
+                      initial={{ opacity: 0, scale: 0.98, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 1.01, y: -10 }}
+                      transition={{ duration: 0.35, ease: "easeInOut" }}
+                    >
+                      <MockupComponent isDark={isDark} />
+                    </motion.div>
+                  </AnimatePresence>
                 </div>
-
-                {/* 3. Chatbot Mock */}
-                <div
-                  className="absolute inset-0 w-full h-full transition-all duration-700 ease-in-out"
-                  style={{
-                    opacity: activeIndex === 2 ? 1 : 0,
-                    transform: `scale(${activeIndex === 2 ? 1 : 0.975}) translateZ(0)`,
-                    visibility: activeIndex === 2 ? "visible" : "hidden",
-                    pointerEvents: activeIndex === 2 ? "auto" : "none",
-                  }}
-                >
-                  <ChatbotMock />
-                </div>
-
               </div>
             </div>
 
           </div>
-
         </div>
-
       </div>
     </section>
   );

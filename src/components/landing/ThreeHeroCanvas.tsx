@@ -248,7 +248,9 @@ export default function ThreeHeroCanvas() {
       pointsMaterial.uniforms.uIsDark.value = isDark ? 1.0 : 0.0;
 
       // Update fog color matching stylesheet background specs (Dark: Warm Obsidian 0x0c0a09 | Light: Soft Cream 0xfbf9f5)
-      scene.fog.color.setHex(isDark ? 0x0c0a09 : 0xfbf9f5);
+      if (scene.fog) {
+        scene.fog.color.setHex(isDark ? 0x0c0a09 : 0xfbf9f5);
+      }
 
       // Update connection lines
       lineMaterial.color.setHex(isDark ? 0xf59e0b : 0x855300);
@@ -317,13 +319,15 @@ export default function ThreeHeroCanvas() {
       // 4. Smoothly fade out the HTML Canvas layer in the DOM
       // Fully invisible by uScrollProgress = CONFIG.fadeScrollPercent (e.g. 70% scrolled)
       const domOpacity = Math.max(0, 1 - scrollProgress / CONFIG.fadeScrollPercent);
-      canvas.style.opacity = domOpacity.toString();
-      
-      // Stop rendering if completely scrolled past to optimize system resources
-      if (domOpacity <= 0) {
-        canvas.style.visibility = "hidden";
-      } else {
-        canvas.style.visibility = "visible";
+      if (canvas) {
+        canvas.style.opacity = domOpacity.toString();
+        
+        // Stop rendering if completely scrolled past to optimize system resources
+        if (domOpacity <= 0) {
+          canvas.style.visibility = "hidden";
+        } else {
+          canvas.style.visibility = "visible";
+        }
       }
     }
 

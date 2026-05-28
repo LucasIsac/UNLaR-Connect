@@ -137,6 +137,25 @@ export default function UniConnectHero() {
           </Link>
           <a
             href="#features"
+            onClick={(e) => {
+              e.preventDefault();
+              const target = document.getElementById("features");
+              if (!target) return;
+              const startY = window.scrollY;
+              const endY = target.getBoundingClientRect().top + startY;
+              const duration = 1400; // ms — long enough to enjoy the hero blur effect
+              let startTime: number | null = null;
+              const easeInOutCubic = (t: number) =>
+                t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+              const step = (timestamp: number) => {
+                if (!startTime) startTime = timestamp;
+                const elapsed = timestamp - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                window.scrollTo(0, startY + (endY - startY) * easeInOutCubic(progress));
+                if (progress < 1) requestAnimationFrame(step);
+              };
+              requestAnimationFrame(step);
+            }}
             className="w-full sm:w-auto px-8 py-4 rounded-xl border border-border/40 bg-white/[0.01] backdrop-blur-md text-muted-foreground font-bold text-sm tracking-wide transition-all duration-300 hover:text-foreground hover:border-border hover:bg-white/[0.04] hover:scale-[1.03] active:scale-[0.98] cursor-pointer text-center"
           >
             Mirá cómo funciona

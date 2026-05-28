@@ -1,346 +1,389 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { motion, useScroll, useMotionValue, useSpring, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { Heart, Sparkles, Code2, ArrowRight } from "lucide-react";
+import { Bot, BookOpen, CheckCircle2, ArrowRight } from "lucide-react";
 import { useTheme } from "@/components/ui/ThemeProvider";
 
+// --- ANIMATED COUNTER COMPONENT ---
+
+function Counter({
+  value,
+  suffix = "",
+  duration = 1.8,
+  delay = 0,
+  startTrigger,
+}: {
+  value: number;
+  suffix?: string;
+  duration?: number;
+  delay?: number;
+  startTrigger: boolean;
+}) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!startTrigger) return;
+
+    let startTimestamp: number | null = null;
+    const step = (timestamp: number) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / (duration * 1000), 1);
+      
+      // Easing: easeOutExpo
+      const easeProgress = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+      setCount(Math.floor(easeProgress * value));
+
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      }
+    };
+    
+    const timeoutId = setTimeout(() => {
+      window.requestAnimationFrame(step);
+    }, delay * 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [value, duration, delay, startTrigger]);
+
+  return (
+    <span>
+      {count}
+      {suffix}
+    </span>
+  );
+}
+
+// --- PARTICLE CLASS FOR CANVAS ---
+
+interface CanvasParticle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  alpha: number;
+  size: number;
+  speed: number;
+}
+
+// --- MAIN CTA SECTION ---
+
 export default function FinalCTA() {
-  const ref = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const buttonRef = useRef<HTMLDivElement>(null);
+
   const [isInView, setIsInView] = useState(false);
+  const [buttonPos, setButtonPos] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
+
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
-  // Intersection Observer
+  // IntersectionObserver to trigger animations
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setIsInView(true);
-        } else {
-          setIsInView(false);
+          observer.disconnect();
         }
       },
       { threshold: 0.05 }
     );
 
-    if (ref.current) {
-      observer.observe(ref.current);
+    if (sectionRef.current) {
+      observer.observe(sectionRef.current);
     }
 
     return () => observer.disconnect();
   }, []);
 
-  // Framer Motion Magnetic Button Physics
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-  const springConfig = { damping: 15, stiffness: 140, mass: 0.15 };
-  const springX = useSpring(mouseX, springConfig);
-  const springY = useSpring(mouseY, springConfig);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left - rect.width / 2;
-    const y = e.clientY - rect.top - rect.height / 2;
-    // magnetic pull ratio (0.3)
-    mouseX.set(x * 0.3);
-    mouseY.set(y * 0.3);
-  };
-
-  const handleMouseLeave = () => {
-    setIsHovered(false);
-    mouseX.set(0);
-    mouseY.set(0);
-  };
-
-  // Scoped Canvas Particle Convergence Effect
+  // Ambient Particle Convergence Canvas logic
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let width = 0;
-    let height = 0;
-    let animFrame: number;
+    let animationFrameId: number;
+    let particles: CanvasParticle[] = [];
+    const particleCount = 40;
 
-    type Particle = {
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      speed: number;
-      radius: number;
-      alpha: number;
-      wiggleSeed: number;
+    const resizeCanvas = () => {
+      if (canvas && canvas.parentElement) {
+        canvas.width = canvas.parentElement.clientWidth || window.innerWidth;
+        canvas.height = canvas.parentElement.clientHeight || window.innerHeight;
+      }
+    };
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+
+    // Helper to spawn particles at edges
+    const createParticle = (w: number, h: number, randomStart = false): CanvasParticle => {
+      let x = Math.random() * w;
+      let y = Math.random() * h;
+      
+      if (!randomStart) {
+        const edge = Math.floor(Math.random() * 4);
+        if (edge === 0) { x = 0; y = Math.random() * h; } // Left
+        else if (edge === 1) { x = w; y = Math.random() * h; } // Right
+        else if (edge === 2) { x = Math.random() * w; y = 0; } // Top
+        else { x = Math.random() * w; y = h; } // Bottom
+      }
+
+      return {
+        x,
+        y,
+        vx: 0,
+        vy: 0,
+        alpha: Math.random() * 0.45 + 0.1,
+        size: Math.random() * 1.5 + 0.6,
+        speed: Math.random() * 0.45 + 0.15,
+      };
     };
 
-    let particles: Particle[] = [];
-
-    function resize() {
-      if (!canvas) return;
-      width = canvas.width = canvas.parentElement?.offsetWidth || window.innerWidth;
-      height = canvas.height = canvas.parentElement?.offsetHeight || window.innerHeight;
-      init();
+    // Initialize particles
+    for (let i = 0; i < particleCount; i++) {
+      particles.push(createParticle(canvas.width, canvas.height, true));
     }
 
-    function init() {
-      particles = [];
-      const count = window.innerWidth < 768 ? 30 : 65;
-      for (let i = 0; i < count; i++) {
-        // Spawn particles closer to outer bounds
-        const angle = Math.random() * Math.PI * 2;
-        const spawnDist = Math.max(width, height) * 0.4 + Math.random() * 200;
-        const x = width / 2 + Math.cos(angle) * spawnDist;
-        const y = height / 2 + Math.sin(angle) * spawnDist;
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      
+      // Adapt particle colors to theme HSL (Dark: Amber 245, 158, 11 | Light: Terracotta 120, 53, 15)
+      const isHtmlDark = document.documentElement.classList.contains("dark");
+      const particleColor = isHtmlDark ? "245, 158, 11" : "148, 74, 35";
 
-        particles.push({
-          x,
-          y,
-          vx: 0,
-          vy: 0,
-          speed: Math.random() * 0.75 + 0.3,
-          radius: Math.random() * 1.5 + 0.5,
-          alpha: 0,
-          wiggleSeed: Math.random() * 100,
-        });
-      }
-    }
-
-    function tick() {
-      if (!ctx || !canvas) return;
-      ctx.clearRect(0, 0, width, height);
-
-      const targetX = width / 2;
-      const targetY = height / 2 - 80; // approximate Y position of CTA button center
-
-      const isCurrentDark = document.documentElement.classList.contains("dark");
-      const COLOR = isCurrentDark ? "245, 158, 11" : "120, 53, 15"; // Vibrant Amber or Terracotta Brown
-
-      for (let p of particles) {
-        const dx = targetX - p.x;
-        const dy = targetY - p.y;
+      particles.forEach((p, idx) => {
+        const dx = centerX - p.x;
+        const dy = centerY - p.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        // Reset if they get too close to the button (converged)
-        if (dist < 40) {
-          const angle = Math.random() * Math.PI * 2;
-          const spawnDist = Math.max(width, height) * 0.5;
-          p.x = targetX + Math.cos(angle) * spawnDist;
-          p.y = targetY + Math.sin(angle) * spawnDist;
-          p.alpha = 0;
-        }
-
-        // Attraction vector towards target Y/X
-        p.vx = (dx / dist) * p.speed;
-        p.vy = (dy / dist) * p.speed;
-
-        // Apply orbital force drift
-        const orbitAngle = Math.atan2(dy, dx) + Math.PI / 2;
-        const orbitPull = 0.15; // swirl force
-        p.vx += Math.cos(orbitAngle) * orbitPull;
-        p.vy += Math.sin(orbitAngle) * orbitPull;
-
-        // Organic wavy movement
-        p.x += p.vx + Math.sin(dist * 0.015 + p.wiggleSeed) * 0.18;
-        p.y += p.vy + Math.cos(dist * 0.015 + p.wiggleSeed) * 0.18;
-
-        // Opacity mapping (Fades in from edges, fades out very close to the center)
-        if (dist > 300) {
-          p.alpha = Math.min(p.alpha + 0.01, 0.35);
-        } else if (dist < 150) {
-          p.alpha = Math.max(p.alpha - 0.02, 0);
+        if (dist < 45) {
+          // Respawn at edges when sucked into central button gravity
+          particles[idx] = createParticle(canvas.width, canvas.height);
         } else {
-          p.alpha = 0.35;
+          // Gravitational pull inward
+          p.x += (dx / dist) * p.speed;
+          p.y += (dy / dist) * p.speed;
+          
+          // Micro noise drift
+          p.x += (Math.random() - 0.5) * 0.25;
+          p.y += (Math.random() - 0.5) * 0.25;
+
+          // Draw
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${particleColor}, ${p.alpha * (dist > 160 ? 1 : dist / 160)})`;
+          ctx.fill();
         }
+      });
 
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${COLOR}, ${p.alpha})`;
-        ctx.fill();
-      }
+      animationFrameId = requestAnimationFrame(animate);
+    };
+    animate();
 
-      animFrame = requestAnimationFrame(tick);
-    }
-
-    resize();
-    tick();
-
-    window.addEventListener("resize", resize);
     return () => {
-      cancelAnimationFrame(animFrame);
-      window.removeEventListener("resize", resize);
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener("resize", resizeCanvas);
     };
   }, []);
 
-  const stats = [
+  // Magnetic Button hover tracker
+  const handleMouseMove = (e: React.MouseEvent) => {
+    const btn = buttonRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const x = e.clientX - (rect.left + rect.width / 2);
+    const y = e.clientY - (rect.top + rect.height / 2);
+    
+    // Capped cursor attraction translation (stretching button position towards cursor)
+    setButtonPos({ x: x * 0.45, y: y * 0.45 });
+  };
+
+  const handleMouseLeave = () => {
+    setButtonPos({ x: 0, y: 0 });
+    setIsHovered(false);
+  };
+
+  const statCards = [
     {
-      icon: Heart,
-      title: "100% Gratis",
-      desc: "Creado por y para estudiantes. Sin suscripciones ni costos ocultos.",
-      accentClass: "text-red-400 border-red-500/20 bg-red-500/5",
+      value: 100,
+      suffix: "%",
+      label: "Gratuito y Libre",
+      description: "Código abierto, sin vueltas ni publicidades molestas.",
+      icon: CheckCircle2,
+      accent: "text-accent border-accent/15",
     },
     {
-      icon: Sparkles,
-      title: "Tutor IA 24/7",
-      desc: "Tus PDFs convertidos en conocimiento dinámico, disponible al instante.",
-      accentClass: "text-accent border-accent/20 bg-accent/5",
+      value: 24,
+      suffix: "/7",
+      label: "Soporte con Asistente IA",
+      description: "Chateá con tus apuntes a cualquier hora al toque.",
+      icon: Bot,
+      accent: "text-secondary border-secondary/15",
     },
     {
-      icon: Code2,
-      title: "Código Abierto",
-      desc: "Colaborativo, transparente y hospedado para toda la comunidad UNLaR.",
-      accentClass: "text-secondary border-secondary/20 bg-secondary/5",
+      value: 5,
+      suffix: "+",
+      label: "Carreras Integradas",
+      description: "Sistemas, Industrial, Enfermería y más integrándose.",
+      icon: BookOpen,
+      accent: "text-accent border-accent/15",
     },
   ];
 
   return (
     <section
-      ref={ref}
-      className="relative z-10 min-h-screen py-32 flex flex-col items-center justify-center px-6 text-center overflow-hidden w-full"
+      ref={sectionRef}
+      className="relative z-10 min-h-screen py-24 flex flex-col items-center justify-center px-6 text-center overflow-hidden"
     >
-      {/* Background convergence canvas */}
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 pointer-events-none -z-10"
-        aria-hidden="true"
-      />
+      {/* 2D CANVAS GRAVITY VORTEX LAYER */}
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none -z-20" />
 
-      {/* Decorative gradient overlay */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none -z-20">
+      {/* Ambient static backdrop glow */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none -z-30">
         <div
-          className={`w-[600px] h-[600px] rounded-full blur-[140px] transition-colors duration-500 ${
-            isDark ? "bg-accent/5" : "bg-primary/5"
+          className={`w-[600px] h-[600px] rounded-full blur-[140px] transition-colors duration-1000 opacity-20 ${
+            isDark ? "bg-accent/10" : "bg-primary/20"
           }`}
         />
       </div>
 
-      {/* SECTION TOP: Copy */}
-      <motion.p
-        className="text-xs font-bold text-accent/70 tracking-[0.2em] uppercase mb-5"
-        initial={{ opacity: 0 }}
-        animate={isInView ? { opacity: 1 } : {}}
-        transition={{ duration: 0.6 }}
-      >
-        Llegó tu turno
-      </motion.p>
+      <div className="max-w-4xl mx-auto w-full flex flex-col items-center">
+        {/* Tu Turno Label */}
+        <motion.p
+          className="text-[11px] font-black text-accent/80 tracking-[0.25em] uppercase mb-6"
+          initial={{ opacity: 0 }}
+          animate={isInView ? { opacity: 1 } : {}}
+          transition={{ duration: 0.6 }}
+        >
+          Es tu turno
+        </motion.p>
 
-      <motion.h2
-        className="font-heading text-4xl sm:text-6.5xl font-black tracking-tight max-w-3xl leading-[1.05] mb-6"
-        initial={{ opacity: 0, y: 30 }}
-        animate={isInView ? { opacity: 1, y: 0 } : {}}
-        transition={{ duration: 0.75, delay: 0.1, ease: [0.25, 1, 0.5, 1] }}
-      >
-        ¿Todavía estudiás{" "}
-        <span className="text-accent relative inline-block">
-          solo
-          <span className="absolute -bottom-1 left-0 right-0 h-2 rounded bg-accent/15 border-b border-accent/20" />
-        </span>
-        ?
-      </motion.h2>
+        {/* Argentine Provocative Headline */}
+        <motion.h2
+          className="font-heading text-4xl sm:text-6xl font-black tracking-tight max-w-3xl leading-[1.1] mb-6 flex flex-col items-center justify-center gap-1 select-none"
+          initial={{ opacity: 0, y: 30 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <span>¿Todavía estudiás</span>
+          <span className="relative px-5 py-1.5 text-accent inline-block select-none mt-1">
+            <span className="absolute inset-0 bg-accent/5 dark:bg-accent/10 border border-accent/15 rounded-xl -z-10" />
+            tan solo?
+          </span>
+        </motion.h2>
 
-      <motion.p
-        className="text-base sm:text-lg text-muted-foreground max-w-xl leading-relaxed mb-12"
-        initial={{ opacity: 0, y: 20 }}
-        animate={isInView ? { opacity: 1, y: 0 } : {}}
-        transition={{ duration: 0.7, delay: 0.25, ease: "easeOut" }}
-      >
-        Unite a los estudiantes de la UNLaR que ya conectaron su forma de aprender, coordinan tutorías y estudian con inteligencia artificial.
-      </motion.p>
+        {/* Subtitle */}
+        <motion.p
+          className="text-sm sm:text-base text-muted-foreground max-w-md leading-relaxed mb-16 px-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.7, delay: 0.25, ease: "easeOut" }}
+        >
+          Unite a los estudiantes de la UNLaR que ya conectaron su forma de aprender, colaborar y salvar el cuatrimestre.
+        </motion.p>
 
-      {/* SECTION MIDDLE: Magnetic spring CTA button */}
-      <motion.div
-        className="relative z-20 mb-24 px-8 py-8 cursor-pointer flex items-center justify-center"
-        initial={{ opacity: 0, y: 20 }}
-        animate={isInView ? { opacity: 1, y: 0 } : {}}
-        transition={{ duration: 0.7, delay: 0.4, ease: "easeOut" }}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        onMouseEnter={() => setIsHovered(true)}
-      >
-        {/* Glow ambient ring pulses */}
-        <div className="absolute pointer-events-none inset-0 flex items-center justify-center">
-          <motion.div
-            className="absolute w-52 h-20 rounded-full border border-accent/20 bg-accent/5 -z-10"
-            animate={{
-              scale: isHovered ? [1, 1.25, 1] : [1, 1.1, 1],
-              opacity: isHovered ? [0.4, 0.05, 0.4] : [0.2, 0.05, 0.2],
-            }}
-            transition={{
-              duration: isHovered ? 1.5 : 3,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
-          />
-          <motion.div
-            className="absolute w-44 h-16 rounded-full border border-accent/30 -z-10"
-            animate={{
-              scale: isHovered ? [1, 1.15, 1] : [1, 1.05, 1],
-              opacity: isHovered ? [0.6, 0.1, 0.6] : [0.3, 0.1, 0.3],
-            }}
-            transition={{
-              duration: isHovered ? 1.2 : 2.5,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: 0.5,
-            }}
-          />
+        {/* PROVABLE STATISTIC BLOCKS (No fake numbers!) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-3xl mb-16 px-4 relative z-10">
+          {statCards.map((stat, idx) => {
+            const Icon = stat.icon;
+            return (
+              <motion.div
+                key={stat.label}
+                className="rounded-2xl p-5 bg-card/45 border border-border/10 flex flex-col items-center justify-center relative overflow-hidden group hover:border-accent/20 transition-all duration-300 backdrop-blur-md shadow-sm"
+                initial={{ opacity: 0, y: 25 }}
+                animate={isInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.6, delay: 0.3 + idx * 0.1, ease: "easeOut" }}
+              >
+                {/* Micro accent glow behind card */}
+                <div className="absolute inset-0 bg-gradient-to-b from-accent/5 to-transparent pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                
+                <div className={`w-8 h-8 rounded-lg bg-card border border-border/50 flex items-center justify-center mb-3.5 ${stat.accent} shadow-sm shrink-0`}>
+                  <Icon className="w-4 h-4 shrink-0" />
+                </div>
+                
+                <div className="font-heading text-2xl font-black text-foreground mb-1 select-none">
+                  <Counter
+                    value={stat.value}
+                    suffix={stat.suffix}
+                    delay={0.4 + idx * 0.15}
+                    startTrigger={isInView}
+                  />
+                </div>
+                
+                <span className="text-[11px] font-bold text-foreground mb-1 block">
+                  {stat.label}
+                </span>
+                
+                <p className="text-[10px] text-muted-foreground/80 leading-normal max-w-[200px] text-center">
+                  {stat.description}
+                </p>
+              </motion.div>
+            );
+          })}
         </div>
 
-        {/* The actual magnetic button container */}
+        {/* MAGNETIC REGISTER CTA BUTTON WITH CONCENTRIC GLOWS */}
         <motion.div
-          style={{ x: springX, y: springY }}
-          className="relative"
-          whileHover={{ scale: 1.035 }}
-          whileTap={{ scale: 0.97 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.7, delay: 0.6, ease: "easeOut" }}
+          className="relative z-10"
         >
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-2 px-11 py-4.5 rounded-2xl bg-accent text-accent-foreground font-black text-sm.5 tracking-wide hover:bg-accent/95 shadow-2xl shadow-accent/20 transition-all active:shadow-accent/10 select-none"
+          <motion.div
+            ref={buttonRef}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            onMouseEnter={() => setIsHovered(true)}
+            animate={{ x: buttonPos.x, y: buttonPos.y }}
+            transition={{ type: "spring", stiffness: 220, damping: 14 }}
+            className="relative p-1"
           >
-            <span>Registrate Gratis</span>
-            <ArrowRight className="w-4 h-4 shrink-0 transition-transform group-hover:translate-x-1" />
-          </Link>
-        </motion.div>
-      </motion.div>
+            {/* Concentric amber idle expansion glows */}
+            <div className="absolute inset-0 flex items-center justify-center -z-10 pointer-events-none">
+              <motion.div
+                className="absolute rounded-2xl border border-accent/25 w-[105%] h-[105%]"
+                animate={isHovered ? { scale: [1, 1.45], opacity: [0.7, 0] } : { scale: [1, 1.3], opacity: [0.5, 0] }}
+                transition={{ repeat: Infinity, duration: isHovered ? 1.4 : 2.2, ease: "easeOut" }}
+              />
+              <motion.div
+                className="absolute rounded-2xl border border-accent/15 w-[105%] h-[105%]"
+                animate={isHovered ? { scale: [1, 1.25], opacity: [0.5, 0] } : { scale: [1, 1.15], opacity: [0.35, 0] }}
+                transition={{ repeat: Infinity, duration: isHovered ? 1.4 : 2.2, ease: "easeOut", delay: isHovered ? 0.7 : 1.1 }}
+              />
+            </div>
 
-      {/* SECTION BOTTOM: Honest, premium qualitative stats blocks */}
-      <div className="max-w-5xl w-full grid grid-cols-1 md:grid-cols-3 gap-6 text-left select-none relative z-10 mt-6">
-        {stats.map((stat, idx) => {
-          const Icon = stat.icon;
-          return (
-            <motion.div
-              key={stat.title}
-              className="bg-glass border border-border/10 rounded-2xl.5 p-6 hover-glow-subtle flex flex-col justify-between"
-              initial={{ opacity: 0, y: 35 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{
-                duration: 0.7,
-                delay: 0.3 + idx * 0.15,
-                ease: [0.25, 1, 0.5, 1],
+            {/* Main Magnetic CTA Link */}
+            <Link
+              href="/dashboard"
+              className="relative inline-flex items-center gap-2 px-10 py-4 rounded-xl bg-accent text-accent-foreground font-black text-sm tracking-wider uppercase shadow-xl hover:bg-accent/95 shadow-accent/10 active:scale-95 transition-all select-none"
+              style={{
+                boxShadow: isHovered
+                  ? (isDark ? "0 10px 40px rgba(245, 158, 11, 0.22)" : "0 10px 40px rgba(148, 74, 35, 0.16)")
+                  : "0 4px 14px rgba(0,0,0,0.02)",
               }}
             >
-              <div>
-                {/* Stat Icon */}
-                <div
-                  className={`w-10 h-10 rounded-xl border flex items-center justify-center mb-5 shrink-0 ${stat.accentClass}`}
-                >
-                  <Icon className="w-4.5 h-4.5" />
-                </div>
+              <span>Registrate ahora, es gratis</span>
+              <ArrowRight className="w-4 h-4 shrink-0 transition-transform group-hover:translate-x-1" />
+            </Link>
+          </motion.div>
+        </motion.div>
 
-                <h3 className="font-heading font-black text-base.5 text-foreground mb-2">
-                  {stat.title}
-                </h3>
-                <p className="text-xs.5 text-muted-foreground leading-relaxed">
-                  {stat.desc}
-                </p>
-              </div>
-            </motion.div>
-          );
-        })}
+        {/* Bottom vertical node link divider line */}
+        <motion.div
+          className="w-px h-20 bg-gradient-to-b from-accent/20 to-transparent mx-auto mt-24"
+          initial={{ opacity: 0, scaleY: 0 }}
+          animate={isInView ? { opacity: 1, scaleY: 1 } : {}}
+          transition={{ duration: 0.8, delay: 0.8 }}
+          style={{ originY: 0 }}
+        />
       </div>
     </section>
   );

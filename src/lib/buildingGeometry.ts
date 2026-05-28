@@ -285,7 +285,7 @@ export function generateCampusPointData(densityMultiplier: number = 1.0) {
     const bboxArea = (maxX - minX) * (maxZ - minZ);
     // Since some polygons might not be perfect axis-aligned boxes (like our 16-sided circle), 
     // we use a simple ray-casting/bounding verification to check if a point lies inside the polygon.
-    function isInsidePolygon(point: [number, number], vs: [number, number][]) {
+    const isInsidePolygon = (point: [number, number], vs: [number, number][]) => {
       const x = point[0], z = point[1];
       let inside = false;
       for (let k = 0, l = vs.length - 1; k < vs.length; l = k++) {
@@ -296,7 +296,7 @@ export function generateCampusPointData(densityMultiplier: number = 1.0) {
         if (intersect) inside = !inside;
       }
       return inside;
-    }
+    };
 
     const numRoofPoints = Math.floor(bboxArea * surfaceDensity);
     let attempts = 0;
