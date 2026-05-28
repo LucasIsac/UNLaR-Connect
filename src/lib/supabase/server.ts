@@ -70,9 +70,10 @@ export async function getVerifiedSession(): Promise<{
   // Safe to call here because getUser() above already validated the JWT.
   // We extract ONLY the access_token — we do NOT use session.user for auth decisions.
   const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) return null;
 
   return {
     userId: user.id,              // identity from getUser() — server-verified ✅
-    accessToken: session?.access_token ?? "", // JWT for static client Authorization header
+    accessToken: session.access_token, // JWT for static client Authorization header
   };
 }

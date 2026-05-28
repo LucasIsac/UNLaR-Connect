@@ -37,6 +37,7 @@ async function fetchUserProfileUncached(userId: string, accessToken: string): Pr
       const name = authUser.user_metadata?.first_name || authUser.user_metadata?.name || "Estudiante";
       const lastName = authUser.user_metadata?.last_name || "";
       const email = authUser.email || "";
+      const avatarUrl = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null;
 
       const { data: insertedUser, error: insertError } = await db
         .from("users")
@@ -45,6 +46,7 @@ async function fetchUserProfileUncached(userId: string, accessToken: string): Pr
           email: email,
           name: name,
           last_name: lastName,
+          avatar_url: avatarUrl,
           role_id: 2
         })
         .select("*, careers(name)")
@@ -62,6 +64,23 @@ async function fetchUserProfileUncached(userId: string, accessToken: string): Pr
       }
     }
     throw new Error("Usuario no encontrado en la base de datos.");
+  }
+
+  if (!dbUserData.avatar_url) {
+    const { data: authData } = await db.auth.getUser();
+    const authUser = authData?.user;
+    const avatarUrl = authUser?.user_metadata?.avatar_url || authUser?.user_metadata?.picture || null;
+
+    if (avatarUrl) {
+      const { error: avatarError } = await db
+        .from("users")
+        .update({ avatar_url: avatarUrl })
+        .eq("id", userId);
+
+      if (!avatarError) {
+        dbUserData.avatar_url = avatarUrl;
+      }
+    }
   }
 
   const { count: hasSubjects } = await db

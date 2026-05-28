@@ -2,11 +2,22 @@
 
 import { createServerClient } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+
+function getSafeRedirectPath(path?: string) {
+  if (!path || !path.startsWith("/") || path.startsWith("//")) {
+    return "/dashboard";
+  }
+
+  return path;
+}
 
 /**
  * Log in a user using email and password.
  */
-export async function loginAction(data: { email: string; password: string }) {
+export async function loginAction(data: { email: string; password: string; next?: string }) {
+  const redirectPath = getSafeRedirectPath(data.next);
+
   try {
     const supabase = createServerClient();
     const { error } = await supabase.auth.signInWithPassword({
@@ -26,11 +37,12 @@ export async function loginAction(data: { email: string; password: string }) {
     }
 
     revalidatePath("/", "layout");
-    return { success: true };
   } catch (err) {
     console.error(err);
     return { success: false, error: "Hubo un drama al iniciar sesión. Intentalo de nuevo." };
   }
+
+  redirect(redirectPath);
 }
 
 /**

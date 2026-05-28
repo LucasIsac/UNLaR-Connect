@@ -5,18 +5,20 @@ import Link from "next/link";
 import { Menu, Search, Bell, Award, User, LogOut, Settings, Calendar, Trophy, Sparkles, Check, Trash2 } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
 import Logo from "../ui/Logo";
-import { fetchCombinedHeaderData, UserProfileExtended } from "@/actions/perfil";
+import { fetchCombinedHeaderData } from "@/actions/perfil";
+import type { CombinedHeaderData, UserProfileExtended } from "@/actions/perfil";
 import { signOutAction } from "@/actions/auth";
 import { fetchNotificationsAction, markNotificationAsReadAction, markAllNotificationsAsReadAction } from "@/actions/notifications";
 import { DbNotification } from "@/types/database";
 
 type HeaderProps = {
   onMenuToggle: () => void;
+  initialData?: CombinedHeaderData;
 };
 
-export default function Header({ onMenuToggle }: HeaderProps) {
-  const [profile, setProfile] = useState<UserProfileExtended | null>(null);
-  const [notifications, setNotifications] = useState<DbNotification[]>([]);
+export default function Header({ onMenuToggle, initialData }: HeaderProps) {
+  const [profile, setProfile] = useState<UserProfileExtended | null>(initialData?.profile ?? null);
+  const [notifications, setNotifications] = useState<DbNotification[]>(initialData?.notifications ?? []);
   
   // Dropdowns active state
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -30,7 +32,9 @@ export default function Header({ onMenuToggle }: HeaderProps) {
   useEffect(() => {
     let isCancelled = false;
 
-    async function loadData() {
+    async function loadData(attempt = 1) {
+      if (initialData) return;
+
       try {
         const { profile, notifications } = await fetchCombinedHeaderData();
         if (!isCancelled) {
@@ -39,6 +43,9 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         }
       } catch (err) {
         console.error("Error loading header metrics:", err);
+        if (!isCancelled && attempt < 3) {
+          window.setTimeout(() => loadData(attempt + 1), attempt * 350);
+        }
       }
     }
     loadData();
@@ -59,7 +66,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
       isCancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [initialData]);
 
   // Listen for clicks outside dropdown menus
   useEffect(() => {
@@ -111,7 +118,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <header suppressHydrationWarning className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-6 md:px-12 h-16 bg-background/50 backdrop-blur-xl border-b border-border/40 shadow-sm transition-colors duration-300">
+    <header suppressHydrationWarning className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-8 md:px-20 lg:px-28 h-16 bg-background/50 backdrop-blur-xl border-b border-border/40 shadow-sm transition-colors duration-300">
       {/* Left: Brand Logo (desktop) & Mobile toggle */}
       <div suppressHydrationWarning className="flex items-center gap-6 shrink-0">
         {/* Desktop Brand Logo */}
@@ -162,7 +169,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         <Link href="/karma" className="flex items-center gap-1.5 bg-accent/10 border border-accent/20 px-3 py-1.5 rounded-full hover:scale-[1.03] transition-transform duration-200 cursor-pointer select-none">
           <Award className="w-4 h-4 text-accent animate-pulse-slow" />
           <span className="text-xs font-bold text-accent tracking-wide">
-            {profile ? profile.points.toLocaleString() : "2.450"} pts
+            {profile ? profile.points.toLocaleString() : "..."} pts
           </span>
         </Link>
 
@@ -261,16 +268,20 @@ export default function Header({ onMenuToggle }: HeaderProps) {
               setIsProfileOpen(!isProfileOpen);
               setIsNotificationsOpen(false);
             }}
-            className={`w-9 h-9 rounded-xl overflow-hidden border transition-colors shrink-0 ${
+            className={`w-9 h-9 rounded-xl overflow-hidden border transition-colors shrink-0 flex items-center justify-center ${
               isProfileOpen ? "border-accent shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "border-border hover:border-accent"
             }`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              alt="Foto de perfil del alumno"
-              className="w-full h-full object-cover"
-              src={profile?.avatar_url || "https://lh3.googleusercontent.com/aida-public/AB6AXuDG7kZthARJWoPUqDDIShLuxuJGHxPM6eh_dFZ6vUCJpDcMLAVUhwXYCRHRWp4g2EG0IU2Rsbhy6R-fMP4njxS_VptnFuC38SCPJY9SODYThVAvnjbCK1XZUX7gGvY80048nOa5c8BLd-8sEqOcZI_3g6HnpGk6fONgBN98bB6t-7auFl5Er-3QmIJY8I86xD7vDken6cwXb1WU2S_MjlMOmKiKLHNUwHo5JTyGIRJfxWF3gwjqpONgQHZ_ti-F5V9qgMFGH0mCDQ"}
-            />
+            {profile?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                alt="Foto de perfil del alumno"
+                className="w-full h-full object-cover"
+                src={profile.avatar_url}
+              />
+            ) : (
+              <User className="w-4 h-4 text-muted-foreground" />
+            )}
           </button>
 
           {/* Profile options card */}
