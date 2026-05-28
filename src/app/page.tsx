@@ -17,8 +17,8 @@ const NodeCanvas = dynamic(() => import("@/components/landing/NodeCanvas"), {
 });
 
 // Heavy scroll component — code-split
-const DashboardMaterialization = dynamic(
-  () => import("@/components/landing/DashboardMaterialization"),
+const ScreenShowcase = dynamic(
+  () => import("@/components/landing/ScreenShowcase"),
   { ssr: false }
 );
 
@@ -91,9 +91,9 @@ export default function Home() {
         {/* Section 3: Feature Cards */}
         <FeatureShowcase />
 
-        {/* Section 4: Dashboard Materialization (scroll-driven showstopper) */}
+        {/* Section 4: Screen Showcase (scroll-driven showstopper) */}
         <div id="dashboard-preview">
-          <DashboardMaterialization />
+          <ScreenShowcase />
         </div>
 
         {/* Section 5: Final CTA */}
