@@ -40,6 +40,7 @@ import {
 import { DbTutorAvailability, DbPostReply } from "@/types/database";
 import { updateUserProfile, toggleTutorStatus } from "@/actions/perfil";
 import { reactivateAccountAction, signOutAction } from "@/actions/auth";
+import { Select } from "@/components/ui/Select";
 
 type DashboardClientProps = {
   initialStats: DashboardStats;
@@ -1102,16 +1103,17 @@ export default function DashboardClient({
 
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Materia relacionada</label>
-                      <select 
+                      <Select 
                         value={uploadSubjectId}
-                        onChange={(e) => setUploadSubjectId(Number(e.target.value))}
+                        onChange={(val) => setUploadSubjectId(Number(val))}
+                        options={[
+                          { value: 1, label: "Análisis Matemático II" },
+                          { value: 2, label: "Programación II" },
+                          { value: 3, label: "Sistemas Operativos" },
+                          { value: 4, label: "Álgebra" }
+                        ]}
                         className="w-full bg-muted/40 border border-border/40 focus:border-accent rounded-xl px-4 py-2.5 text-sm text-cream-bone focus:outline-none"
-                      >
-                        <option value={1} className="bg-card">Análisis Matemático II</option>
-                        <option value={2} className="bg-card">Programación II</option>
-                        <option value={3} className="bg-card">Sistemas Operativos</option>
-                        <option value={4} className="bg-card">Álgebra</option>
-                      </select>
+                      />
                     </div>
 
                     {/* Drag and Drop Zone Mock */}
@@ -1248,18 +1250,16 @@ export default function DashboardClient({
                     <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
                       ¿Qué carrera estás cursando?
                     </label>
-                    <div className="relative">
-                      <select
-                        value={onboardingCareerId}
-                        onChange={(e) => setOnboardingCareerId(Number(e.target.value))}
-                        className="w-full bg-muted/40 border border-[#534434]/40 focus:border-accent rounded-xl py-3 px-4 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all appearance-none cursor-pointer"
-                      >
-                        <option value={1} className="bg-card text-foreground">Ingeniería en Sistemas de Información (2015)</option>
-                        <option value={2} className="bg-card text-foreground">Licenciatura en Ciencias de la Computación (2020)</option>
-                        <option value={3} className="bg-card text-foreground">Tecnicatura en Informática (2018)</option>
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
+                    <Select
+                      value={onboardingCareerId}
+                      onChange={(val) => setOnboardingCareerId(Number(val))}
+                      options={[
+                        { value: 1, label: "Ingeniería en Sistemas de Información (2015)" },
+                        { value: 2, label: "Licenciatura en Ciencias de la Computación (2020)" },
+                        { value: 3, label: "Tecnicatura en Informática (2018)" }
+                      ]}
+                      className="w-full bg-muted/40 border border-[#534434]/40 rounded-xl py-3 px-4 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all cursor-pointer"
+                    />
                   </div>
 
                   <div className="flex justify-between items-center pt-2">

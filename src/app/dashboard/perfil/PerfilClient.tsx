@@ -33,6 +33,7 @@ import {
   UserProfileExtended
 } from "@/actions/perfil";
 import { DbSubject, DbCareer, DbTutorAvailability } from "@/types/database";
+import { Select } from "@/components/ui/Select";
 
 const DAYS_OF_WEEK = [
   "Domingo",
@@ -881,18 +882,12 @@ export default function PerfilClient({
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Carrera Universitaria</label>
-                  <div className="relative">
-                    <select
-                      value={editCareerId}
-                      onChange={(e) => setEditCareerId(Number(e.target.value))}
-                      className="w-full bg-muted/30 border border-border/40 focus:border-accent rounded-xl py-2.5 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all font-semibold appearance-none cursor-pointer"
-                    >
-                      {careers.map(car => (
-                        <option key={car.id} value={car.id} className="bg-card text-foreground">{car.name}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
+                  <Select
+                    value={editCareerId}
+                    onChange={(val) => setEditCareerId(Number(val))}
+                    options={careers.map(car => ({ value: car.id, label: car.name }))}
+                    className="w-full bg-muted/30 border border-border/40 focus:border-accent rounded-xl py-2.5 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all font-semibold cursor-pointer"
+                  />
                 </div>
               </div>
 
@@ -955,22 +950,20 @@ export default function PerfilClient({
               <form onSubmit={handleAddAvailability} className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Día de la Semana</label>
-                  <div className="relative">
-                    <select
-                      value={scheduleDay}
-                      onChange={(e) => setScheduleDay(Number(e.target.value))}
-                      className="w-full bg-muted/30 border border-border/40 focus:border-accent rounded-xl py-2.5 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all font-semibold appearance-none cursor-pointer"
-                    >
-                      <option value={1} className="bg-card text-foreground">Lunes</option>
-                      <option value={2} className="bg-card text-foreground">Martes</option>
-                      <option value={3} className="bg-card text-foreground">Miércoles</option>
-                      <option value={4} className="bg-card text-foreground">Jueves</option>
-                      <option value={5} className="bg-card text-foreground">Viernes</option>
-                      <option value={6} className="bg-card text-foreground">Sábado</option>
-                      <option value={0} className="bg-card text-foreground">Domingo</option>
-                    </select>
-                    <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
+                  <Select
+                    value={scheduleDay}
+                    onChange={(val) => setScheduleDay(Number(val))}
+                    options={[
+                      { value: 1, label: "Lunes" },
+                      { value: 2, label: "Martes" },
+                      { value: 3, label: "Miércoles" },
+                      { value: 4, label: "Jueves" },
+                      { value: 5, label: "Viernes" },
+                      { value: 6, label: "Sábado" },
+                      { value: 0, label: "Domingo" }
+                    ]}
+                    className="w-full bg-muted/30 border border-border/40 focus:border-accent rounded-xl py-2.5 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all font-semibold cursor-pointer"
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

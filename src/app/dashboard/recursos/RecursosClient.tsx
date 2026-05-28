@@ -32,6 +32,7 @@ import {
   castResourceVote,
   ResourceExtended
 } from "@/actions/recursos";
+import { Select } from "@/components/ui/Select";
 
 const tabs = ["Recientes", "Más Valorados", "Mis Guardados"];
 
@@ -563,44 +564,47 @@ export default function RecursosClient({ initialResources }: RecursosClientProps
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-semibold text-muted-foreground mb-1">Materia</label>
-                          <select
+                          <Select
                             value={newCategory}
-                            onChange={(e) => setNewCategory(e.target.value)}
+                            onChange={(val) => setNewCategory(val)}
+                            options={[
+                              { value: "Sistemas Operativos", label: "Sistemas Operativos" },
+                              { value: "Bases de Datos", label: "Bases de Datos" },
+                              { value: "Paradigmas de Prog.", label: "Paradigmas de Prog." },
+                              { value: "Análisis Matemático II", label: "Análisis Matemático II" }
+                            ]}
                             className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                          >
-                            <option>Sistemas Operativos</option>
-                            <option>Bases de Datos</option>
-                            <option>Paradigmas de Prog.</option>
-                            <option>Análisis Matemático II</option>
-                          </select>
+                          />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-muted-foreground mb-1">Eje Temático</label>
-                          <select
+                          <Select
                             value={newAxis}
-                            onChange={(e) => setNewAxis(e.target.value)}
+                            onChange={(val) => setNewAxis(val)}
+                            options={[
+                              { value: "Gestión de Memoria", label: "Gestión de Memoria" },
+                              { value: "Consultas SQL", label: "Consultas SQL" },
+                              { value: "Integrales Múltiples", label: "Integrales Múltiples" },
+                              { value: "Programación Funcional", label: "Programación Funcional" }
+                            ]}
                             className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                          >
-                            <option>Gestión de Memoria</option>
-                            <option>Consultas SQL</option>
-                            <option>Integrales Múltiples</option>
-                            <option>Programación Funcional</option>
-                          </select>
+                          />
                         </div>
                       </div>
 
                       <div>
                         <label className="block text-xs font-semibold text-muted-foreground mb-1">Tipo de Archivo</label>
-                        <select
+                        <Select
                           value={newType}
-                          onChange={(e) => setNewType(e.target.value)}
-                          className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                        >
-                          <option>Apunte de Teoría</option>
-                          <option>Trabajo Práctico Resuelto</option>
-                          <option>Examen Anterior</option>
-                          <option>Otro</option>
-                        </select>
+                          onChange={(val) => setNewType(val)}
+                          options={[
+                            { value: "Apunte de Teoría", label: "Apunte de Teoría" },
+                            { value: "Trabajo Práctico Resuelto", label: "Trabajo Práctico Resuelto" },
+                            { value: "Examen Anterior", label: "Examen Anterior" },
+                            { value: "Otro", label: "Otro" }
+                          ]}
+                          className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-3 text-xs text-cream-bone focus:outline-none focus:ring-1 focus:ring-accent transition-all"
+                        />
                       </div>
 
                       {/* Dashed Drag & Drop simulator */}

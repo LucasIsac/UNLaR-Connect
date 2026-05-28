@@ -35,6 +35,7 @@ import {
   ForumPostExtended
 } from "@/actions/foros";
 import { DbPostReply } from "@/types/database";
+import { Select } from "@/components/ui/Select";
 
 const MOCK_USER_ID = "123e4567-e89b-12d3-a456-426614174000";
 
@@ -647,30 +648,32 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                     <label className="block text-xs font-semibold text-muted-foreground mb-1">
                       Materia / Cátedra
                     </label>
-                    <select
+                    <Select
                       value={newSubject}
-                      onChange={(e) => setNewSubject(e.target.value)}
+                      onChange={(val) => setNewSubject(val)}
+                      options={[
+                        { value: "Análisis Matemático II", label: "Análisis Matemático II" },
+                        { value: "Programación II", label: "Programación II" },
+                        { value: "Algoritmos y Estructuras de Datos", label: "Algoritmos y Estructuras de Datos" },
+                        { value: "Sistemas Operativos", label: "Sistemas Operativos" }
+                      ]}
                       className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                    >
-                      <option>Análisis Matemático II</option>
-                      <option>Programación II</option>
-                      <option>Algoritmos y Estructuras de Datos</option>
-                      <option>Sistemas Operativos</option>
-                    </select>
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-muted-foreground mb-1">
                       Categoría
                     </label>
-                    <select
+                    <Select
                       value={newCategory}
-                      onChange={(e) => setNewCategory(e.target.value)}
+                      onChange={(val) => setNewCategory(val)}
+                      options={[
+                        { value: "Duda Técnica", label: "Duda Técnica" },
+                        { value: "Consejo de Cursada", label: "Consejo de Cursada" },
+                        { value: "Ayuda con TP", label: "Ayuda con TP" }
+                      ]}
                       className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                    >
-                      <option>Duda Técnica</option>
-                      <option>Consejo de Cursada</option>
-                      <option>Ayuda con TP</option>
-                    </select>
+                    />
                   </div>
                 </div>
 
