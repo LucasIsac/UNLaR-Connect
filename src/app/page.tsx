@@ -3,8 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import SmoothScroll from "@/components/ui/SmoothScroll";
-import HeroVoid from "@/components/landing/HeroVoid";
-import FeatureShowcase from "@/components/landing/FeatureShowcase";
+import UniConnectHero from "@/components/landing/UniConnectHero";
 import FinalCTA from "@/components/landing/FinalCTA";
 import Footer from "@/components/layout/Footer";
 import { CONFIG } from "@/lib/constants";
@@ -16,9 +15,9 @@ const NodeCanvas = dynamic(() => import("@/components/landing/NodeCanvas"), {
   ssr: false,
 });
 
-// Heavy scroll component — code-split
-const DashboardMaterialization = dynamic(
-  () => import("@/components/landing/DashboardMaterialization"),
+// Unified scroll-driven feature showcase component — code-split
+const ScreenShowcase = dynamic(
+  () => import("@/components/landing/ScreenShowcase"),
   { ssr: false }
 );
 
@@ -83,17 +82,13 @@ export default function Home() {
       </div>
 
 
-      {/* Page content - all sections */}
-      <main className="relative pt-24">
-        {/* Section 1+2: The Void + Hero Headline */}
-        <HeroVoid />
+      <main className="relative">
+        {/* Section 1+2: 3D Point Cloud Hero + Headline */}
+        <UniConnectHero />
 
-        {/* Section 3: Feature Cards */}
-        <FeatureShowcase />
-
-        {/* Section 4: Dashboard Materialization (scroll-driven showstopper) */}
-        <div id="dashboard-preview">
-          <DashboardMaterialization />
+        {/* Section 3: Unified Scroll-driven Screen & Feature Showcase */}
+        <div id="features">
+          <ScreenShowcase />
         </div>
 
         {/* Section 5: Final CTA */}

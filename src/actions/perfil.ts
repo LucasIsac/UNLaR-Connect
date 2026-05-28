@@ -1,135 +1,99 @@
 "use server";
 
-import { supabase } from "@/lib/supabase";
+import { createServerClient, createStaticClient, getVerifiedSession } from "@/lib/supabase";
 import { 
   DbUser, 
   DbTutorAvailability, 
   DbSubject, 
-  DbCareer 
+  DbCareer,
+  DbNotification
 } from "@/types/database";
-
-// Cast supabase to any to prevent compiler errors for undefined database clients during development
-const db = supabase as any;
+import { unstable_cache } from "next/cache";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 
 export interface UserProfileExtended extends DbUser {
   careerName?: string;
-  isTutorActive: boolean; // Virtual field determining if tutor status is enabled
+  isTutorActive: boolean;
 }
 
-// ==========================================
-// 🗄️ PERSISTENT MOCK STATE FOR DEVELOPMENT
-// Matches the structure and points of Alejandro Garcia
-// ==========================================
+/**
+ * UNCACHED: Fetch complete profile detail for the current student
+ */
+async function fetchUserProfileUncached(userId: string, accessToken: string): Promise<UserProfileExtended> {
+  const db = createStaticClient(accessToken);
 
-const MOCK_USER_ID = "123e4567-e89b-12d3-a456-426614174000";
+  const { data: dbUserData, error: userError } = await db
+    .from("users")
+    .select("*, careers(name)")
+    .eq("id", userId)
+    .single();
 
-let mockUser: DbUser = {
-  id: MOCK_USER_ID,
-  role_id: 2, // 2 = Estudiante, 3 = Tutor/Estudiante
-  career_id: 1, // Ing. en Sistemas de Información
-  name: "Alejandro",
-  last_name: "Garcia",
-  email: "ale.garcia@unlar.edu.ar",
-  is_unlar_member: true,
-  points: 2450,
-  tutor_rating: 4.8,
-  total_reviews: 15,
-  created_at: new Date().toISOString()
-};
+  if (userError || !dbUserData) {
+    console.log(`[Cache Self-Heal] User ${userId} not found in public.users. Attempting to restore...`);
+    const { data: authData } = await db.auth.getUser();
+    const authUser = authData?.user;
+    
+    if (authUser) {
+      const name = authUser.user_metadata?.first_name || authUser.user_metadata?.name || "Estudiante";
+      const lastName = authUser.user_metadata?.last_name || "";
+      const email = authUser.email || "";
 
-let mockTutorActive = true;
+      const { data: insertedUser, error: insertError } = await db
+        .from("users")
+        .insert({
+          id: userId,
+          email: email,
+          name: name,
+          last_name: lastName,
+          role_id: 2
+        })
+        .select("*, careers(name)")
+        .single();
 
-const MOCK_CAREERS: DbCareer[] = [
-  { id: 1, name: "Ingeniería en Sistemas de Información", plan_study: "2015" },
-  { id: 2, name: "Licenciatura en Ciencias de la Computación", plan_study: "2020" },
-  { id: 3, name: "Tecnicatura en Informática", plan_study: "2018" }
-];
-
-const MOCK_SUBJECTS: DbSubject[] = [
-  { id: 1, name: "Análisis Matemático I", year: 1 },
-  { id: 2, name: "Análisis Matemático II", year: 2 },
-  { id: 3, name: "Programación I", year: 1 },
-  { id: 4, name: "Programación II", year: 2 },
-  { id: 5, name: "Paradigmas de Programación", year: 3 },
-  { id: 6, name: "Sistemas Operativos", year: 3 },
-  { id: 7, name: "Bases de Datos", year: 3 },
-  { id: 8, name: "Álgebra", year: 1 },
-  { id: 9, name: "Física I", year: 1 },
-  { id: 10, name: "Ingeniería de Software", year: 4 }
-];
-
-// Active subjects Alejandro is teaching
-let mockTutorSubjects: number[] = [2, 4]; // Análisis Matemático II and Programación II
-
-// Weekly schedule availability
-let mockAvailability: DbTutorAvailability[] = [
-  {
-    id: 1,
-    tutor_id: MOCK_USER_ID,
-    day_of_week: 1, // Lunes
-    start_time: "18:30",
-    end_time: "20:00"
-  },
-  {
-    id: 2,
-    tutor_id: MOCK_USER_ID,
-    day_of_week: 3, // Miércoles
-    start_time: "16:00",
-    end_time: "18:00"
+      if (!insertError && insertedUser) {
+        console.log(`[Cache Self-Heal] User ${userId} successfully created in public.users.`);
+        return {
+          ...insertedUser,
+          careerName: insertedUser.careers?.name,
+          isTutorActive: false
+        };
+      } else {
+        console.error(`[Cache Self-Heal] Failed to auto-create user in public.users:`, insertError);
+      }
+    }
+    throw new Error("Usuario no encontrado en la base de datos.");
   }
-];
 
-// ==========================================
-// 🚀 SERVER ACTIONS (SUPABASE READY)
-// ==========================================
+  const { count: hasSubjects } = await db
+    .from("tutor_subjects")
+    .select("*", { count: "exact", head: true })
+    .eq("tutor_id", userId);
+
+  return {
+    ...dbUserData,
+    careerName: dbUserData.careers?.name,
+    isTutorActive: (hasSubjects || 0) > 0 || dbUserData.role_id === 3
+  };
+}
 
 /**
- * Fetch complete profile detail for the current student
+ * Fetch complete profile detail for the current student (CACHED)
  */
 export async function fetchUserProfile(): Promise<UserProfileExtended> {
-  // Artificial delay to exhibit our modern skeleton UI
-  await new Promise(resolve => setTimeout(resolve, 800));
+  const session = await getVerifiedSession();
+  if (!session) throw new Error("No estás autenticado/a.");
 
-  const USE_REAL_DATABASE = false; // Set to true to switch to live Supabase db
-  if (USE_REAL_DATABASE) {
-    try {
-      const authUserResponse = await db.auth.getUser();
-      const authUser = authUserResponse?.data?.user;
+  const { userId, accessToken } = session;
+  console.log(`[Cache Access] fetchUserProfile for user: ${userId}`);
 
-      if (authUser) {
-        // Fetch user matching architecture users schema
-        const { data: dbUserData, error: userError } = await db
-          .from("users")
-          .select("*, careers(name)")
-          .eq("id", authUser.id)
-          .single();
-
-        if (!userError && dbUserData) {
-          // Check if user has tutor subjects or availability
-          const { count: hasSubjects } = await db
-            .from("tutor_subjects")
-            .select("*", { count: "exact", head: true })
-            .eq("tutor_id", authUser.id);
-
-          return {
-            ...dbUserData,
-            careerName: dbUserData.careers?.name,
-            isTutorActive: (hasSubjects || 0) > 0 || dbUserData.role_id === 3
-          };
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching profile from Supabase:", err);
+  return unstable_cache(
+    async () => fetchUserProfileUncached(userId, accessToken),
+    ["user-profile", userId],
+    {
+      tags: [CACHE_TAGS.userProfile(userId)],
+      revalidate: 86400
     }
-  }
-
-  // Fallback to local mock state
-  const career = MOCK_CAREERS.find(c => c.id === mockUser.career_id);
-  return {
-    ...mockUser,
-    careerName: career ? career.name : "Ingeniería en Sistemas de Información",
-    isTutorActive: mockTutorActive
-  };
+  )();
 }
 
 /**
@@ -142,70 +106,43 @@ export async function updateUserProfile(
   avatarUrl?: string
 ): Promise<{ success: boolean; data?: UserProfileExtended; error?: string }> {
   try {
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    if (!name.trim() || !lastName.trim()) {
-      return { success: false, error: "El nombre y apellido no pueden quedar vacíos." };
+    if (!name.trim()) {
+      return { success: false, error: "El nombre no puede quedar vacío." };
     }
 
-    const USE_REAL_DATABASE = false;
-    if (USE_REAL_DATABASE) {
-      try {
-        const authUserResponse = await db.auth.getUser();
-        const authUser = authUserResponse?.data?.user;
+    const db = createServerClient();
+    const authUserResponse = await db.auth.getUser();
+    const authUser = authUserResponse?.data?.user;
 
-        if (authUser) {
-          const { error } = await db
-            .from("users")
-            .update({
-              name: name.trim(),
-              last_name: lastName.trim(),
-              career_id: careerId
-            })
-            .eq("id", authUser.id);
-
-          if (error) throw error;
-
-          // Fetch career name and updated details
-          const { data: dbUserData, error: getError } = await db
-            .from("users")
-            .select("*, careers(name)")
-            .eq("id", authUser.id)
-            .single();
-
-          if (!getError && dbUserData) {
-            return {
-              success: true,
-              data: {
-                ...dbUserData,
-                careerName: dbUserData.careers?.name,
-                isTutorActive: dbUserData.role_id === 3
-              }
-            };
-          }
-        }
-      } catch (err) {
-        console.error("Error updating user profile in Supabase:", err);
-        return { success: false, error: "Hubo un error al actualizar los datos en Supabase." };
-      }
+    if (!authUser) {
+      return { success: false, error: "No estás autenticado/a." };
     }
 
-    // Mutate mock state
-    mockUser.name = name.trim();
-    mockUser.last_name = lastName.trim();
-    mockUser.career_id = careerId;
-
-    const career = MOCK_CAREERS.find(c => c.id === careerId);
-    const updated: UserProfileExtended = {
-      ...mockUser,
-      careerName: career ? career.name : "Ingeniería en Sistemas de Información",
-      isTutorActive: mockTutorActive
+    const updatePayload: any = {
+      name: name.trim(),
+      last_name: lastName.trim(),
+      career_id: careerId
     };
 
+    if (avatarUrl !== undefined) {
+      updatePayload.avatar_url = avatarUrl;
+    }
+
+    const { error } = await db
+      .from("users")
+      .update(updatePayload)
+      .eq("id", authUser.id);
+
+    if (error) throw error;
+
+    invalidateCache(CACHE_TAGS.userProfile(authUser.id));
+    invalidateCache(CACHE_TAGS.dashboardStats(authUser.id));
+
+    const updated = await fetchUserProfile();
     return { success: true, data: updated };
-  } catch (err) {
-    console.error("Error updating profile:", err);
-    return { success: false, error: "Tuvimos un drama al guardar tu información personal." };
+  } catch (err: any) {
+    console.error("Error updating user profile in Supabase:", err);
+    return { success: false, error: err.message || "Hubo un error al actualizar los datos en Supabase." };
   }
 }
 
@@ -216,70 +153,67 @@ export async function toggleTutorStatus(
   active: boolean
 ): Promise<{ success: boolean; isTutorActive: boolean; error?: string }> {
   try {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const USE_REAL_DATABASE = false;
-    if (USE_REAL_DATABASE) {
-      try {
-        const authUserResponse = await db.auth.getUser();
-        const authUser = authUserResponse?.data?.user;
+    const db = createServerClient();
+    const authUserResponse = await db.auth.getUser();
+    const authUser = authUserResponse?.data?.user;
 
-        if (authUser) {
-          const { error } = await db
-            .from("users")
-            .update({ role_id: active ? 3 : 2 }) // 3 represents Tutor, 2 represents regular student
-            .eq("id", authUser.id);
-
-          if (error) throw error;
-          
-          return { success: true, isTutorActive: active };
-        }
-      } catch (err) {
-        console.error("Error toggling tutor status in Supabase:", err);
-        return { success: false, isTutorActive: !active, error: "No se pudo cambiar el estado de tutor en base de datos." };
-      }
+    if (!authUser) {
+      return { success: false, isTutorActive: !active, error: "No estás autenticado/a." };
     }
 
-    // Mutate mock state
-    mockTutorActive = active;
-    mockUser.role_id = active ? 3 : 2; 
+    const { error } = await db
+      .from("users")
+      .update({ role_id: active ? 3 : 2 }) // 3 = Tutor, 2 = Estudiante
+      .eq("id", authUser.id);
 
+    if (error) throw error;
+
+    invalidateCache(CACHE_TAGS.userProfile(authUser.id));
+    invalidateCache(CACHE_TAGS.dashboardStats(authUser.id));
+    
     return { success: true, isTutorActive: active };
-  } catch (err) {
-    console.error("Error toggling tutor status:", err);
-    return { success: false, isTutorActive: !active, error: "No pudimos modificar tu estado de tutor." };
+  } catch (err: any) {
+    console.error("Error toggling tutor status in Supabase:", err);
+    return { success: false, isTutorActive: !active, error: err.message || "No se pudo cambiar el estado de tutor." };
   }
 }
 
 /**
- * Fetch subjects student is registered to teach
+ * UNCACHED: Fetch subjects student is registered to teach
  */
-export async function fetchTutorSubjects(): Promise<DbSubject[]> {
-  await new Promise(resolve => setTimeout(resolve, 400));
+async function fetchTutorSubjectsUncached(userId: string, accessToken: string): Promise<DbSubject[]> {
+  const db = createStaticClient(accessToken);
+  const { data, error } = await db
+    .from("tutor_subjects")
+    .select("subjects(*)")
+    .eq("tutor_id", userId);
   
-  const USE_REAL_DATABASE = false;
-  if (USE_REAL_DATABASE) {
-    try {
-      const authUserResponse = await db.auth.getUser();
-      const authUser = authUserResponse?.data?.user;
-
-      if (authUser) {
-        const { data } = await db
-          .from("tutor_subjects")
-          .select("subjects(*)")
-          .eq("tutor_id", authUser.id);
-        
-        if (data) {
-          return data.map((item: any) => item.subjects);
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching tutor subjects from Supabase:", err);
-    }
+  if (error) {
+    console.error("Error fetching tutor subjects from Supabase:", error);
+    return [];
   }
 
-  // Filter mock subjects matching IDs
-  return MOCK_SUBJECTS.filter(s => mockTutorSubjects.includes(s.id));
+  return (data || []).map((item: any) => item.subjects).filter(Boolean);
+}
+
+/**
+ * Fetch subjects student is registered to teach (CACHED)
+ */
+export async function fetchTutorSubjects(): Promise<DbSubject[]> {
+  const session = await getVerifiedSession();
+  if (!session) return [];
+
+  const { userId, accessToken } = session;
+  console.log(`[Cache Access] fetchTutorSubjects for user: ${userId}`);
+
+  return unstable_cache(
+    async () => fetchTutorSubjectsUncached(userId, accessToken),
+    ["tutor-subjects", userId],
+    {
+      tags: [CACHE_TAGS.tutorSubjects(userId)],
+      revalidate: 86400
+    }
+  )();
 }
 
 /**
@@ -289,59 +223,40 @@ export async function addTutorSubject(
   subjectId: number
 ): Promise<{ success: boolean; data?: DbSubject[]; error?: string }> {
   try {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const db = createServerClient();
+    const authUserResponse = await db.auth.getUser();
+    const authUser = authUserResponse?.data?.user;
 
-    const USE_REAL_DATABASE = false;
-    if (USE_REAL_DATABASE) {
-      try {
-        const authUserResponse = await db.auth.getUser();
-        const authUser = authUserResponse?.data?.user;
-
-        if (authUser) {
-          // Double check if already registered
-          const { count } = await db
-            .from("tutor_subjects")
-            .select("*", { count: "exact", head: true })
-            .eq("tutor_id", authUser.id)
-            .eq("subject_id", subjectId);
-
-          if ((count || 0) > 0) {
-            return { success: false, error: "Ya estás dictando esta materia." };
-          }
-
-          const { error } = await db
-            .from("tutor_subjects")
-            .insert({ tutor_id: authUser.id, subject_id: subjectId });
-          
-          if (error) throw error;
-
-          // Fetch updated subjects
-          const { data } = await db
-            .from("tutor_subjects")
-            .select("subjects(*)")
-            .eq("tutor_id", authUser.id);
-          
-          if (data) {
-            return { success: true, data: data.map((item: any) => item.subjects) };
-          }
-        }
-      } catch (err) {
-        console.error("Error adding tutor subject in Supabase:", err);
-        return { success: false, error: "Tuvimos un error al insertar la materia en Supabase." };
-      }
+    if (!authUser) {
+      return { success: false, error: "No estás autenticado/a." };
     }
 
-    // Mock Fallback
-    if (mockTutorSubjects.includes(subjectId)) {
+    const { count, error: countError } = await db
+      .from("tutor_subjects")
+      .select("*", { count: "exact", head: true })
+      .eq("tutor_id", authUser.id)
+      .eq("subject_id", subjectId);
+
+    if (countError) throw countError;
+
+    if ((count || 0) > 0) {
       return { success: false, error: "Ya estás dictando esta materia." };
     }
 
-    mockTutorSubjects.push(subjectId);
-    const updatedList = MOCK_SUBJECTS.filter(s => mockTutorSubjects.includes(s.id));
-    return { success: true, data: updatedList };
-  } catch (err) {
-    console.error("Error adding tutor subject:", err);
-    return { success: false, error: "No se pudo vincular la materia." };
+    const { error: insertError } = await db
+      .from("tutor_subjects")
+      .insert({ tutor_id: authUser.id, subject_id: subjectId });
+    
+    if (insertError) throw insertError;
+
+    invalidateCache(CACHE_TAGS.tutorSubjects(authUser.id));
+    invalidateCache(CACHE_TAGS.userProfile(authUser.id));
+
+    const freshSubjects = await fetchTutorSubjects();
+    return { success: true, data: freshSubjects };
+  } catch (err: any) {
+    console.error("Error adding tutor subject in Supabase:", err);
+    return { success: false, error: err.message || "Tuvimos un error al vincular la materia." };
   }
 }
 
@@ -352,77 +267,71 @@ export async function removeTutorSubject(
   subjectId: number
 ): Promise<{ success: boolean; data?: DbSubject[]; error?: string }> {
   try {
-    await new Promise(resolve => setTimeout(resolve, 400));
+    const db = createServerClient();
+    const authUserResponse = await db.auth.getUser();
+    const authUser = authUserResponse?.data?.user;
 
-    const USE_REAL_DATABASE = false;
-    if (USE_REAL_DATABASE) {
-      try {
-        const authUserResponse = await db.auth.getUser();
-        const authUser = authUserResponse?.data?.user;
-
-        if (authUser) {
-          const { error } = await db
-            .from("tutor_subjects")
-            .delete()
-            .eq("tutor_id", authUser.id)
-            .eq("subject_id", subjectId);
-          
-          if (error) throw error;
-
-          // Fetch updated list
-          const { data } = await db
-            .from("tutor_subjects")
-            .select("subjects(*)")
-            .eq("tutor_id", authUser.id);
-          
-          if (data) {
-            return { success: true, data: data.map((item: any) => item.subjects) };
-          }
-        }
-      } catch (err) {
-        console.error("Error removing tutor subject in Supabase:", err);
-        return { success: false, error: "No se pudo remover la materia de Supabase." };
-      }
+    if (!authUser) {
+      return { success: false, error: "No estás autenticado/a." };
     }
 
-    // Mock fallback
-    mockTutorSubjects = mockTutorSubjects.filter(id => id !== subjectId);
-    const updatedList = MOCK_SUBJECTS.filter(s => mockTutorSubjects.includes(s.id));
-    return { success: true, data: updatedList };
-  } catch (err) {
-    console.error("Error removing tutor subject:", err);
-    return { success: false, error: "No se pudo desvincular la materia." };
+    const { error: deleteError } = await db
+      .from("tutor_subjects")
+      .delete()
+      .eq("tutor_id", authUser.id)
+      .eq("subject_id", subjectId);
+    
+    if (deleteError) throw deleteError;
+
+    invalidateCache(CACHE_TAGS.tutorSubjects(authUser.id));
+    invalidateCache(CACHE_TAGS.userProfile(authUser.id));
+
+    const freshSubjects = await fetchTutorSubjects();
+    return { success: true, data: freshSubjects };
+  } catch (err: any) {
+    console.error("Error removing tutor subject in Supabase:", err);
+    return { success: false, error: err.message || "No se pudo desvincular la materia de base de datos." };
   }
 }
 
 /**
- * Fetch tutor schedule availability
+ * UNCACHED: Fetch tutor schedule availability
  */
-export async function fetchTutorAvailability(): Promise<DbTutorAvailability[]> {
-  await new Promise(resolve => setTimeout(resolve, 400));
+async function fetchTutorAvailabilityUncached(userId: string, accessToken: string): Promise<DbTutorAvailability[]> {
+  const db = createStaticClient(accessToken);
+  const { data, error } = await db
+    .from("tutor_availability")
+    .select("*")
+    .eq("tutor_id", userId)
+    .order("day_of_week", { ascending: true })
+    .order("start_time", { ascending: true });
 
-  const USE_REAL_DATABASE = false;
-  if (USE_REAL_DATABASE) {
-    try {
-      const authUserResponse = await db.auth.getUser();
-      const authUser = authUserResponse?.data?.user;
-
-      if (authUser) {
-        const { data } = await db
-          .from("tutor_availability")
-          .select("*")
-          .eq("tutor_id", authUser.id)
-          .order("day_of_week", { ascending: true })
-          .order("start_time", { ascending: true });
-        
-        if (data) return data;
-      }
-    } catch (err) {
-      console.error("Error fetching availability from Supabase:", err);
-    }
+  if (error) {
+    console.error("Error fetching availability from Supabase:", error);
+    return [];
   }
 
-  return mockAvailability;
+  return data || [];
+}
+
+/**
+ * Fetch tutor schedule availability (CACHED)
+ */
+export async function fetchTutorAvailability(): Promise<DbTutorAvailability[]> {
+  const session = await getVerifiedSession();
+  if (!session) return [];
+
+  const { userId, accessToken } = session;
+  console.log(`[Cache Access] fetchTutorAvailability for user: ${userId}`);
+
+  return unstable_cache(
+    async () => fetchTutorAvailabilityUncached(userId, accessToken),
+    ["tutor-availability", userId],
+    {
+      tags: [CACHE_TAGS.tutorAvailability(userId)],
+      revalidate: 86400
+    }
+  )();
 }
 
 /**
@@ -432,79 +341,158 @@ export async function saveTutorAvailability(
   availabilityList: DbTutorAvailability[]
 ): Promise<{ success: boolean; data?: DbTutorAvailability[]; error?: string }> {
   try {
-    await new Promise(resolve => setTimeout(resolve, 600));
+    const db = createServerClient();
+    const authUserResponse = await db.auth.getUser();
+    const authUser = authUserResponse?.data?.user;
 
-    const USE_REAL_DATABASE = false;
-    if (USE_REAL_DATABASE) {
-      try {
-        const authUserResponse = await db.auth.getUser();
-        const authUser = authUserResponse?.data?.user;
-
-        if (authUser) {
-          // Clear all previous slots
-          const { error: deleteError } = await db
-            .from("tutor_availability")
-            .delete()
-            .eq("tutor_id", authUser.id);
-          
-          if (deleteError) throw deleteError;
-
-          // Insert new slots if list is not empty
-          if (availabilityList.length > 0) {
-            const insertData = availabilityList.map(slot => ({
-              tutor_id: authUser.id,
-              day_of_week: slot.day_of_week,
-              start_time: slot.start_time,
-              end_time: slot.end_time
-            }));
-            const { error: insertError } = await db
-              .from("tutor_availability")
-              .insert(insertData);
-            if (insertError) throw insertError;
-          }
-
-          // Fetch updated schedule slots
-          const { data } = await db
-            .from("tutor_availability")
-            .select("*")
-            .eq("tutor_id", authUser.id)
-            .order("day_of_week", { ascending: true })
-            .order("start_time", { ascending: true });
-          
-          if (data) return { success: true, data };
-        }
-      } catch (err) {
-        console.error("Error saving availability in Supabase:", err);
-        return { success: false, error: "No se pudo guardar la agenda de disponibilidad en Supabase." };
-      }
+    if (!authUser) {
+      return { success: false, error: "No estás autenticado/a." };
     }
 
-    // Map availability to mock storage
-    mockAvailability = availabilityList.map((slot, index) => ({
-      id: slot.id || index + 1,
-      tutor_id: MOCK_USER_ID,
-      day_of_week: slot.day_of_week,
-      start_time: slot.start_time,
-      end_time: slot.end_time
-    }));
+    const { error: deleteError } = await db
+      .from("tutor_availability")
+      .delete()
+      .eq("tutor_id", authUser.id);
+    
+    if (deleteError) throw deleteError;
 
-    return { success: true, data: mockAvailability };
-  } catch (err) {
-    console.error("Error saving availability:", err);
-    return { success: false, error: "No se pudo guardar la agenda de horarios." };
+    if (availabilityList.length > 0) {
+      const insertData = availabilityList.map(slot => ({
+        tutor_id: authUser.id,
+        day_of_week: slot.day_of_week,
+        start_time: slot.start_time,
+        end_time: slot.end_time
+      }));
+
+      const { error: insertError } = await db
+        .from("tutor_availability")
+        .insert(insertData);
+    
+      if (insertError) throw insertError;
+    }
+
+    invalidateCache(CACHE_TAGS.tutorAvailability(authUser.id));
+
+    const fresh = await fetchTutorAvailability();
+    return { success: true, data: fresh };
+  } catch (err: any) {
+    console.error("Error saving availability in Supabase:", err);
+    return { success: false, error: err.message || "No se pudo guardar la agenda de disponibilidad." };
   }
 }
 
 /**
- * Fetch official list of careers for dropdown selection
+ * UNCACHED: Fetch official list of careers for dropdown selection
  */
-export async function fetchCareers(): Promise<DbCareer[]> {
-  return MOCK_CAREERS;
+async function fetchCareersUncached(accessToken: string): Promise<DbCareer[]> {
+  const db = createStaticClient(accessToken);
+  const { data, error } = await db
+    .from("careers")
+    .select("*")
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching careers from Supabase:", error);
+    return [];
+  }
+
+  return data || [];
 }
 
 /**
- * Fetch all official college subjects
+ * Fetch official list of careers for dropdown selection (CACHED)
+ */
+export async function fetchCareers(): Promise<DbCareer[]> {
+  const session = await getVerifiedSession();
+  const accessToken = session?.accessToken ?? "";
+
+  console.log("[Cache Access] fetchCareers");
+
+  return unstable_cache(
+    async () => fetchCareersUncached(accessToken),
+    ["careers-list"],
+    {
+      tags: [CACHE_TAGS.careersList],
+      revalidate: 86400
+    }
+  )();
+}
+
+/**
+ * UNCACHED: Fetch all official college subjects
+ */
+async function fetchSubjectsUncached(accessToken: string): Promise<DbSubject[]> {
+  const db = createStaticClient(accessToken);
+  const { data, error } = await db
+    .from("subjects")
+    .select("*")
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching subjects from Supabase:", error);
+    return [];
+  }
+
+  return data || [];
+}
+
+/**
+ * Fetch all official college subjects (CACHED)
  */
 export async function fetchSubjects(): Promise<DbSubject[]> {
-  return MOCK_SUBJECTS;
+  const session = await getVerifiedSession();
+  const accessToken = session?.accessToken ?? "";
+
+  console.log("[Cache Access] fetchSubjects");
+
+  return unstable_cache(
+    async () => fetchSubjectsUncached(accessToken),
+    ["subjects-list"],
+    {
+      tags: [CACHE_TAGS.subjectsList],
+      revalidate: 86400
+    }
+  )();
+}
+
+export interface CombinedHeaderData {
+  profile: UserProfileExtended;
+  notifications: DbNotification[];
+}
+
+/**
+ * Fetch both user profile and notifications in a single optimized Server Action call.
+ */
+export async function fetchCombinedHeaderData(): Promise<CombinedHeaderData> {
+  const session = await getVerifiedSession();
+  if (!session) throw new Error("No estás autenticado/a.");
+
+  const { userId, accessToken } = session;
+  console.log(`[Combined Cache Access] fetchCombinedHeaderData for user: ${userId}`);
+
+  const [profile, notifications] = await Promise.all([
+    unstable_cache(
+      async () => fetchUserProfileUncached(userId, accessToken),
+      ["user-profile", userId],
+      {
+        tags: [CACHE_TAGS.userProfile(userId)],
+        revalidate: 86400
+      }
+    )(),
+    (async () => {
+      const db = createStaticClient(accessToken);
+      const { data, error } = await db
+        .from("notifications")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.error("Error fetching header notifications:", error);
+        return [];
+      }
+      return data || [];
+    })()
+  ]);
+
+  return { profile, notifications };
 }

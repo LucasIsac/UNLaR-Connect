@@ -127,24 +127,7 @@
     transform: translateY(-1px);
   }
 
-  /* Custom Premium Scrollbar for both dark and light modes */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.25);
-    border-radius: 9999px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--accent) / 0.5);
-  }
+
   
   /* Text gradients for special items (e.g. Asistente IA) */
   .text-gradient-ai {
@@ -211,5 +194,93 @@
 ::view-transition-new(root) {
   z-index: 9999;
 }
+
+/* ==========================================
+   GLOBAL SCROLLBAR PREMIUM STYLING
+   Must reside outside Tailwind @layer blocks
+   to prevent preflight reset overrides.
+   ========================================== */
+
+/* ==========================================
+   GLOBAL SCROLLBAR PREMIUM STYLING
+   Must reside outside Tailwind @layer blocks
+   to prevent preflight reset overrides.
+   ========================================== */
+
+/* 1. Scrollbar Container Dimensions (Chrome, Safari, Edge, Opera) */
+::-webkit-scrollbar,
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+main::-webkit-scrollbar,
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+  display: block !important;
+}
+
+/* 2. Scrollbar Track (Empty area) */
+::-webkit-scrollbar-track,
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track,
+main::-webkit-scrollbar-track,
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+/* 3. Scrollbar Thumb - Light Theme (Default) */
+::-webkit-scrollbar-thumb,
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
+main::-webkit-scrollbar-thumb,
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #DCD7D0 !important;
+  border-radius: 9999px !important;
+  border: 1px solid transparent !important; /* Prevents rendering artifacts */
+  background-clip: padding-box !important;
+}
+
+/* 4. Scrollbar Thumb Hover - Light Theme (Default) */
+::-webkit-scrollbar-thumb:hover,
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover,
+main::-webkit-scrollbar-thumb:hover,
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #F6CB81 !important;
+}
+
+/* 5. Scrollbar Thumb - Dark Theme */
+.dark::-webkit-scrollbar-thumb,
+.dark ::-webkit-scrollbar-thumb,
+html.dark::-webkit-scrollbar-thumb,
+html.dark ::-webkit-scrollbar-thumb,
+body.dark::-webkit-scrollbar-thumb,
+body.dark ::-webkit-scrollbar-thumb,
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #312B25 !important;
+}
+
+/* 6. Scrollbar Thumb Hover - Dark Theme */
+.dark::-webkit-scrollbar-thumb:hover,
+.dark ::-webkit-scrollbar-thumb:hover,
+html.dark::-webkit-scrollbar-thumb:hover,
+html.dark ::-webkit-scrollbar-thumb:hover,
+body.dark::-webkit-scrollbar-thumb:hover,
+body.dark ::-webkit-scrollbar-thumb:hover,
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #80540A !important;
+}
+
+/* 7. Firefox-only Scrollbar Styling (using -moz-appearance to avoid Chrome 121+ conflicts) */
+@supports (-moz-appearance: none) {
+  * {
+    scrollbar-width: thin !important;
+    scrollbar-color: #DCD7D0 transparent !important;
+  }
+  .dark *,
+  html.dark * {
+    scrollbar-color: #312B25 transparent !important;
+  }
+}
+
 
 

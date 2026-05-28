@@ -30,6 +30,7 @@ export default function RootLayout({
     <html lang="es" className={`${inter.variable} ${montserrat.variable}`} suppressHydrationWarning>
       <head>
         <script
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
@@ -50,7 +51,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="font-sans antialiased custom-scrollbar">
+      <body className="font-sans antialiased custom-scrollbar" suppressHydrationWarning>
         <ThemeProvider>
           {children}
           <LogoSwitcher />

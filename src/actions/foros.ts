@@ -1,7 +1,9 @@
 "use server";
 
-import { supabase } from "@/lib/supabase";
-import { DbPost, DbPostReply, DbSubject } from "@/types/database";
+import { createServerClient, createStaticClient, getVerifiedSession } from "@/lib/supabase";
+import { DbPost, DbPostReply } from "@/types/database";
+import { unstable_cache } from "next/cache";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 
 export interface ForumPostExtended extends DbPost {
   subjectName?: string;
@@ -20,128 +22,81 @@ export interface ForumPostExtended extends DbPost {
   } | null;
 }
 
-const MOCK_USER_ID = "123e4567-e89b-12d3-a456-426614174000";
+/**
+ * UNCACHED: Fetch all forum posts (threads list)
+ */
+async function fetchForumPostsUncached(accessToken: string): Promise<ForumPostExtended[]> {
+  const supabase = createStaticClient(accessToken);
+  const { data, error } = await supabase
+    .from("posts")
+    .select(`
+      *,
+      subject:subjects(name),
+      post_type:post_types(name),
+      author:users!user_id(name, last_name, points, deleted_at),
+      post_replies(id)
+    `)
+    .order("created_at", { ascending: false });
 
-let mockPosts: ForumPostExtended[] = [
-  {
-    id: "post-1",
-    user_id: "user-martin",
-    subject_id: 1,
-    post_type_id: 1, // Duda Técnica
-    title: "¿Cómo plantear integrales dobles en coordenadas polares?",
-    content: "Estoy trabado con el TP3, ejercicio 4. Entiendo la teoría básica pero al momento de definir los límites de integración para regiones circulares desplazadas me confundo con el r y el ángulo theta. ¿Alguien tiene un tip visual o un apunte que lo explique más claro?",
-    upvotes: 15,
-    is_resolved: true,
-    created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
-    subjectName: "Análisis Matemático II",
-    authorName: "Martín S.",
-    githubUsername: "martinprlt",
-    authorKarma: 1200,
-    repliesCount: 3,
-    category: "Duda Técnica",
-    categoryColor: "text-red-400 bg-red-400/10 border-red-400/20",
-    dotColor: "bg-accent",
-    bestAnswer: {
-      author: "Prof. García",
-      role: "Profesor",
-      content:
-        "La clave está en graficar la región primero. Si tu circunferencia está desplazada del origen (ej: (x-1)² + y² = 1), tenés que reemplazar x=r·cos(θ), y=r·sin(θ) en esa ecuación para encontrar el límite de 'r' en función de 'θ'. Te dejo un enlace a un GeoGebra interactivo en la sección de recursos.",
-      badge: "Mejor Respuesta",
-    }
-  },
-  {
-    id: "post-2",
-    user_id: "user-luciana",
-    subject_id: 2,
-    post_type_id: 2, // Consejo
-    title: "¿Conviene rendir final libre o esperar a recursar?",
-    content: "Me quedé regular pero siento que la cursada la hice muy a las apuradas y los conceptos de grafos no me quedaron del todo claros. ¿Alguien rindió el final de Algoritmos libre? ¿Es muy exigente o me recomiendan recursarla el cuatrimestre que viene para afianzar?",
-    upvotes: 8,
-    is_resolved: false,
-    created_at: new Date(Date.now() - 24 * 3600000).toISOString(),
-    subjectName: "Algoritmos y Estructuras de Datos",
-    authorName: "Luciana V.",
-    authorKarma: 850,
-    repliesCount: 1,
-    category: "Consejo de Cursada",
-    categoryColor: "text-accent bg-accent/10 border-accent/20",
-    dotColor: "bg-secondary",
-    bestAnswer: null
-  },
-  {
-    id: "post-3",
-    user_id: "user-camila",
-    subject_id: 3,
-    post_type_id: 3, // Ayuda TP
-    title: "Error de segmentación en lista enlazada (C)",
-    content: "Estoy implementando una lista enlazada simple para el TP de Programación II y me tira segmentation fault al intentar eliminar un nodo del medio. Ya revisé los punteros mil veces pero no encuentro el bug. ¿Alguien me da una mano?",
-    upvotes: 6,
-    is_resolved: false,
-    created_at: new Date(Date.now() - 3 * 3600000).toISOString(),
-    subjectName: "Programación II",
-    authorName: "Camila R.",
-    authorKarma: 2100,
-    repliesCount: 0,
-    category: "Ayuda con TP",
-    categoryColor: "text-teal-400 bg-teal-400/10 border-teal-400/20",
-    dotColor: "bg-accent",
-    bestAnswer: null
+  if (error) {
+    console.error("Error fetching forum posts from Supabase:", error);
+    return [];
   }
-];
 
-let mockReplies: Record<string, DbPostReply[]> = {
-  "post-1": [
-    {
-      id: "reply-10",
-      post_id: "post-1",
-      user_id: "user-prof-garcia",
-      content: "La clave está en graficar la región primero. Si tu circunferencia está desplazada del origen (ej: (x-1)² + y² = 1), tenés que reemplazar x=r·cos(θ), y=r·sin(θ) en esa ecuación para encontrar el límite de 'r' en función de 'θ'. Te dejo un enlace a un GeoGebra interactivo en la sección de recursos.",
-      upvotes: 8,
-      is_accepted: true,
-      created_at: new Date(Date.now() - 1.8 * 3600000).toISOString()
-    },
-    {
-      id: "reply-11",
-      post_id: "post-1",
-      user_id: "user-lucas",
-      content: "Ufff me re sirvió a mí también ese GeoGebra, ¡muchas gracias Profesor!",
-      upvotes: 2,
-      is_accepted: false,
-      created_at: new Date(Date.now() - 1 * 3600000).toISOString()
-    }
-  ],
-  "post-2": [
-    {
-      id: "reply-20",
-      post_id: "post-2",
-      user_id: "user-tomi",
-      content: "Che, yo rendí Algoritmos libre el año pasado y no es imposible, pero te sacan el cuero con la parte práctica de árboles balanceados (AVL). Si no te sentís 100% segura, recursarla te da otra base para lo que viene después en Programación II.",
-      upvotes: 4,
-      is_accepted: false,
-      created_at: new Date(Date.now() - 8 * 3600000).toISOString()
-    }
-  ],
-  "post-3": []
-};
+  return (data || [])
+    .filter((post: any) => post.author && !post.author.deleted_at)
+    .map((post: any) => {
+      const catColor = post.post_type?.id === 1 
+        ? "text-red-400 bg-red-400/10 border-red-400/20" 
+        : post.post_type?.id === 2 
+          ? "text-accent bg-accent/10 border-accent/20" 
+          : "text-teal-400 bg-teal-400/10 border-teal-400/20";
+      
+      const dotColor = post.post_type?.id === 1 
+        ? "bg-red-400" 
+        : post.post_type?.id === 2 
+          ? "bg-secondary" 
+          : "bg-accent";
+
+      return {
+        id: post.id,
+        user_id: post.user_id,
+        subject_id: post.subject_id,
+        post_type_id: post.post_type_id,
+        title: post.title,
+        content: post.content,
+        upvotes: post.upvotes || 0,
+        is_resolved: post.is_resolved || false,
+        created_at: post.created_at,
+        subjectName: post.subject?.name || "General",
+        authorName: `${post.author.name} ${post.author.last_name || ""}`.trim(),
+        authorKarma: post.author.points || 0,
+        repliesCount: post.post_replies ? post.post_replies.length : 0,
+        category: post.post_type?.name || "Duda Académica",
+        categoryColor: catColor,
+        dotColor,
+        bestAnswer: null
+      };
+    });
+}
 
 /**
- * Fetch all forum posts (threads list)
+ * Fetch all forum posts (threads list) (CACHED)
  */
 export async function fetchForumPosts(): Promise<ForumPostExtended[]> {
-  // Artificial delay to show off the beautiful skeleton loader
-  await new Promise(resolve => setTimeout(resolve, 800));
+  const session = await getVerifiedSession();
+  const accessToken = session?.accessToken ?? "";
 
-  const USE_REAL_DATABASE = false; // Toggle to connect to Supabase
-  if (USE_REAL_DATABASE) {
-    try {
-      // Real database fetch would go here
-      // const { data } = await supabase.from('posts').select('*, users(name, last_name, points)').order('created_at', { ascending: false });
-    } catch (error) {
-      console.error(error);
+  console.log("[Cache Access] fetchForumPosts");
+
+  return unstable_cache(
+    async () => fetchForumPostsUncached(accessToken),
+    ["forum-posts"],
+    {
+      tags: [CACHE_TAGS.forumPosts],
+      revalidate: 86400
     }
-  }
-
-  return mockPosts;
+  )();
 }
 
 /**
@@ -154,34 +109,91 @@ export async function createForumPost(
   category: string
 ): Promise<{ success: boolean; data?: ForumPostExtended; error?: string }> {
   try {
-    await new Promise(resolve => setTimeout(resolve, 600));
+    const supabase = createServerClient();
+    const authResponse = await supabase.auth.getUser();
+    const authUser = authResponse?.data?.user;
+
+    if (!authUser) {
+      return { success: false, error: "Che, no estás autenticado/a." };
+    }
 
     if (!title.trim() || !content.trim()) {
       return { success: false, error: "El título y cuerpo del hilo son obligatorios." };
     }
 
-    let catColor = "text-teal-400 bg-teal-400/10 border-teal-400/20";
-    let dotColor = "bg-accent";
-    if (category === "Duda Técnica") {
-      catColor = "text-red-400 bg-red-400/10 border-red-400/20";
-      dotColor = "bg-red-400";
-    } else if (category === "Consejo de Cursada") {
-      catColor = "text-accent bg-accent/10 border-accent/20";
-      dotColor = "bg-secondary";
+    const { data: subjectData } = await supabase
+      .from("subjects")
+      .select("id")
+      .eq("name", subject)
+      .limit(1);
+
+    const subjectId = subjectData && subjectData.length > 0 ? subjectData[0].id : 1;
+
+    let post_type_id = 1;
+    if (category === "Consejo de Cursada") {
+      post_type_id = 2;
+    } else if (category === "Ayuda con TP" || category === "Compraventa") {
+      post_type_id = 3;
     }
 
-    const newPost: ForumPostExtended = {
-      id: `post-${Date.now()}`,
-      user_id: MOCK_USER_ID,
-      post_type_id: category === "Duda Técnica" ? 1 : category === "Consejo de Cursada" ? 2 : 3,
-      title: title.trim(),
-      content: content.trim(),
-      upvotes: 1,
-      is_resolved: false,
-      created_at: new Date().toISOString(),
+    const { data: newPostData, error: insertError } = await supabase
+      .from("posts")
+      .insert({
+        user_id: authUser.id,
+        subject_id: subjectId,
+        post_type_id,
+        title: title.trim(),
+        content: content.trim(),
+        upvotes: 1,
+        is_resolved: false
+      })
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    const { data: authorData } = await supabase
+      .from("users")
+      .select("name, last_name, points")
+      .eq("id", authUser.id)
+      .single();
+
+    const currentPoints = authorData?.points || 0;
+    await supabase
+      .from("users")
+      .update({ points: currentPoints + 15 })
+      .eq("id", authUser.id);
+
+    invalidateCache(CACHE_TAGS.forumPosts);
+    invalidateCache(CACHE_TAGS.recentForumPosts);
+    invalidateCache(CACHE_TAGS.dashboardStats(authUser.id));
+    invalidateCache(CACHE_TAGS.userProfile(authUser.id));
+
+    const catColor = post_type_id === 1 
+      ? "text-red-400 bg-red-400/10 border-red-400/20" 
+      : post_type_id === 2 
+        ? "text-accent bg-accent/10 border-accent/20" 
+        : "text-teal-400 bg-teal-400/10 border-teal-400/20";
+    
+    const dotColor = post_type_id === 1 
+      ? "bg-red-400" 
+      : post_type_id === 2 
+        ? "bg-secondary" 
+        : "bg-accent";
+
+    const responseData: ForumPostExtended = {
+      id: newPostData.id,
+      user_id: newPostData.user_id,
+      subject_id: newPostData.subject_id,
+      post_type_id: newPostData.post_type_id,
+      title: newPostData.title,
+      content: newPostData.content,
+      upvotes: newPostData.upvotes,
+      is_resolved: newPostData.is_resolved,
+      created_at: newPostData.created_at,
       subjectName: subject,
-      authorName: "Tu Perfil",
-      authorKarma: 2450,
+      authorName: authorData ? `${authorData.name} ${authorData.last_name || ""}`.trim() : "Tu Perfil",
+      authorKarma: currentPoints + 15,
       repliesCount: 0,
       category,
       categoryColor: catColor,
@@ -189,17 +201,10 @@ export async function createForumPost(
       bestAnswer: null
     };
 
-    // Prepend to local mock database
-    mockPosts = [newPost, ...mockPosts];
-    mockReplies[newPost.id] = [];
-
-    // Supabase equivalent insert query:
-    // await supabase.from('posts').insert(newPost);
-
-    return { success: true, data: newPost };
-  } catch (error) {
-    console.error(error);
-    return { success: false, error: "Hubo un problema al crear tu hilo." };
+    return { success: true, data: responseData };
+  } catch (error: any) {
+    console.error("Error creating forum post:", error);
+    return { success: false, error: error.message || "Hubo un problema al crear tu hilo." };
   }
 }
 
@@ -212,13 +217,8 @@ export async function castPostVote(
   currentVote: "up" | "down" | null
 ): Promise<{ success: boolean; likes?: number; error?: string }> {
   try {
-    await new Promise(resolve => setTimeout(resolve, 200));
-
-    const postIndex = mockPosts.findIndex(p => p.id === postId);
-    if (postIndex === -1) {
-      return { success: false, error: "Hilo no encontrado." };
-    }
-
+    const supabase = createServerClient();
+    
     let diff = 0;
     if (currentVote === direction) {
       diff = direction === "up" ? -1 : 1;
@@ -228,24 +228,81 @@ export async function castPostVote(
       diff = direction === "up" ? 1 : -1;
     }
 
-    mockPosts[postIndex].upvotes += diff;
+    const { data: postData } = await supabase
+      .from("posts")
+      .select("upvotes")
+      .eq("id", postId)
+      .single();
 
-    // Supabase update:
-    // await supabase.from('posts').update({ upvotes: mockPosts[postIndex].upvotes }).eq('id', postId);
+    const currentUpvotes = postData?.upvotes || 0;
+    const newUpvotes = currentUpvotes + diff;
 
-    return { success: true, likes: mockPosts[postIndex].upvotes };
-  } catch (error) {
-    console.error(error);
-    return { success: false, error: "No se pudo registrar tu voto." };
+    const { error } = await supabase
+      .from("posts")
+      .update({ upvotes: newUpvotes })
+      .eq("id", postId);
+
+    if (error) throw error;
+
+    invalidateCache(CACHE_TAGS.forumPosts);
+    invalidateCache(CACHE_TAGS.recentForumPosts);
+
+    return { success: true, likes: newUpvotes };
+  } catch (error: any) {
+    console.error("Error casting post vote:", error);
+    return { success: false, error: error.message || "No se pudo registrar tu voto." };
   }
 }
 
 /**
- * Fetch replies for a specific thread
+ * UNCACHED: Fetch replies for a specific thread
+ */
+async function fetchPostRepliesUncached(postId: string, accessToken: string): Promise<DbPostReply[]> {
+  const supabase = createStaticClient(accessToken);
+  const { data, error } = await supabase
+    .from("post_replies")
+    .select(`
+      *,
+      author:users!user_id(name, last_name, deleted_at)
+    `)
+    .eq("post_id", postId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching post replies from Supabase:", error);
+    return [];
+  }
+
+  return (data || [])
+    .filter((r: any) => r.author && !r.author.deleted_at)
+    .map((r: any) => ({
+      id: r.id,
+      post_id: r.post_id,
+      user_id: r.user_id,
+      content: r.content,
+      upvotes: r.upvotes || 0,
+      is_accepted: r.is_accepted || false,
+      created_at: r.created_at
+    }));
+}
+
+/**
+ * Fetch replies for a specific thread (CACHED)
  */
 export async function fetchPostReplies(postId: string): Promise<DbPostReply[]> {
-  await new Promise(resolve => setTimeout(resolve, 400));
-  return mockReplies[postId] || [];
+  const session = await getVerifiedSession();
+  const accessToken = session?.accessToken ?? "";
+
+  console.log(`[Cache Access] fetchPostReplies for post: ${postId}`);
+
+  return unstable_cache(
+    async () => fetchPostRepliesUncached(postId, accessToken),
+    ["post-replies", postId],
+    {
+      tags: [CACHE_TAGS.postReplies(postId)],
+      revalidate: 86400
+    }
+  )();
 }
 
 /**
@@ -256,41 +313,39 @@ export async function addPostReply(
   content: string
 ): Promise<{ success: boolean; data?: DbPostReply[]; error?: string }> {
   try {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const supabase = createServerClient();
+    const authResponse = await supabase.auth.getUser();
+    const authUser = authResponse?.data?.user;
+
+    if (!authUser) {
+      return { success: false, error: "No estás autenticado/a." };
+    }
 
     if (!content.trim()) {
       return { success: false, error: "La respuesta no puede estar vacía." };
     }
 
-    const newReply: DbPostReply = {
-      id: `reply-${Date.now()}`,
-      post_id: postId,
-      user_id: MOCK_USER_ID,
-      content: content.trim(),
-      upvotes: 0,
-      is_accepted: false,
-      created_at: new Date().toISOString()
-    };
+    const { error } = await supabase
+      .from("post_replies")
+      .insert({
+        post_id: postId,
+        user_id: authUser.id,
+        content: content.trim(),
+        upvotes: 0,
+        is_accepted: false
+      });
 
-    if (!mockReplies[postId]) {
-      mockReplies[postId] = [];
-    }
+    if (error) throw error;
 
-    mockReplies[postId].push(newReply);
+    invalidateCache(CACHE_TAGS.postReplies(postId));
+    invalidateCache(CACHE_TAGS.forumPosts);
+    invalidateCache(CACHE_TAGS.recentForumPosts);
 
-    // Update reply count in mock post
-    const postIndex = mockPosts.findIndex(p => p.id === postId);
-    if (postIndex !== -1) {
-      mockPosts[postIndex].repliesCount += 1;
-    }
-
-    // Supabase:
-    // await supabase.from('post_replies').insert(newReply);
-
-    return { success: true, data: mockReplies[postId] };
-  } catch (error) {
-    console.error(error);
-    return { success: false, error: "No se pudo publicar la respuesta." };
+    const freshReplies = await fetchPostReplies(postId);
+    return { success: true, data: freshReplies };
+  } catch (error: any) {
+    console.error("Error adding post reply:", error);
+    return { success: false, error: error.message || "No se pudo publicar la respuesta." };
   }
 }
 
@@ -302,37 +357,31 @@ export async function resolvePost(
   replyId?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    await new Promise(resolve => setTimeout(resolve, 400));
+    const supabase = createServerClient();
+    
+    const { error: postError } = await supabase
+      .from("posts")
+      .update({ is_resolved: true })
+      .eq("id", postId);
 
-    const postIndex = mockPosts.findIndex(p => p.id === postId);
-    if (postIndex === -1) {
-      return { success: false, error: "Hilo no encontrado." };
+    if (postError) throw postError;
+
+    if (replyId) {
+      const { error: replyError } = await supabase
+        .from("post_replies")
+        .update({ is_accepted: true })
+        .eq("id", replyId);
+
+      if (replyError) throw replyError;
     }
 
-    mockPosts[postIndex].is_resolved = true;
-
-    if (replyId && mockReplies[postId]) {
-      mockReplies[postId] = mockReplies[postId].map(r => 
-        r.id === replyId ? { ...r, is_accepted: true } : r
-      );
-      
-      const acceptedReply = mockReplies[postId].find(r => r.id === replyId);
-      if (acceptedReply) {
-        mockPosts[postIndex].bestAnswer = {
-          author: "Respuesta Aceptada",
-          role: "Estudiante",
-          content: acceptedReply.content,
-          badge: "Mejor Respuesta"
-        };
-      }
-    }
-
-    // Supabase:
-    // await supabase.from('posts').update({ is_resolved: true }).eq('id', postId);
+    invalidateCache(CACHE_TAGS.forumPosts);
+    invalidateCache(CACHE_TAGS.recentForumPosts);
+    invalidateCache(CACHE_TAGS.postReplies(postId));
 
     return { success: true };
-  } catch (error) {
-    console.error(error);
-    return { success: false, error: "No se pudo actualizar la resolución del hilo." };
+  } catch (error: any) {
+    console.error("Error resolving post:", error);
+    return { success: false, error: error.message || "No se pudo actualizar la resolución del hilo." };
   }
 }

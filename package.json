@@ -2,6 +2,7 @@
   "name": "unlar-connect",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.24.0",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,7 +10,8 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@studio-freight/react-lenis": "^0.0.47",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.106.2",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",
     "lenis": "^1.3.23",
@@ -17,12 +19,14 @@
     "next": "14.2.35",
     "react": "^18",
     "react-dom": "^18",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/three": "^0.184.1",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "postcss": "^8",

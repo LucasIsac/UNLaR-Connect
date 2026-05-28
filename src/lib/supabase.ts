@@ -1,9 +1,13 @@
-// Supabase Client Configuration
-// This file will hold the client instantiation for interacting with the database and authentication.
+// Supabase Client Configuration Entrypoint
+//
+// IMPORTANT: In Next.js App Router, you MUST use the appropriate client:
+// - For Client Components ("use client"):
+//   import { createClient } from "@/lib/supabase/client";
+//
+// - For Server Components, Server Actions, or Route Handlers:
+//   import { createClient } from "@/lib/supabase/server";
 
-export const supabase = {
-  // Placeholder client
-  auth: {
-    getUser: async () => null,
-  },
-};
+export { createClient as createBrowserClient } from "./supabase/client";
+export { createClient as createServerClient, createStaticClient, getVerifiedSession } from "./supabase/server";
+
+

@@ -1,15 +1,21 @@
-"use client";
+import { fetchKarmaLeaderboard } from "@/actions/karma";
+import { getVerifiedSession } from "@/lib/supabase";
+import RankingClient from "./RankingClient";
 
-import { Trophy } from "lucide-react";
-import PlaceholderPage from "@/components/ui/PlaceholderPage";
+export const metadata = {
+  title: "Ranking de Estudiantes - UNLaR Connect",
+  description: "Conocé a los alumnos más destacados y los mayores aportes por carrera en UNLaR Connect.",
+};
 
-export default function RankingPage() {
+export default async function RankingPage() {
+  const leaderboard = await fetchKarmaLeaderboard();
+  const session = await getVerifiedSession();
+
   return (
-    <PlaceholderPage
-      title="Ranking de Estudiantes"
-      subtitle="Los colaboradores más destacados"
-      description="Descubrí quiénes son los estudiantes que más aportan resúmenes y respuestas de valor a nuestra comunidad académica UNLaR. ¡Vos también podés figurar acá!"
-      icon={Trophy}
+    <RankingClient 
+      initialLeaderboard={leaderboard} 
+      currentUserId={session?.userId} 
     />
   );
 }
+

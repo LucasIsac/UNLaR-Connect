@@ -1,6 +1,6 @@
 "use server";
 
-import { supabase } from "@/lib/supabase";
+import { createServerClient, createStaticClient, getVerifiedSession } from "@/lib/supabase";
 import { 
   DbUser, 
   DbTutoringSession, 
@@ -11,6 +11,8 @@ import {
   DbPostReply,
   DbDocument
 } from "@/types/database";
+import { unstable_cache } from "next/cache";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 
 // Custom return types for Server Actions
 export interface DashboardStats {
@@ -35,403 +37,459 @@ export interface ForumPostExtended extends DbPost {
   repliesCount: number;
 }
 
-// 1. Mock Data Fallbacks (For when Supabase is not fully seeded or connected yet)
-const MOCK_USER_ID = "123e4567-e89b-12d3-a456-426614174000";
-
-const MOCK_USER: DbUser = {
-  id: MOCK_USER_ID,
-  role_id: 2, // Estudiante
-  career_id: 1, // Ing. en Sistemas
-  name: "Alejandro",
-  last_name: "Garcia",
-  email: "ale.garcia@unlar.edu.ar",
-  is_unlar_member: true,
-  points: 2450, // total XP
-  tutor_rating: 4.8,
-  total_reviews: 15,
-  created_at: new Date().toISOString()
-};
-
-const MOCK_BADGES: DbBadge[] = [
-  {
-    id: 1,
-    name: "Colaborador Destacado",
-    description: "Otorgado por responder 5 dudas en los foros comunitarios.",
-    icon_name: "forum",
-    required_points: 500,
-    created_at: new Date().toISOString()
-  },
-  {
-    id: 2,
-    name: "Tutor Estrella",
-    description: "Alcanzado al mantener un rating superior a 4.5 en 10 tutorías.",
-    icon_name: "handshake",
-    required_points: 1000,
-    created_at: new Date().toISOString()
-  },
-  {
-    id: 3,
-    name: "Lector Veloz",
-    description: "Otorgado por leer 20 recursos en el banco de apuntes.",
-    icon_name: "menu_book",
-    required_points: 3000, // Not unlocked yet because user has 2450 points
-    created_at: new Date().toISOString()
-  }
-];
-
-let mockSessions: UpcomingSessionExtended[] = [
-  {
-    id: "session-1",
-    tutor_id: "tutor-carlos",
-    student_id: MOCK_USER_ID,
-    scheduled_start: new Date(new Date().setHours(18, 30, 0)).toISOString(), // Today at 18:30
-    scheduled_end: new Date(new Date().setHours(20, 0, 0)).toISOString(),
-    status: "confirmed",
-    meeting_link: "https://meet.google.com/abc-defg-hij",
-    created_at: new Date().toISOString(),
-    subject: { id: 1, name: "Análisis Matemático II", year: 2 },
-    peerName: "Prof. Carlos M.",
-    isTutorRole: false // Alejandro is the student
-  },
-  {
-    id: "session-2",
-    tutor_id: MOCK_USER_ID,
-    student_id: "student-martina",
-    scheduled_start: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString(), // Tomorrow
-    scheduled_end: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString(),
-    status: "pending",
-    meeting_link: "",
-    created_at: new Date().toISOString(),
-    subject: { id: 2, name: "Programación II", year: 2 },
-    peerName: "Martina S.",
-    isTutorRole: true // Alejandro is the tutor
-  }
-];
-
-const MOCK_POSTS: ForumPostExtended[] = [
-  {
-    id: "post-1",
-    user_id: "user-lucas",
-    subject_id: 1,
-    post_type_id: 1, // Duda Académica
-    title: "¿Cómo aplicar el Teorema de Rolle en este ejercicio?",
-    content: "Hola gente, no me sale aplicar las hipótesis del teorema en una función partida...",
-    upvotes: 24,
-    is_resolved: true,
-    created_at: new Date(Date.now() - 3 * 3600000).toISOString(), // 3 hours ago
-    subjectName: "Análisis Matemático II",
-    postTypeName: "Duda Académica",
-    repliesCount: 8
-  },
-  {
-    id: "post-2",
-    user_id: "user-flavia",
-    subject_id: 3,
-    post_type_id: 2, // Consejo
-    title: "Recomendaciones para el final de Sistemas Operativos",
-    content: "Buenas! Rindo SO la semana que viene. ¿Qué temas suelen tomar con más frecuencia?",
-    upvotes: 12,
-    is_resolved: false,
-    created_at: new Date(Date.now() - 5 * 3600000).toISOString(), // 5 hours ago
-    subjectName: "Sistemas Operativos",
-    postTypeName: "Consejo de Cursada",
-    repliesCount: 5
-  },
-  {
-    id: "post-3",
-    user_id: "user-tomas",
-    subject_id: 4,
-    post_type_id: 3, // Compraventa
-    title: "Vendo apuntes impresos de Álgebra (casi nuevos)",
-    content: "Los imprimí este cuatrimestre y están en excelente estado, sin rayar.",
-    upvotes: 0,
-    is_resolved: false,
-    created_at: new Date(Date.now() - 10 * 3600000).toISOString(), // 10 hours ago
-    subjectName: "Álgebra",
-    postTypeName: "Compraventa",
-    repliesCount: 0
-  }
-];
-
-// 2. Extra Mock Data for Modals Phase
-let mockAvailability: DbTutorAvailability[] = [
-  {
-    id: 1,
-    tutor_id: MOCK_USER_ID,
-    day_of_week: 1, // Lunes
-    start_time: "18:30",
-    end_time: "20:00"
-  },
-  {
-    id: 2,
-    tutor_id: MOCK_USER_ID,
-    day_of_week: 3, // Miércoles
-    start_time: "16:00",
-    end_time: "18:00"
-  }
-];
-
-let mockReplies: Record<string, DbPostReply[]> = {
-  "post-1": [
-    {
-      id: "reply-1",
-      post_id: "post-1",
-      user_id: "user-carlos",
-      content: "¡Hola Ale! Sí, recordá que tenés que verificar primero que la función sea continua en el intervalo cerrado [a, b] y derivable en el abierto (a, b). En el punto de quiebre de la función partida, tenés que comprobar que los límites laterales coincidan.",
-      upvotes: 5,
-      is_accepted: true,
-      created_at: new Date(Date.now() - 2 * 3600000).toISOString() // 2 hours ago
-    }
-  ],
-  "post-2": [
-    {
-      id: "reply-2",
-      post_id: "post-2",
-      user_id: "user-juan",
-      content: "Che, estudiale a fondo el tema de Semáforos y Monitores. Siempre toman un ejercicio práctico de concurrencia y sincronización de procesos en la cursada.",
-      upvotes: 3,
-      is_accepted: false,
-      created_at: new Date(Date.now() - 1 * 3600000).toISOString()
-    }
-  ],
-  "post-3": []
-};
-
-let mockDocuments: DbDocument[] = [];
-
 /**
- * Fetch core statistics, level, XP, and badges earned by the user.
+ * UNCACHED: Fetch core statistics, level, XP, and badges earned by the user.
+ * Uses an explicit accessToken so this function is safe inside unstable_cache.
  */
-export async function fetchDashboardStats(): Promise<DashboardStats> {
-  // Artificial delay to show off the beautiful skeleton loader
-  await new Promise(resolve => setTimeout(resolve, 800));
+async function fetchDashboardStatsUncached(userId: string, accessToken: string): Promise<DashboardStats> {
+  const supabase = createStaticClient(accessToken);
 
-  const USE_REAL_DATABASE = false; // Set to true to enable Supabase calls
+  // 1. Fetch user metrics
+  let { data: dbUser, error: userError } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", userId)
+    .single();
 
-  if (USE_REAL_DATABASE) {
-    try {
-      const authResponse = await (supabase.auth.getUser() as any);
-      const authUser = authResponse?.data?.user;
-      
-      if (authUser) {
-        // Execute database select to fetch user metrics
-        // const { data: dbUser } = await supabase.from('users').select('*').eq('id', authUser.id).single();
-        // const { data: dbBadges } = await supabase.from('user_badges').select('badges(*)').eq('user_id', authUser.id);
-        // Real database mapping would happen here.
+  if (userError || !dbUser) {
+    console.log(`[Cache Self-Heal/Dashboard] User ${userId} not found in public.users. Attempting to restore...`);
+    const { data: authData } = await supabase.auth.getUser();
+    const authUser = authData?.user;
+    
+    if (authUser) {
+      const name = authUser.user_metadata?.first_name || authUser.user_metadata?.name || "Estudiante";
+      const lastName = authUser.user_metadata?.last_name || "";
+      const email = authUser.email || "";
+      const avatarUrl = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null;
+
+      const { data: insertedUser, error: insertError } = await supabase
+        .from("users")
+        .insert({
+          id: userId,
+          email: email,
+          name: name,
+          last_name: lastName,
+          avatar_url: avatarUrl,
+          role_id: 2
+        })
+        .select("*")
+        .single();
+
+      if (!insertError && insertedUser) {
+        console.log(`[Cache Self-Heal/Dashboard] User ${userId} successfully created in public.users.`);
+        dbUser = insertedUser;
+      } else {
+        console.error(`[Cache Self-Heal/Dashboard] Failed to auto-create user:`, insertError);
+        throw new Error("Usuario no encontrado en la base de datos.");
       }
-    } catch (error) {
-      console.error("Error fetching dashboard stats from Supabase:", error);
+    } else {
+      throw new Error("Usuario no encontrado en la base de datos.");
     }
   }
 
-  // Calculating XP and Level: Level increases every 200 points
-  const points = MOCK_USER.points;
-  const karmaLevel = 12;
-  const nextLevelXP = 3000;
-  const xpPercentage = (points / nextLevelXP) * 100;
+  // 2. Fetch badges
+  const { data: allBadges } = await supabase
+    .from("badges")
+    .select("*")
+    .order("required_points", { ascending: true });
+
+  const recentBadges = allBadges || [];
+
+  const points = dbUser.points || 0;
+  const karmaLevel = Math.floor(points / 250) + 1;
+  const nextLevelXP = karmaLevel * 250;
+  const xpPercentage = Math.min(((points % 250) / 250) * 100, 100);
+  const notificationsCount = 3;
 
   return {
-    user: MOCK_USER,
+    user: dbUser as DbUser,
     karmaLevel,
     currentXP: points,
     nextLevelXP,
     xpPercentage,
-    recentBadges: MOCK_BADGES,
-    notificationsCount: 3
+    recentBadges,
+    notificationsCount
   };
 }
 
 /**
- * Fetch all upcoming tutoring sessions for the student (either as tutor or learner)
+ * Fetch core statistics, level, XP, and badges earned by the user (CACHED).
+ */
+export async function fetchDashboardStats(): Promise<DashboardStats> {
+  const session = await getVerifiedSession();
+  if (!session) throw new Error("No estás autenticado/a.");
+
+  const { userId, accessToken } = session;
+  console.log(`[Cache Access] fetchDashboardStats for user: ${userId}`);
+
+  return unstable_cache(
+    async () => fetchDashboardStatsUncached(userId, accessToken),
+    ["dashboard-stats", userId],
+    {
+      tags: [CACHE_TAGS.dashboardStats(userId)],
+      revalidate: 86400
+    }
+  )();
+}
+
+/**
+ * UNCACHED: Fetch all upcoming tutoring sessions for the student.
+ */
+async function fetchUpcomingSessionsUncached(userId: string, accessToken: string): Promise<UpcomingSessionExtended[]> {
+  const supabase = createStaticClient(accessToken);
+
+  const { data, error } = await supabase
+    .from("tutoring_sessions")
+    .select(`
+      *,
+      subject:subjects(*),
+      tutor:users!tutor_id(name, last_name, deleted_at),
+      student:users!student_id(name, last_name, deleted_at)
+    `)
+    .or(`student_id.eq.${userId},tutor_id.eq.${userId}`)
+    .order("scheduled_start", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching tutoring sessions from Supabase:", error);
+    return [];
+  }
+
+  const extendedSessions: UpcomingSessionExtended[] = (data || [])
+    .filter((session: any) => {
+      const isTutorRole = session.tutor_id === userId;
+      const peer = isTutorRole ? session.student : session.tutor;
+      return !(peer && peer.deleted_at);
+    })
+    .map((session: any) => {
+      const isTutorRole = session.tutor_id === userId;
+      const peer = isTutorRole ? session.student : session.tutor;
+      const peerName = peer ? `${peer.name} ${peer.last_name || ""}`.trim() : "Compañero/a";
+
+      return {
+        id: session.id,
+        tutor_id: session.tutor_id,
+        student_id: session.student_id,
+        scheduled_start: session.scheduled_start,
+        scheduled_end: session.scheduled_end,
+        status: session.status,
+        meeting_link: session.meeting_link || "",
+        created_at: session.created_at,
+        subject: session.subject || { id: 0, name: "Materia Desconocida", year: 1 },
+        peerName,
+        isTutorRole
+      };
+    });
+
+  return extendedSessions;
+}
+
+/**
+ * Fetch all upcoming tutoring sessions for the student (CACHED).
  */
 export async function fetchUpcomingSessions(): Promise<UpcomingSessionExtended[]> {
-  // Artificial delay to show off the beautiful skeleton loader
-  await new Promise(resolve => setTimeout(resolve, 800));
+  const session = await getVerifiedSession();
+  if (!session) return [];
 
-  const USE_REAL_DATABASE = false; // Set to true to enable Supabase calls
+  const { userId, accessToken } = session;
+  console.log(`[Cache Access] fetchUpcomingSessions for user: ${userId}`);
 
-  if (USE_REAL_DATABASE) {
-    try {
-      const authResponse = await (supabase.auth.getUser() as any);
-      const authUser = authResponse?.data?.user;
-      
-      if (authUser) {
-        // Real Database Query structure:
-        // const { data: sessions } = await supabase
-        //   .from('tutoring_sessions')
-        //   .select('*, subject:subjects(*), tutor:users!tutor_id(name, last_name), student:users!student_id(name, last_name)')
-        //   .or(`student_id.eq.${authUser.id},tutor_id.eq.${authUser.id}`)
-        //   .order('scheduled_start', { ascending: true });
-      }
-    } catch (error) {
-      console.error("Error fetching tutoring sessions from Supabase:", error);
+  return unstable_cache(
+    async () => fetchUpcomingSessionsUncached(userId, accessToken),
+    ["upcoming-sessions", userId],
+    {
+      tags: [CACHE_TAGS.upcomingSessions(userId)],
+      revalidate: 86400
     }
-  }
-
-  return mockSessions;
+  )();
 }
 
 /**
- * Fetch recent forum activities or academic questions
+ * UNCACHED: Fetch recent forum activities or academic questions.
+ */
+async function fetchRecentForumPostsUncached(accessToken: string): Promise<ForumPostExtended[]> {
+  const supabase = createStaticClient(accessToken);
+  
+  const { data, error } = await supabase
+    .from("posts")
+    .select(`
+      *,
+      subject:subjects(name),
+      post_type:post_types(name),
+      author:users!user_id(name, last_name, deleted_at),
+      replies:post_replies(count)
+    `)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  if (error) {
+    console.error("Error fetching recent forum posts from Supabase:", error);
+    return [];
+  }
+
+  const extendedPosts: ForumPostExtended[] = (data || [])
+    .filter((post: any) => post.author && !post.author.deleted_at)
+    .map((post: any) => ({
+      id: post.id,
+      user_id: post.user_id,
+      subject_id: post.subject_id,
+      post_type_id: post.post_type_id,
+      title: post.title,
+      content: post.content,
+      upvotes: post.upvotes || 0,
+      is_resolved: post.is_resolved,
+      created_at: post.created_at,
+      subjectName: post.subject?.name,
+      postTypeName: post.post_type?.name || "Duda Académica",
+      repliesCount: post.replies ? post.replies[0]?.count || 0 : 0
+    }));
+
+  return extendedPosts;
+}
+
+/**
+ * Fetch recent forum activities or academic questions (CACHED).
  */
 export async function fetchRecentForumPosts(): Promise<ForumPostExtended[]> {
-  // Artificial delay to show off the beautiful skeleton loader
-  await new Promise(resolve => setTimeout(resolve, 800));
+  const session = await getVerifiedSession();
+  const accessToken = session?.accessToken ?? "";
 
-  const USE_REAL_DATABASE = false; // Set to true to enable Supabase calls
+  console.log("[Cache Access] fetchRecentForumPosts");
 
-  if (USE_REAL_DATABASE) {
-    try {
-      const authResponse = await (supabase.auth.getUser() as any);
-      const authUser = authResponse?.data?.user;
-
-      if (authUser) {
-        // Real database fetch query:
-        // const { data: posts } = await supabase
-        //   .from('posts')
-        //   .select('*, subject:subjects(name), post_type:post_types(name), replies:post_replies(count)')
-        //   .order('created_at', { ascending: false })
-        //   .limit(5);
-      }
-    } catch (error) {
-      console.error("Error fetching forum posts from Supabase:", error);
+  return unstable_cache(
+    async () => fetchRecentForumPostsUncached(accessToken),
+    ["recent-forum-posts"],
+    {
+      tags: [CACHE_TAGS.recentForumPosts],
+      revalidate: 86400
     }
-  }
-
-  return MOCK_POSTS;
+  )();
 }
 
 /**
- * Update the status of a tutoring session (Accept class or Reject/Cancel class)
+ * Update the status of a tutoring session (Accept class or Reject/Cancel class).
  */
 export async function updateSessionStatus(
   sessionId: string, 
   newStatus: 'confirmed' | 'canceled'
 ): Promise<{ success: boolean; data?: UpcomingSessionExtended[]; error?: string }> {
   try {
-    // 1. Authenticate user
-    const authResponse = await (supabase.auth.getUser() as any);
+    const supabase = createServerClient();
+    const authResponse = await supabase.auth.getUser();
     const authUser = authResponse?.data?.user;
 
-    // In local development or fallback mode, we mutate our local mock state:
-    const sessionIndex = mockSessions.findIndex(s => s.id === sessionId);
-    if (sessionIndex !== -1) {
-      if (newStatus === 'canceled') {
-        // Remove the rejected session or set status to canceled
-        mockSessions = mockSessions.filter(s => s.id !== sessionId);
-      } else {
-        mockSessions[sessionIndex].status = 'confirmed';
-        // Simulating videocall link assignment
-        mockSessions[sessionIndex].meeting_link = "https://meet.google.com/xyz-pdqk-wlm";
-      }
-
-      // If authUser is valid, we would update Supabase:
-      if (authUser) {
-        // await supabase.from('tutoring_sessions').update({ status: newStatus }).eq('id', sessionId);
-      }
-
-      return { success: true, data: mockSessions };
+    if (!authUser) {
+      return { success: false, error: "Che, no estás autenticado/a." };
     }
 
-    return { success: false, error: "Clase no encontrada." };
-  } catch (error) {
+    const { data: sessionData } = await supabase
+      .from("tutoring_sessions")
+      .select("tutor_id, student_id")
+      .eq("id", sessionId)
+      .single();
+
+    const updateData: any = { status: newStatus };
+    if (newStatus === "confirmed") {
+      updateData.meeting_link = "https://meet.google.com/xyz-pdqk-wlm";
+    }
+
+    const { error } = await supabase
+      .from("tutoring_sessions")
+      .update(updateData)
+      .eq("id", sessionId);
+
+    if (error) throw error;
+
+    invalidateCache(CACHE_TAGS.upcomingSessions(authUser.id));
+    if (sessionData) {
+      const peerId = sessionData.tutor_id === authUser.id ? sessionData.student_id : sessionData.tutor_id;
+      if (peerId) {
+        invalidateCache(CACHE_TAGS.upcomingSessions(peerId));
+      }
+    }
+
+    const freshSessions = await fetchUpcomingSessions();
+    return { success: true, data: freshSessions };
+  } catch (error: any) {
     console.error("Error updating session status:", error);
-    return { success: false, error: "Hubo un problema al procesar tu solicitud." };
+    return { success: false, error: error.message || "Hubo un problema al procesar tu solicitud." };
   }
 }
 
 /**
- * Fetch active tutor availability schedule slots
+ * UNCACHED: Fetch active tutor availability schedule slots.
  */
-export async function fetchTutorAvailability(): Promise<DbTutorAvailability[]> {
-  await new Promise(resolve => setTimeout(resolve, 400));
-  return mockAvailability;
+async function fetchTutorAvailabilityUncached(userId: string, accessToken: string): Promise<DbTutorAvailability[]> {
+  const supabase = createStaticClient(accessToken);
+
+  const { data, error } = await supabase
+    .from("tutor_availability")
+    .select("*")
+    .eq("tutor_id", userId)
+    .order("day_of_week", { ascending: true })
+    .order("start_time", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching tutor availability from Supabase:", error);
+    return [];
+  }
+
+  return data || [];
 }
 
 /**
- * Save active tutor availability calendar slots
+ * Fetch active tutor availability schedule slots (CACHED).
+ */
+export async function fetchTutorAvailability(): Promise<DbTutorAvailability[]> {
+  const session = await getVerifiedSession();
+  if (!session) return [];
+
+  const { userId, accessToken } = session;
+  console.log(`[Cache Access] fetchTutorAvailability for user: ${userId}`);
+
+  return unstable_cache(
+    async () => fetchTutorAvailabilityUncached(userId, accessToken),
+    ["tutor-availability", userId],
+    {
+      tags: [CACHE_TAGS.tutorAvailability(userId)],
+      revalidate: 86400
+    }
+  )();
+}
+
+/**
+ * Save active tutor availability calendar slots.
  */
 export async function saveTutorAvailability(
   availabilityList: DbTutorAvailability[]
 ): Promise<{ success: boolean; data?: DbTutorAvailability[]; error?: string }> {
   try {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Validate inputs
-    mockAvailability = availabilityList.map((slot, index) => ({
-      ...slot,
-      id: slot.id || index + 1,
-      tutor_id: MOCK_USER_ID
-    }));
+    const supabase = createServerClient();
+    const authResponse = await supabase.auth.getUser();
+    const authUser = authResponse?.data?.user;
 
-    // In a live Supabase environment, we would do:
-    // await supabase.from('tutor_availability').delete().eq('tutor_id', MOCK_USER_ID);
-    // await supabase.from('tutor_availability').insert(availabilityList);
+    if (!authUser) {
+      return { success: false, error: "No autenticado." };
+    }
 
-    return { success: true, data: mockAvailability };
-  } catch (error) {
+    const { error: deleteError } = await supabase
+      .from("tutor_availability")
+      .delete()
+      .eq("tutor_id", authUser.id);
+
+    if (deleteError) throw deleteError;
+
+    if (availabilityList.length > 0) {
+      const insertData = availabilityList.map(slot => ({
+        tutor_id: authUser.id,
+        day_of_week: slot.day_of_week,
+        start_time: slot.start_time,
+        end_time: slot.end_time
+      }));
+
+      const { error: insertError } = await supabase
+        .from("tutor_availability")
+        .insert(insertData);
+
+      if (insertError) throw insertError;
+    }
+
+    invalidateCache(CACHE_TAGS.tutorAvailability(authUser.id));
+
+    const fresh = await fetchTutorAvailability();
+    return { success: true, data: fresh };
+  } catch (error: any) {
     console.error("Error saving tutor availability:", error);
-    return { success: false, error: "Hubo un problema al actualizar tu agenda." };
+    return { success: false, error: error.message || "Hubo un problema al actualizar tu agenda." };
   }
 }
 
 /**
- * Fetch all replies/comments associated with a forum post
+ * UNCACHED: Fetch all replies/comments associated with a forum post.
  */
-export async function fetchPostReplies(postId: string): Promise<DbPostReply[]> {
-  await new Promise(resolve => setTimeout(resolve, 400));
-  return mockReplies[postId] || [];
+async function fetchPostRepliesUncached(postId: string, accessToken: string): Promise<DbPostReply[]> {
+  const supabase = createStaticClient(accessToken);
+  const { data, error } = await supabase
+    .from("post_replies")
+    .select(`
+      *,
+      author:users!user_id(name, last_name, deleted_at)
+    `)
+    .eq("post_id", postId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching post replies from Supabase:", error);
+    return [];
+  }
+
+  return (data || []).filter((r: any) => r.author && !r.author.deleted_at);
 }
 
 /**
- * Submit a new reply comment to a forum post
+ * Fetch all replies/comments associated with a forum post (CACHED).
+ */
+export async function fetchPostReplies(postId: string): Promise<DbPostReply[]> {
+  const session = await getVerifiedSession();
+  const accessToken = session?.accessToken ?? "";
+
+  console.log(`[Cache Access] fetchPostReplies for post: ${postId}`);
+
+  return unstable_cache(
+    async () => fetchPostRepliesUncached(postId, accessToken),
+    ["post-replies", postId],
+    {
+      tags: [CACHE_TAGS.postReplies(postId)],
+      revalidate: 86400
+    }
+  )();
+}
+
+/**
+ * Submit a new reply comment to a forum post.
  */
 export async function addPostReply(
   postId: string,
   content: string
 ): Promise<{ success: boolean; data?: DbPostReply[]; error?: string }> {
   try {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const supabase = createServerClient();
+    const authResponse = await supabase.auth.getUser();
+    const authUser = authResponse?.data?.user;
+
+    if (!authUser) {
+      return { success: false, error: "No estás autenticado/a." };
+    }
 
     if (!content.trim()) {
       return { success: false, error: "El comentario no puede estar vacío." };
     }
 
-    const newReply: DbPostReply = {
-      id: `reply-${Date.now()}`,
-      post_id: postId,
-      user_id: MOCK_USER_ID,
-      content: content.trim(),
-      upvotes: 0,
-      is_accepted: false,
-      created_at: new Date().toISOString()
-    };
+    const { error } = await supabase
+      .from("post_replies")
+      .insert({
+        post_id: postId,
+        user_id: authUser.id,
+        content: content.trim(),
+        upvotes: 0,
+        is_accepted: false
+      });
 
-    if (!mockReplies[postId]) {
-      mockReplies[postId] = [];
-    }
-    
-    // Append to local state
-    mockReplies[postId].push(newReply);
+    if (error) throw error;
 
-    // Increment repliesCount on the matching post
-    const postIndex = MOCK_POSTS.findIndex(p => p.id === postId);
-    if (postIndex !== -1) {
-      MOCK_POSTS[postIndex].repliesCount += 1;
-    }
+    invalidateCache(CACHE_TAGS.postReplies(postId));
+    invalidateCache(CACHE_TAGS.forumPosts);
+    invalidateCache(CACHE_TAGS.recentForumPosts);
 
-    // Supabase equivalent query:
-    // await supabase.from('post_replies').insert(newReply);
-
-    return { success: true, data: mockReplies[postId] };
-  } catch (error) {
+    const replies = await fetchPostReplies(postId);
+    return { success: true, data: replies };
+  } catch (error: any) {
     console.error("Error adding post reply:", error);
-    return { success: false, error: "Hubo un problema al enviar tu comentario." };
+    return { success: false, error: error.message || "Hubo un problema al enviar tu comentario." };
   }
 }
 
 /**
- * Upload a document metadata entry (mock document registration)
+ * Upload a document metadata entry.
  */
 export async function uploadApunte(
   title: string,
@@ -439,37 +497,100 @@ export async function uploadApunte(
   fileType: string
 ): Promise<{ success: boolean; data?: DbDocument; error?: string }> {
   try {
-    await new Promise(resolve => setTimeout(resolve, 600));
+    const supabase = createServerClient();
+    const authResponse = await supabase.auth.getUser();
+    const authUser = authResponse?.data?.user;
+
+    if (!authUser) {
+      return { success: false, error: "No estás autenticado/a." };
+    }
 
     if (!title.trim()) {
       return { success: false, error: "El título del apunte es obligatorio." };
     }
 
-    const newDoc: DbDocument = {
-      id: `doc-${Date.now()}`,
-      user_id: MOCK_USER_ID,
+    const newDoc = {
+      user_id: authUser.id,
       subject_id: subjectId,
       title: title.trim(),
       document_type: fileType,
-      storage_url: `https://supabase-storage.unlarconnect/apuntes/${title.toLowerCase().replace(/\s+/g, '-')}.${fileType}`,
-      uploaded_at: new Date().toISOString(),
+      storage_url: `https://accwhmxpbfdvecwaxdho.supabase.co/storage/v1/object/public/apuntes/${title.toLowerCase().replace(/\s+/g, '-')}.${fileType}`,
       upvotes: 0
     };
 
-    mockDocuments.push(newDoc);
+    const { data, error } = await supabase
+      .from("documents")
+      .insert(newDoc)
+      .select()
+      .single();
 
-    // Award XP points to user for uploading a document (gamification match)
-    MOCK_USER.points += 50; // Award 50 points
+    if (error) throw error;
 
-    // Supabase equivalent queries:
-    // await supabase.storage.from('apuntes').upload(filePath, file);
-    // await supabase.from('documents').insert(newDoc);
-    // await supabase.from('users').update({ points: points + 50 }).eq('id', MOCK_USER_ID);
+    const { data: dbUser } = await supabase
+      .from("users")
+      .select("points")
+      .eq("id", authUser.id)
+      .single();
 
-    return { success: true, data: newDoc };
-  } catch (error) {
+    const currentPoints = dbUser?.points || 0;
+    await supabase
+      .from("users")
+      .update({ points: currentPoints + 50 })
+      .eq("id", authUser.id);
+
+    invalidateCache(CACHE_TAGS.resources);
+    invalidateCache(CACHE_TAGS.dashboardStats(authUser.id));
+    invalidateCache(CACHE_TAGS.userProfile(authUser.id));
+
+    return { success: true, data: data as DbDocument };
+  } catch (error: any) {
     console.error("Error uploading apunte:", error);
-    return { success: false, error: "Hubo un problema al registrar tu apunte." };
+    return { success: false, error: error.message || "Hubo un problema al registrar tu apunte." };
   }
 }
 
+export interface CombinedDashboardData {
+  stats: DashboardStats;
+  sessions: UpcomingSessionExtended[];
+  posts: ForumPostExtended[];
+}
+
+/**
+ * Fetch stats, sessions, and posts in a single optimized Server Action call.
+ */
+export async function fetchCombinedDashboardData(): Promise<CombinedDashboardData> {
+  const session = await getVerifiedSession();
+  if (!session) throw new Error("No estás autenticado/a.");
+
+  const { userId, accessToken } = session;
+  console.log(`[Combined Cache Access] fetchCombinedDashboardData for user: ${userId}`);
+
+  const [stats, sessions, posts] = await Promise.all([
+    unstable_cache(
+      async () => fetchDashboardStatsUncached(userId, accessToken),
+      ["dashboard-stats", userId],
+      {
+        tags: [CACHE_TAGS.dashboardStats(userId)],
+        revalidate: 86400
+      }
+    )(),
+    unstable_cache(
+      async () => fetchUpcomingSessionsUncached(userId, accessToken),
+      ["upcoming-sessions", userId],
+      {
+        tags: [CACHE_TAGS.upcomingSessions(userId)],
+        revalidate: 86400
+      }
+    )(),
+    unstable_cache(
+      async () => fetchRecentForumPostsUncached(accessToken),
+      ["recent-forum-posts"],
+      {
+        tags: [CACHE_TAGS.recentForumPosts],
+        revalidate: 86400
+      }
+    )()
+  ]);
+
+  return { stats, sessions, posts };
+}
