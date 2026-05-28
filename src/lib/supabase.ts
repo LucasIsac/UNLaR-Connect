@@ -8,5 +8,6 @@
 //   import { createClient } from "@/lib/supabase/server";
 
 export { createClient as createBrowserClient } from "./supabase/client";
-export { createClient as createServerClient } from "./supabase/server";
+export { createClient as createServerClient, createStaticClient, getVerifiedSession } from "./supabase/server";
+
 

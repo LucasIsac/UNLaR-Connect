@@ -1,7 +1,9 @@
 "use server";
 
-import { createServerClient } from "@/lib/supabase";
-import { DbPost, DbPostReply, DbSubject } from "@/types/database";
+import { createServerClient, createStaticClient, getVerifiedSession } from "@/lib/supabase";
+import { DbPost, DbPostReply } from "@/types/database";
+import { unstable_cache } from "next/cache";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 
 export interface ForumPostExtended extends DbPost {
   subjectName?: string;
@@ -21,10 +23,10 @@ export interface ForumPostExtended extends DbPost {
 }
 
 /**
- * Fetch all forum posts (threads list)
+ * UNCACHED: Fetch all forum posts (threads list)
  */
-export async function fetchForumPosts(): Promise<ForumPostExtended[]> {
-  const supabase = createServerClient();
+async function fetchForumPostsUncached(accessToken: string): Promise<ForumPostExtended[]> {
+  const supabase = createStaticClient(accessToken);
   const { data, error } = await supabase
     .from("posts")
     .select(`
@@ -41,7 +43,6 @@ export async function fetchForumPosts(): Promise<ForumPostExtended[]> {
     return [];
   }
 
-  // Filter out posts from soft-deleted users
   return (data || [])
     .filter((post: any) => post.author && !post.author.deleted_at)
     .map((post: any) => {
@@ -80,6 +81,25 @@ export async function fetchForumPosts(): Promise<ForumPostExtended[]> {
 }
 
 /**
+ * Fetch all forum posts (threads list) (CACHED)
+ */
+export async function fetchForumPosts(): Promise<ForumPostExtended[]> {
+  const session = await getVerifiedSession();
+  const accessToken = session?.accessToken ?? "";
+
+  console.log("[Cache Access] fetchForumPosts");
+
+  return unstable_cache(
+    async () => fetchForumPostsUncached(accessToken),
+    ["forum-posts"],
+    {
+      tags: [CACHE_TAGS.forumPosts],
+      revalidate: 86400
+    }
+  )();
+}
+
+/**
  * Create a new forum post
  */
 export async function createForumPost(
@@ -101,7 +121,6 @@ export async function createForumPost(
       return { success: false, error: "El título y cuerpo del hilo son obligatorios." };
     }
 
-    // 1. Look up subject ID matching name
     const { data: subjectData } = await supabase
       .from("subjects")
       .select("id")
@@ -110,7 +129,6 @@ export async function createForumPost(
 
     const subjectId = subjectData && subjectData.length > 0 ? subjectData[0].id : 1;
 
-    // 2. Map category to post_type_id
     let post_type_id = 1;
     if (category === "Consejo de Cursada") {
       post_type_id = 2;
@@ -118,7 +136,6 @@ export async function createForumPost(
       post_type_id = 3;
     }
 
-    // 3. Insert post
     const { data: newPostData, error: insertError } = await supabase
       .from("posts")
       .insert({
@@ -135,19 +152,22 @@ export async function createForumPost(
 
     if (insertError) throw insertError;
 
-    // 4. Fetch author user details to build extended response
     const { data: authorData } = await supabase
       .from("users")
       .select("name, last_name, points")
       .eq("id", authUser.id)
       .single();
 
-    // 5. Award 15 Karma points to the user for posting
     const currentPoints = authorData?.points || 0;
     await supabase
       .from("users")
       .update({ points: currentPoints + 15 })
       .eq("id", authUser.id);
+
+    invalidateCache(CACHE_TAGS.forumPosts);
+    invalidateCache(CACHE_TAGS.recentForumPosts);
+    invalidateCache(CACHE_TAGS.dashboardStats(authUser.id));
+    invalidateCache(CACHE_TAGS.userProfile(authUser.id));
 
     const catColor = post_type_id === 1 
       ? "text-red-400 bg-red-400/10 border-red-400/20" 
@@ -224,6 +244,9 @@ export async function castPostVote(
 
     if (error) throw error;
 
+    invalidateCache(CACHE_TAGS.forumPosts);
+    invalidateCache(CACHE_TAGS.recentForumPosts);
+
     return { success: true, likes: newUpvotes };
   } catch (error: any) {
     console.error("Error casting post vote:", error);
@@ -232,10 +255,10 @@ export async function castPostVote(
 }
 
 /**
- * Fetch replies for a specific thread
+ * UNCACHED: Fetch replies for a specific thread
  */
-export async function fetchPostReplies(postId: string): Promise<DbPostReply[]> {
-  const supabase = createServerClient();
+async function fetchPostRepliesUncached(postId: string, accessToken: string): Promise<DbPostReply[]> {
+  const supabase = createStaticClient(accessToken);
   const { data, error } = await supabase
     .from("post_replies")
     .select(`
@@ -250,7 +273,6 @@ export async function fetchPostReplies(postId: string): Promise<DbPostReply[]> {
     return [];
   }
 
-  // Filter out replies from soft-deleted authors
   return (data || [])
     .filter((r: any) => r.author && !r.author.deleted_at)
     .map((r: any) => ({
@@ -262,6 +284,25 @@ export async function fetchPostReplies(postId: string): Promise<DbPostReply[]> {
       is_accepted: r.is_accepted || false,
       created_at: r.created_at
     }));
+}
+
+/**
+ * Fetch replies for a specific thread (CACHED)
+ */
+export async function fetchPostReplies(postId: string): Promise<DbPostReply[]> {
+  const session = await getVerifiedSession();
+  const accessToken = session?.accessToken ?? "";
+
+  console.log(`[Cache Access] fetchPostReplies for post: ${postId}`);
+
+  return unstable_cache(
+    async () => fetchPostRepliesUncached(postId, accessToken),
+    ["post-replies", postId],
+    {
+      tags: [CACHE_TAGS.postReplies(postId)],
+      revalidate: 86400
+    }
+  )();
 }
 
 /**
@@ -296,6 +337,10 @@ export async function addPostReply(
 
     if (error) throw error;
 
+    invalidateCache(CACHE_TAGS.postReplies(postId));
+    invalidateCache(CACHE_TAGS.forumPosts);
+    invalidateCache(CACHE_TAGS.recentForumPosts);
+
     const freshReplies = await fetchPostReplies(postId);
     return { success: true, data: freshReplies };
   } catch (error: any) {
@@ -314,7 +359,6 @@ export async function resolvePost(
   try {
     const supabase = createServerClient();
     
-    // Set is_resolved on post
     const { error: postError } = await supabase
       .from("posts")
       .update({ is_resolved: true })
@@ -322,7 +366,6 @@ export async function resolvePost(
 
     if (postError) throw postError;
 
-    // If replyId is specified, mark it as is_accepted = true
     if (replyId) {
       const { error: replyError } = await supabase
         .from("post_replies")
@@ -331,6 +374,10 @@ export async function resolvePost(
 
       if (replyError) throw replyError;
     }
+
+    invalidateCache(CACHE_TAGS.forumPosts);
+    invalidateCache(CACHE_TAGS.recentForumPosts);
+    invalidateCache(CACHE_TAGS.postReplies(postId));
 
     return { success: true };
   } catch (error: any) {

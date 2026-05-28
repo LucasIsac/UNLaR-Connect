@@ -1,52 +1,99 @@
 "use server";
 
-import { createServerClient } from "@/lib/supabase";
+import { createServerClient, createStaticClient, getVerifiedSession } from "@/lib/supabase";
 import { 
   DbUser, 
   DbTutorAvailability, 
   DbSubject, 
-  DbCareer 
+  DbCareer,
+  DbNotification
 } from "@/types/database";
+import { unstable_cache } from "next/cache";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 
 export interface UserProfileExtended extends DbUser {
   careerName?: string;
-  isTutorActive: boolean; // Virtual field determining if tutor status is enabled
+  isTutorActive: boolean;
 }
 
 /**
- * Fetch complete profile detail for the current student
+ * UNCACHED: Fetch complete profile detail for the current student
  */
-export async function fetchUserProfile(): Promise<UserProfileExtended> {
-  const db = createServerClient();
-  const authUserResponse = await db.auth.getUser();
-  const authUser = authUserResponse?.data?.user;
+async function fetchUserProfileUncached(userId: string, accessToken: string): Promise<UserProfileExtended> {
+  const db = createStaticClient(accessToken);
 
-  if (!authUser) {
-    throw new Error("No estás autenticado/a.");
-  }
-
-  // Fetch user matching architecture users schema
   const { data: dbUserData, error: userError } = await db
     .from("users")
     .select("*, careers(name)")
-    .eq("id", authUser.id)
+    .eq("id", userId)
     .single();
 
   if (userError || !dbUserData) {
+    console.log(`[Cache Self-Heal] User ${userId} not found in public.users. Attempting to restore...`);
+    const { data: authData } = await db.auth.getUser();
+    const authUser = authData?.user;
+    
+    if (authUser) {
+      const name = authUser.user_metadata?.first_name || authUser.user_metadata?.name || "Estudiante";
+      const lastName = authUser.user_metadata?.last_name || "";
+      const email = authUser.email || "";
+
+      const { data: insertedUser, error: insertError } = await db
+        .from("users")
+        .insert({
+          id: userId,
+          email: email,
+          name: name,
+          last_name: lastName,
+          role_id: 2
+        })
+        .select("*, careers(name)")
+        .single();
+
+      if (!insertError && insertedUser) {
+        console.log(`[Cache Self-Heal] User ${userId} successfully created in public.users.`);
+        return {
+          ...insertedUser,
+          careerName: insertedUser.careers?.name,
+          isTutorActive: false
+        };
+      } else {
+        console.error(`[Cache Self-Heal] Failed to auto-create user in public.users:`, insertError);
+      }
+    }
     throw new Error("Usuario no encontrado en la base de datos.");
   }
 
-  // Check if user has tutor subjects or availability
   const { count: hasSubjects } = await db
     .from("tutor_subjects")
     .select("*", { count: "exact", head: true })
-    .eq("tutor_id", authUser.id);
+    .eq("tutor_id", userId);
 
   return {
     ...dbUserData,
     careerName: dbUserData.careers?.name,
     isTutorActive: (hasSubjects || 0) > 0 || dbUserData.role_id === 3
   };
+}
+
+/**
+ * Fetch complete profile detail for the current student (CACHED)
+ */
+export async function fetchUserProfile(): Promise<UserProfileExtended> {
+  const session = await getVerifiedSession();
+  if (!session) throw new Error("No estás autenticado/a.");
+
+  const { userId, accessToken } = session;
+  console.log(`[Cache Access] fetchUserProfile for user: ${userId}`);
+
+  return unstable_cache(
+    async () => fetchUserProfileUncached(userId, accessToken),
+    ["user-profile", userId],
+    {
+      tags: [CACHE_TAGS.userProfile(userId)],
+      revalidate: 86400
+    }
+  )();
 }
 
 /**
@@ -88,7 +135,9 @@ export async function updateUserProfile(
 
     if (error) throw error;
 
-    // Fetch updated user details
+    invalidateCache(CACHE_TAGS.userProfile(authUser.id));
+    invalidateCache(CACHE_TAGS.dashboardStats(authUser.id));
+
     const updated = await fetchUserProfile();
     return { success: true, data: updated };
   } catch (err: any) {
@@ -118,6 +167,9 @@ export async function toggleTutorStatus(
       .eq("id", authUser.id);
 
     if (error) throw error;
+
+    invalidateCache(CACHE_TAGS.userProfile(authUser.id));
+    invalidateCache(CACHE_TAGS.dashboardStats(authUser.id));
     
     return { success: true, isTutorActive: active };
   } catch (err: any) {
@@ -127,32 +179,41 @@ export async function toggleTutorStatus(
 }
 
 /**
- * Fetch subjects student is registered to teach
+ * UNCACHED: Fetch subjects student is registered to teach
  */
-export async function fetchTutorSubjects(): Promise<DbSubject[]> {
-  const db = createServerClient();
-  const authUserResponse = await db.auth.getUser();
-  const authUser = authUserResponse?.data?.user;
-
-  if (!authUser) {
-    return [];
-  }
-
+async function fetchTutorSubjectsUncached(userId: string, accessToken: string): Promise<DbSubject[]> {
+  const db = createStaticClient(accessToken);
   const { data, error } = await db
     .from("tutor_subjects")
     .select("subjects(*)")
-    .eq("tutor_id", authUser.id);
+    .eq("tutor_id", userId);
   
   if (error) {
     console.error("Error fetching tutor subjects from Supabase:", error);
     return [];
   }
 
-  if (data) {
-    return data.map((item: any) => item.subjects).filter(Boolean);
-  }
+  return (data || []).map((item: any) => item.subjects).filter(Boolean);
+}
 
-  return [];
+/**
+ * Fetch subjects student is registered to teach (CACHED)
+ */
+export async function fetchTutorSubjects(): Promise<DbSubject[]> {
+  const session = await getVerifiedSession();
+  if (!session) return [];
+
+  const { userId, accessToken } = session;
+  console.log(`[Cache Access] fetchTutorSubjects for user: ${userId}`);
+
+  return unstable_cache(
+    async () => fetchTutorSubjectsUncached(userId, accessToken),
+    ["tutor-subjects", userId],
+    {
+      tags: [CACHE_TAGS.tutorSubjects(userId)],
+      revalidate: 86400
+    }
+  )();
 }
 
 /**
@@ -170,7 +231,6 @@ export async function addTutorSubject(
       return { success: false, error: "No estás autenticado/a." };
     }
 
-    // Check if already registered
     const { count, error: countError } = await db
       .from("tutor_subjects")
       .select("*", { count: "exact", head: true })
@@ -188,6 +248,9 @@ export async function addTutorSubject(
       .insert({ tutor_id: authUser.id, subject_id: subjectId });
     
     if (insertError) throw insertError;
+
+    invalidateCache(CACHE_TAGS.tutorSubjects(authUser.id));
+    invalidateCache(CACHE_TAGS.userProfile(authUser.id));
 
     const freshSubjects = await fetchTutorSubjects();
     return { success: true, data: freshSubjects };
@@ -220,6 +283,9 @@ export async function removeTutorSubject(
     
     if (deleteError) throw deleteError;
 
+    invalidateCache(CACHE_TAGS.tutorSubjects(authUser.id));
+    invalidateCache(CACHE_TAGS.userProfile(authUser.id));
+
     const freshSubjects = await fetchTutorSubjects();
     return { success: true, data: freshSubjects };
   } catch (err: any) {
@@ -229,21 +295,14 @@ export async function removeTutorSubject(
 }
 
 /**
- * Fetch tutor schedule availability
+ * UNCACHED: Fetch tutor schedule availability
  */
-export async function fetchTutorAvailability(): Promise<DbTutorAvailability[]> {
-  const db = createServerClient();
-  const authUserResponse = await db.auth.getUser();
-  const authUser = authUserResponse?.data?.user;
-
-  if (!authUser) {
-    return [];
-  }
-
+async function fetchTutorAvailabilityUncached(userId: string, accessToken: string): Promise<DbTutorAvailability[]> {
+  const db = createStaticClient(accessToken);
   const { data, error } = await db
     .from("tutor_availability")
     .select("*")
-    .eq("tutor_id", authUser.id)
+    .eq("tutor_id", userId)
     .order("day_of_week", { ascending: true })
     .order("start_time", { ascending: true });
 
@@ -253,6 +312,26 @@ export async function fetchTutorAvailability(): Promise<DbTutorAvailability[]> {
   }
 
   return data || [];
+}
+
+/**
+ * Fetch tutor schedule availability (CACHED)
+ */
+export async function fetchTutorAvailability(): Promise<DbTutorAvailability[]> {
+  const session = await getVerifiedSession();
+  if (!session) return [];
+
+  const { userId, accessToken } = session;
+  console.log(`[Cache Access] fetchTutorAvailability for user: ${userId}`);
+
+  return unstable_cache(
+    async () => fetchTutorAvailabilityUncached(userId, accessToken),
+    ["tutor-availability", userId],
+    {
+      tags: [CACHE_TAGS.tutorAvailability(userId)],
+      revalidate: 86400
+    }
+  )();
 }
 
 /**
@@ -270,7 +349,6 @@ export async function saveTutorAvailability(
       return { success: false, error: "No estás autenticado/a." };
     }
 
-    // Clear previous slots
     const { error: deleteError } = await db
       .from("tutor_availability")
       .delete()
@@ -278,7 +356,6 @@ export async function saveTutorAvailability(
     
     if (deleteError) throw deleteError;
 
-    // Insert new slots
     if (availabilityList.length > 0) {
       const insertData = availabilityList.map(slot => ({
         tutor_id: authUser.id,
@@ -290,9 +367,11 @@ export async function saveTutorAvailability(
       const { error: insertError } = await db
         .from("tutor_availability")
         .insert(insertData);
-
+    
       if (insertError) throw insertError;
     }
+
+    invalidateCache(CACHE_TAGS.tutorAvailability(authUser.id));
 
     const fresh = await fetchTutorAvailability();
     return { success: true, data: fresh };
@@ -303,10 +382,10 @@ export async function saveTutorAvailability(
 }
 
 /**
- * Fetch official list of careers for dropdown selection
+ * UNCACHED: Fetch official list of careers for dropdown selection
  */
-export async function fetchCareers(): Promise<DbCareer[]> {
-  const db = createServerClient();
+async function fetchCareersUncached(accessToken: string): Promise<DbCareer[]> {
+  const db = createStaticClient(accessToken);
   const { data, error } = await db
     .from("careers")
     .select("*")
@@ -321,10 +400,29 @@ export async function fetchCareers(): Promise<DbCareer[]> {
 }
 
 /**
- * Fetch all official college subjects
+ * Fetch official list of careers for dropdown selection (CACHED)
  */
-export async function fetchSubjects(): Promise<DbSubject[]> {
-  const db = createServerClient();
+export async function fetchCareers(): Promise<DbCareer[]> {
+  const session = await getVerifiedSession();
+  const accessToken = session?.accessToken ?? "";
+
+  console.log("[Cache Access] fetchCareers");
+
+  return unstable_cache(
+    async () => fetchCareersUncached(accessToken),
+    ["careers-list"],
+    {
+      tags: [CACHE_TAGS.careersList],
+      revalidate: 86400
+    }
+  )();
+}
+
+/**
+ * UNCACHED: Fetch all official college subjects
+ */
+async function fetchSubjectsUncached(accessToken: string): Promise<DbSubject[]> {
+  const db = createStaticClient(accessToken);
   const { data, error } = await db
     .from("subjects")
     .select("*")
@@ -336,4 +434,65 @@ export async function fetchSubjects(): Promise<DbSubject[]> {
   }
 
   return data || [];
+}
+
+/**
+ * Fetch all official college subjects (CACHED)
+ */
+export async function fetchSubjects(): Promise<DbSubject[]> {
+  const session = await getVerifiedSession();
+  const accessToken = session?.accessToken ?? "";
+
+  console.log("[Cache Access] fetchSubjects");
+
+  return unstable_cache(
+    async () => fetchSubjectsUncached(accessToken),
+    ["subjects-list"],
+    {
+      tags: [CACHE_TAGS.subjectsList],
+      revalidate: 86400
+    }
+  )();
+}
+
+export interface CombinedHeaderData {
+  profile: UserProfileExtended;
+  notifications: DbNotification[];
+}
+
+/**
+ * Fetch both user profile and notifications in a single optimized Server Action call.
+ */
+export async function fetchCombinedHeaderData(): Promise<CombinedHeaderData> {
+  const session = await getVerifiedSession();
+  if (!session) throw new Error("No estás autenticado/a.");
+
+  const { userId, accessToken } = session;
+  console.log(`[Combined Cache Access] fetchCombinedHeaderData for user: ${userId}`);
+
+  const [profile, notifications] = await Promise.all([
+    unstable_cache(
+      async () => fetchUserProfileUncached(userId, accessToken),
+      ["user-profile", userId],
+      {
+        tags: [CACHE_TAGS.userProfile(userId)],
+        revalidate: 86400
+      }
+    )(),
+    (async () => {
+      const db = createStaticClient(accessToken);
+      const { data, error } = await db
+        .from("notifications")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.error("Error fetching header notifications:", error);
+        return [];
+      }
+      return data || [];
+    })()
+  ]);
+
+  return { profile, notifications };
 }

@@ -1,7 +1,9 @@
 "use server";
 
-import { createServerClient } from "@/lib/supabase";
+import { createServerClient, createStaticClient, getVerifiedSession } from "@/lib/supabase";
 import { DbDocument } from "@/types/database";
+import { unstable_cache } from "next/cache";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 
 export interface ResourceExtended extends DbDocument {
   category: string;
@@ -15,10 +17,10 @@ export interface ResourceExtended extends DbDocument {
 }
 
 /**
- * Fetch all resources/documents
+ * UNCACHED: Fetch all resources/documents
  */
-export async function fetchResources(): Promise<ResourceExtended[]> {
-  const supabase = createServerClient();
+async function fetchResourcesUncached(accessToken: string): Promise<ResourceExtended[]> {
+  const supabase = createStaticClient(accessToken);
   const { data, error } = await supabase
     .from("documents")
     .select(`
@@ -33,7 +35,6 @@ export async function fetchResources(): Promise<ResourceExtended[]> {
     return [];
   }
 
-  // Filter out documents from soft-deleted users
   return (data || [])
     .filter((doc: any) => doc.author && !doc.author.deleted_at)
     .map((doc: any) => {
@@ -67,6 +68,25 @@ export async function fetchResources(): Promise<ResourceExtended[]> {
 }
 
 /**
+ * Fetch all resources/documents (CACHED)
+ */
+export async function fetchResources(): Promise<ResourceExtended[]> {
+  const session = await getVerifiedSession();
+  const accessToken = session?.accessToken ?? "";
+
+  console.log("[Cache Access] fetchResources");
+
+  return unstable_cache(
+    async () => fetchResourcesUncached(accessToken),
+    ["resources"],
+    {
+      tags: [CACHE_TAGS.resources],
+      revalidate: 86400
+    }
+  )();
+}
+
+/**
  * Upload resource document metadata entry
  */
 export async function uploadResource(
@@ -88,7 +108,6 @@ export async function uploadResource(
       return { success: false, error: "El título del apunte es obligatorio." };
     }
 
-    // 1. Look up subject ID matching Materia/category name
     const { data: subjectData } = await supabase
       .from("subjects")
       .select("id")
@@ -97,7 +116,6 @@ export async function uploadResource(
 
     const subjectId = subjectData && subjectData.length > 0 ? subjectData[0].id : 1;
 
-    // 2. Insert document row
     const { data: newDocData, error: insertError } = await supabase
       .from("documents")
       .insert({
@@ -113,7 +131,6 @@ export async function uploadResource(
 
     if (insertError) throw insertError;
 
-    // 3. Fetch author details and update their Karma points by 50 points
     const { data: authorData } = await supabase
       .from("users")
       .select("name, last_name, points")
@@ -125,6 +142,10 @@ export async function uploadResource(
       .from("users")
       .update({ points: currentPoints + 50 })
       .eq("id", authUser.id);
+
+    invalidateCache(CACHE_TAGS.resources);
+    invalidateCache(CACHE_TAGS.dashboardStats(authUser.id));
+    invalidateCache(CACHE_TAGS.userProfile(authUser.id));
 
     const catColor = category === "Sistemas Operativos" 
       ? "text-orange-400 bg-orange-400/10 border-orange-400/20" 
@@ -165,7 +186,6 @@ export async function uploadResource(
 export async function toggleSaveResource(
   resourceId: string
 ): Promise<{ success: boolean; saved?: boolean; error?: string }> {
-  // Client component optimistically toggles the heart and keeps it in local state
   return { success: true, saved: true };
 }
 
@@ -192,6 +212,8 @@ export async function castResourceVote(
       .eq("id", resourceId);
 
     if (error) throw error;
+
+    invalidateCache(CACHE_TAGS.resources);
 
     return { success: true, likes: newUpvotes };
   } catch (error: any) {

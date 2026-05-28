@@ -1,6 +1,6 @@
 "use server";
 
-import { createServerClient } from "@/lib/supabase";
+import { createServerClient, createStaticClient, getVerifiedSession } from "@/lib/supabase";
 import { 
   DbUser, 
   DbTutoringSession, 
@@ -11,6 +11,8 @@ import {
   DbPostReply,
   DbDocument
 } from "@/types/database";
+import { unstable_cache } from "next/cache";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 
 // Custom return types for Server Actions
 export interface DashboardStats {
@@ -36,26 +38,51 @@ export interface ForumPostExtended extends DbPost {
 }
 
 /**
- * Fetch core statistics, level, XP, and badges earned by the user.
+ * UNCACHED: Fetch core statistics, level, XP, and badges earned by the user.
+ * Uses an explicit accessToken so this function is safe inside unstable_cache.
  */
-export async function fetchDashboardStats(): Promise<DashboardStats> {
-  const supabase = createServerClient();
-  const authResponse = await supabase.auth.getUser();
-  const authUser = authResponse?.data?.user;
-
-  if (!authUser) {
-    throw new Error("No estás autenticado/a.");
-  }
+async function fetchDashboardStatsUncached(userId: string, accessToken: string): Promise<DashboardStats> {
+  const supabase = createStaticClient(accessToken);
 
   // 1. Fetch user metrics
-  const { data: dbUser, error: userError } = await supabase
+  let { data: dbUser, error: userError } = await supabase
     .from("users")
     .select("*")
-    .eq("id", authUser.id)
+    .eq("id", userId)
     .single();
 
   if (userError || !dbUser) {
-    throw new Error("Usuario no encontrado en la base de datos.");
+    console.log(`[Cache Self-Heal/Dashboard] User ${userId} not found in public.users. Attempting to restore...`);
+    const { data: authData } = await supabase.auth.getUser();
+    const authUser = authData?.user;
+    
+    if (authUser) {
+      const name = authUser.user_metadata?.first_name || authUser.user_metadata?.name || "Estudiante";
+      const lastName = authUser.user_metadata?.last_name || "";
+      const email = authUser.email || "";
+
+      const { data: insertedUser, error: insertError } = await supabase
+        .from("users")
+        .insert({
+          id: userId,
+          email: email,
+          name: name,
+          last_name: lastName,
+          role_id: 2
+        })
+        .select("*")
+        .single();
+
+      if (!insertError && insertedUser) {
+        console.log(`[Cache Self-Heal/Dashboard] User ${userId} successfully created in public.users.`);
+        dbUser = insertedUser;
+      } else {
+        console.error(`[Cache Self-Heal/Dashboard] Failed to auto-create user:`, insertError);
+        throw new Error("Usuario no encontrado en la base de datos.");
+      }
+    } else {
+      throw new Error("Usuario no encontrado en la base de datos.");
+    }
   }
 
   // 2. Fetch badges
@@ -66,13 +93,10 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
 
   const recentBadges = allBadges || [];
 
-  // Calculating level: let's do Level = Math.floor(points / 250) + 1, and level threshold:
   const points = dbUser.points || 0;
   const karmaLevel = Math.floor(points / 250) + 1;
   const nextLevelXP = karmaLevel * 250;
   const xpPercentage = Math.min(((points % 250) / 250) * 100, 100);
-
-  // Return standard notifications
   const notificationsCount = 3;
 
   return {
@@ -87,16 +111,30 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
 }
 
 /**
- * Fetch all upcoming tutoring sessions for the student (either as tutor or learner)
+ * Fetch core statistics, level, XP, and badges earned by the user (CACHED).
  */
-export async function fetchUpcomingSessions(): Promise<UpcomingSessionExtended[]> {
-  const supabase = createServerClient();
-  const authResponse = await supabase.auth.getUser();
-  const authUser = authResponse?.data?.user;
+export async function fetchDashboardStats(): Promise<DashboardStats> {
+  const session = await getVerifiedSession();
+  if (!session) throw new Error("No estás autenticado/a.");
 
-  if (!authUser) {
-    return [];
-  }
+  const { userId, accessToken } = session;
+  console.log(`[Cache Access] fetchDashboardStats for user: ${userId}`);
+
+  return unstable_cache(
+    async () => fetchDashboardStatsUncached(userId, accessToken),
+    ["dashboard-stats", userId],
+    {
+      tags: [CACHE_TAGS.dashboardStats(userId)],
+      revalidate: 86400
+    }
+  )();
+}
+
+/**
+ * UNCACHED: Fetch all upcoming tutoring sessions for the student.
+ */
+async function fetchUpcomingSessionsUncached(userId: string, accessToken: string): Promise<UpcomingSessionExtended[]> {
+  const supabase = createStaticClient(accessToken);
 
   const { data, error } = await supabase
     .from("tutoring_sessions")
@@ -106,7 +144,7 @@ export async function fetchUpcomingSessions(): Promise<UpcomingSessionExtended[]
       tutor:users!tutor_id(name, last_name, deleted_at),
       student:users!student_id(name, last_name, deleted_at)
     `)
-    .or(`student_id.eq.${authUser.id},tutor_id.eq.${authUser.id}`)
+    .or(`student_id.eq.${userId},tutor_id.eq.${userId}`)
     .order("scheduled_start", { ascending: true });
 
   if (error) {
@@ -116,16 +154,12 @@ export async function fetchUpcomingSessions(): Promise<UpcomingSessionExtended[]
 
   const extendedSessions: UpcomingSessionExtended[] = (data || [])
     .filter((session: any) => {
-      // Exclude sessions where the other participant is soft-deleted
-      const isTutorRole = session.tutor_id === authUser.id;
+      const isTutorRole = session.tutor_id === userId;
       const peer = isTutorRole ? session.student : session.tutor;
-      if (peer && peer.deleted_at) {
-        return false;
-      }
-      return true;
+      return !(peer && peer.deleted_at);
     })
     .map((session: any) => {
-      const isTutorRole = session.tutor_id === authUser.id;
+      const isTutorRole = session.tutor_id === userId;
       const peer = isTutorRole ? session.student : session.tutor;
       const peerName = peer ? `${peer.name} ${peer.last_name || ""}`.trim() : "Compañero/a";
 
@@ -148,10 +182,30 @@ export async function fetchUpcomingSessions(): Promise<UpcomingSessionExtended[]
 }
 
 /**
- * Fetch recent forum activities or academic questions
+ * Fetch all upcoming tutoring sessions for the student (CACHED).
  */
-export async function fetchRecentForumPosts(): Promise<ForumPostExtended[]> {
-  const supabase = createServerClient();
+export async function fetchUpcomingSessions(): Promise<UpcomingSessionExtended[]> {
+  const session = await getVerifiedSession();
+  if (!session) return [];
+
+  const { userId, accessToken } = session;
+  console.log(`[Cache Access] fetchUpcomingSessions for user: ${userId}`);
+
+  return unstable_cache(
+    async () => fetchUpcomingSessionsUncached(userId, accessToken),
+    ["upcoming-sessions", userId],
+    {
+      tags: [CACHE_TAGS.upcomingSessions(userId)],
+      revalidate: 86400
+    }
+  )();
+}
+
+/**
+ * UNCACHED: Fetch recent forum activities or academic questions.
+ */
+async function fetchRecentForumPostsUncached(accessToken: string): Promise<ForumPostExtended[]> {
+  const supabase = createStaticClient(accessToken);
   
   const { data, error } = await supabase
     .from("posts")
@@ -172,28 +226,45 @@ export async function fetchRecentForumPosts(): Promise<ForumPostExtended[]> {
 
   const extendedPosts: ForumPostExtended[] = (data || [])
     .filter((post: any) => post.author && !post.author.deleted_at)
-    .map((post: any) => {
-      return {
-        id: post.id,
-        user_id: post.user_id,
-        subject_id: post.subject_id,
-        post_type_id: post.post_type_id,
-        title: post.title,
-        content: post.content,
-        upvotes: post.upvotes || 0,
-        is_resolved: post.is_resolved,
-        created_at: post.created_at,
-        subjectName: post.subject?.name,
-        postTypeName: post.post_type?.name || "Duda Académica",
-        repliesCount: post.replies ? post.replies[0]?.count || 0 : 0
-      };
-    });
+    .map((post: any) => ({
+      id: post.id,
+      user_id: post.user_id,
+      subject_id: post.subject_id,
+      post_type_id: post.post_type_id,
+      title: post.title,
+      content: post.content,
+      upvotes: post.upvotes || 0,
+      is_resolved: post.is_resolved,
+      created_at: post.created_at,
+      subjectName: post.subject?.name,
+      postTypeName: post.post_type?.name || "Duda Académica",
+      repliesCount: post.replies ? post.replies[0]?.count || 0 : 0
+    }));
 
   return extendedPosts;
 }
 
 /**
- * Update the status of a tutoring session (Accept class or Reject/Cancel class)
+ * Fetch recent forum activities or academic questions (CACHED).
+ */
+export async function fetchRecentForumPosts(): Promise<ForumPostExtended[]> {
+  const session = await getVerifiedSession();
+  const accessToken = session?.accessToken ?? "";
+
+  console.log("[Cache Access] fetchRecentForumPosts");
+
+  return unstable_cache(
+    async () => fetchRecentForumPostsUncached(accessToken),
+    ["recent-forum-posts"],
+    {
+      tags: [CACHE_TAGS.recentForumPosts],
+      revalidate: 86400
+    }
+  )();
+}
+
+/**
+ * Update the status of a tutoring session (Accept class or Reject/Cancel class).
  */
 export async function updateSessionStatus(
   sessionId: string, 
@@ -208,6 +279,12 @@ export async function updateSessionStatus(
       return { success: false, error: "Che, no estás autenticado/a." };
     }
 
+    const { data: sessionData } = await supabase
+      .from("tutoring_sessions")
+      .select("tutor_id, student_id")
+      .eq("id", sessionId)
+      .single();
+
     const updateData: any = { status: newStatus };
     if (newStatus === "confirmed") {
       updateData.meeting_link = "https://meet.google.com/xyz-pdqk-wlm";
@@ -220,6 +297,14 @@ export async function updateSessionStatus(
 
     if (error) throw error;
 
+    invalidateCache(CACHE_TAGS.upcomingSessions(authUser.id));
+    if (sessionData) {
+      const peerId = sessionData.tutor_id === authUser.id ? sessionData.student_id : sessionData.tutor_id;
+      if (peerId) {
+        invalidateCache(CACHE_TAGS.upcomingSessions(peerId));
+      }
+    }
+
     const freshSessions = await fetchUpcomingSessions();
     return { success: true, data: freshSessions };
   } catch (error: any) {
@@ -229,21 +314,15 @@ export async function updateSessionStatus(
 }
 
 /**
- * Fetch active tutor availability schedule slots
+ * UNCACHED: Fetch active tutor availability schedule slots.
  */
-export async function fetchTutorAvailability(): Promise<DbTutorAvailability[]> {
-  const supabase = createServerClient();
-  const authResponse = await supabase.auth.getUser();
-  const authUser = authResponse?.data?.user;
-
-  if (!authUser) {
-    return [];
-  }
+async function fetchTutorAvailabilityUncached(userId: string, accessToken: string): Promise<DbTutorAvailability[]> {
+  const supabase = createStaticClient(accessToken);
 
   const { data, error } = await supabase
     .from("tutor_availability")
     .select("*")
-    .eq("tutor_id", authUser.id)
+    .eq("tutor_id", userId)
     .order("day_of_week", { ascending: true })
     .order("start_time", { ascending: true });
 
@@ -256,7 +335,27 @@ export async function fetchTutorAvailability(): Promise<DbTutorAvailability[]> {
 }
 
 /**
- * Save active tutor availability calendar slots
+ * Fetch active tutor availability schedule slots (CACHED).
+ */
+export async function fetchTutorAvailability(): Promise<DbTutorAvailability[]> {
+  const session = await getVerifiedSession();
+  if (!session) return [];
+
+  const { userId, accessToken } = session;
+  console.log(`[Cache Access] fetchTutorAvailability for user: ${userId}`);
+
+  return unstable_cache(
+    async () => fetchTutorAvailabilityUncached(userId, accessToken),
+    ["tutor-availability", userId],
+    {
+      tags: [CACHE_TAGS.tutorAvailability(userId)],
+      revalidate: 86400
+    }
+  )();
+}
+
+/**
+ * Save active tutor availability calendar slots.
  */
 export async function saveTutorAvailability(
   availabilityList: DbTutorAvailability[]
@@ -270,7 +369,6 @@ export async function saveTutorAvailability(
       return { success: false, error: "No autenticado." };
     }
 
-    // Delete existing availability slots
     const { error: deleteError } = await supabase
       .from("tutor_availability")
       .delete()
@@ -278,7 +376,6 @@ export async function saveTutorAvailability(
 
     if (deleteError) throw deleteError;
 
-    // Insert new availability slots
     if (availabilityList.length > 0) {
       const insertData = availabilityList.map(slot => ({
         tutor_id: authUser.id,
@@ -294,6 +391,8 @@ export async function saveTutorAvailability(
       if (insertError) throw insertError;
     }
 
+    invalidateCache(CACHE_TAGS.tutorAvailability(authUser.id));
+
     const fresh = await fetchTutorAvailability();
     return { success: true, data: fresh };
   } catch (error: any) {
@@ -303,10 +402,10 @@ export async function saveTutorAvailability(
 }
 
 /**
- * Fetch all replies/comments associated with a forum post
+ * UNCACHED: Fetch all replies/comments associated with a forum post.
  */
-export async function fetchPostReplies(postId: string): Promise<DbPostReply[]> {
-  const supabase = createServerClient();
+async function fetchPostRepliesUncached(postId: string, accessToken: string): Promise<DbPostReply[]> {
+  const supabase = createStaticClient(accessToken);
   const { data, error } = await supabase
     .from("post_replies")
     .select(`
@@ -321,12 +420,30 @@ export async function fetchPostReplies(postId: string): Promise<DbPostReply[]> {
     return [];
   }
 
-  // Filter out replies from soft-deleted users
   return (data || []).filter((r: any) => r.author && !r.author.deleted_at);
 }
 
 /**
- * Submit a new reply comment to a forum post
+ * Fetch all replies/comments associated with a forum post (CACHED).
+ */
+export async function fetchPostReplies(postId: string): Promise<DbPostReply[]> {
+  const session = await getVerifiedSession();
+  const accessToken = session?.accessToken ?? "";
+
+  console.log(`[Cache Access] fetchPostReplies for post: ${postId}`);
+
+  return unstable_cache(
+    async () => fetchPostRepliesUncached(postId, accessToken),
+    ["post-replies", postId],
+    {
+      tags: [CACHE_TAGS.postReplies(postId)],
+      revalidate: 86400
+    }
+  )();
+}
+
+/**
+ * Submit a new reply comment to a forum post.
  */
 export async function addPostReply(
   postId: string,
@@ -345,19 +462,21 @@ export async function addPostReply(
       return { success: false, error: "El comentario no puede estar vacío." };
     }
 
-    const newReply = {
-      post_id: postId,
-      user_id: authUser.id,
-      content: content.trim(),
-      upvotes: 0,
-      is_accepted: false
-    };
-
     const { error } = await supabase
       .from("post_replies")
-      .insert(newReply);
+      .insert({
+        post_id: postId,
+        user_id: authUser.id,
+        content: content.trim(),
+        upvotes: 0,
+        is_accepted: false
+      });
 
     if (error) throw error;
+
+    invalidateCache(CACHE_TAGS.postReplies(postId));
+    invalidateCache(CACHE_TAGS.forumPosts);
+    invalidateCache(CACHE_TAGS.recentForumPosts);
 
     const replies = await fetchPostReplies(postId);
     return { success: true, data: replies };
@@ -368,7 +487,7 @@ export async function addPostReply(
 }
 
 /**
- * Upload a document metadata entry
+ * Upload a document metadata entry.
  */
 export async function uploadApunte(
   title: string,
@@ -405,7 +524,6 @@ export async function uploadApunte(
 
     if (error) throw error;
 
-    // Increment points for user by 50 points (Karma points)
     const { data: dbUser } = await supabase
       .from("users")
       .select("points")
@@ -418,9 +536,59 @@ export async function uploadApunte(
       .update({ points: currentPoints + 50 })
       .eq("id", authUser.id);
 
+    invalidateCache(CACHE_TAGS.resources);
+    invalidateCache(CACHE_TAGS.dashboardStats(authUser.id));
+    invalidateCache(CACHE_TAGS.userProfile(authUser.id));
+
     return { success: true, data: data as DbDocument };
   } catch (error: any) {
     console.error("Error uploading apunte:", error);
     return { success: false, error: error.message || "Hubo un problema al registrar tu apunte." };
   }
+}
+
+export interface CombinedDashboardData {
+  stats: DashboardStats;
+  sessions: UpcomingSessionExtended[];
+  posts: ForumPostExtended[];
+}
+
+/**
+ * Fetch stats, sessions, and posts in a single optimized Server Action call.
+ */
+export async function fetchCombinedDashboardData(): Promise<CombinedDashboardData> {
+  const session = await getVerifiedSession();
+  if (!session) throw new Error("No estás autenticado/a.");
+
+  const { userId, accessToken } = session;
+  console.log(`[Combined Cache Access] fetchCombinedDashboardData for user: ${userId}`);
+
+  const [stats, sessions, posts] = await Promise.all([
+    unstable_cache(
+      async () => fetchDashboardStatsUncached(userId, accessToken),
+      ["dashboard-stats", userId],
+      {
+        tags: [CACHE_TAGS.dashboardStats(userId)],
+        revalidate: 86400
+      }
+    )(),
+    unstable_cache(
+      async () => fetchUpcomingSessionsUncached(userId, accessToken),
+      ["upcoming-sessions", userId],
+      {
+        tags: [CACHE_TAGS.upcomingSessions(userId)],
+        revalidate: 86400
+      }
+    )(),
+    unstable_cache(
+      async () => fetchRecentForumPostsUncached(accessToken),
+      ["recent-forum-posts"],
+      {
+        tags: [CACHE_TAGS.recentForumPosts],
+        revalidate: 86400
+      }
+    )()
+  ]);
+
+  return { stats, sessions, posts };
 }

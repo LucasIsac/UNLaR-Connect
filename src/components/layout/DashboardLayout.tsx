@@ -12,7 +12,7 @@ export default function DashboardLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="relative min-h-screen bg-background text-foreground transition-colors duration-300 flex overflow-hidden">
+    <div suppressHydrationWarning className="relative min-h-screen bg-background text-foreground transition-colors duration-300 flex overflow-hidden">
       {/* Header toolbar */}
       <Header onMenuToggle={() => setIsSidebarOpen(true)} />
 

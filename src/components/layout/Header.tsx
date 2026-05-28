@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Menu, Search, Bell, Award, User, LogOut, Settings, Calendar, Trophy, Sparkles, Check, Trash2 } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
 import Logo from "../ui/Logo";
-import { fetchUserProfile, UserProfileExtended } from "@/actions/perfil";
+import { fetchCombinedHeaderData, UserProfileExtended } from "@/actions/perfil";
 import { signOutAction } from "@/actions/auth";
 import { fetchNotificationsAction, markNotificationAsReadAction, markAllNotificationsAsReadAction } from "@/actions/notifications";
 import { DbNotification } from "@/types/database";
@@ -28,14 +28,15 @@ export default function Header({ onMenuToggle }: HeaderProps) {
 
   // Load user profile & notifications on mount
   useEffect(() => {
+    let isCancelled = false;
+
     async function loadData() {
       try {
-        const [profileData, notificationsData] = await Promise.all([
-          fetchUserProfile(),
-          fetchNotificationsAction()
-        ]);
-        setProfile(profileData);
-        setNotifications(notificationsData);
+        const { profile, notifications } = await fetchCombinedHeaderData();
+        if (!isCancelled) {
+          setProfile(profile);
+          setNotifications(notifications);
+        }
       } catch (err) {
         console.error("Error loading header metrics:", err);
       }
@@ -46,13 +47,18 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     const interval = setInterval(async () => {
       try {
         const fresh = await fetchNotificationsAction();
-        setNotifications(fresh);
+        if (!isCancelled) {
+          setNotifications(fresh);
+        }
       } catch (err) {
         console.error(err);
       }
     }, 30000);
 
-    return () => clearInterval(interval);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   // Listen for clicks outside dropdown menus
@@ -105,13 +111,13 @@ export default function Header({ onMenuToggle }: HeaderProps) {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <header className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-6 md:px-10 h-16 bg-background/50 backdrop-blur-xl border-b border-border/40 shadow-sm transition-colors duration-300">
+    <header suppressHydrationWarning className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-6 md:px-10 h-16 bg-background/50 backdrop-blur-xl border-b border-border/40 shadow-sm transition-colors duration-300">
       {/* Left: Brand Logo (desktop) & Mobile toggle & Search Bar */}
-      <div className="flex flex-1 items-center gap-6">
+      <div suppressHydrationWarning className="flex flex-1 items-center gap-6">
         {/* Desktop Brand Logo */}
-        <Link href="/dashboard" className="hidden md:flex items-center gap-3 shrink-0 group">
+        <Link suppressHydrationWarning href="/dashboard" className="hidden md:flex items-center gap-3 shrink-0 group">
           <Logo className="w-8 h-8 transition-transform duration-300 group-hover:scale-105" />
-          <div className="flex flex-col text-left">
+          <div suppressHydrationWarning className="flex flex-col text-left">
             <span className="font-heading font-black text-sm tracking-tight leading-none text-foreground">
               UNLaR<span className="text-accent font-bold">-Connect</span>
             </span>
@@ -144,7 +150,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
       </div>
 
       {/* Right: Actions (Points, notifications, profile, theme) */}
-      <div className="flex items-center gap-4">
+      <div suppressHydrationWarning className="flex items-center gap-4">
         {/* Mobile Search Button (shows only when screen is small) */}
         <button className="p-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30 sm:hidden transition-colors">
           <Search className="w-4 h-4" />
