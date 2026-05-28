@@ -132,7 +132,9 @@ const CLIENT_MOCK_POSTS: ForumPostExtended[] = [
     created_at: new Date(Date.now() - 3 * 3600000).toISOString(),
     subjectName: "Análisis Matemático II",
     postTypeName: "Duda Académica",
-    repliesCount: 1
+    repliesCount: 1,
+    type: "question",
+    metadata: {}
   },
   {
     id: "post-2",
@@ -146,7 +148,9 @@ const CLIENT_MOCK_POSTS: ForumPostExtended[] = [
     created_at: new Date(Date.now() - 5 * 3600000).toISOString(),
     subjectName: "Sistemas Operativos",
     postTypeName: "Consejo de Cursada",
-    repliesCount: 1
+    repliesCount: 1,
+    type: "resource",
+    metadata: {}
   },
   {
     id: "post-3",
@@ -160,7 +164,15 @@ const CLIENT_MOCK_POSTS: ForumPostExtended[] = [
     created_at: new Date(Date.now() - 10 * 3600000).toISOString(),
     subjectName: "Álgebra",
     postTypeName: "Compraventa",
-    repliesCount: 0
+    repliesCount: 0,
+    type: "sell_rent",
+    metadata: {
+      item_name: "Apuntes de Álgebra",
+      price: 1500,
+      condition: "used_good",
+      mode: "sell",
+      location: "Sede Central"
+    }
   }
 ];
 

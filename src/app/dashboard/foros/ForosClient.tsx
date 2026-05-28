@@ -4,16 +4,13 @@
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
-  ThumbsUp,
   MessageSquare,
   Pencil,
   SlidersHorizontal,
   Star,
-  User,
   Plus,
   ArrowUp,
   ArrowDown,
-  Code2,
   Flame,
   CheckCircle2,
   X,
@@ -23,7 +20,12 @@ import {
   MessageCircle,
   GraduationCap,
   Calendar,
-  Award
+  Award,
+  Coins,
+  Package,
+  MapPin,
+  Clock,
+  Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -32,6 +34,7 @@ import {
   fetchPostReplies,
   addPostReply,
   resolvePost,
+  interactWithPost,
   ForumPostExtended
 } from "@/actions/foros";
 import { DbPostReply } from "@/types/database";
@@ -40,10 +43,12 @@ import { Select } from "@/components/ui/Select";
 const MOCK_USER_ID = "123e4567-e89b-12d3-a456-426614174000";
 
 const categories = [
-  { label: "Todas", color: "text-foreground bg-muted border-border/40" },
-  { label: "Duda Técnica", color: "text-red-400 bg-red-400/10 border-red-400/20" },
-  { label: "Consejo de Cursada", color: "text-accent bg-accent/10 border-accent/20" },
-  { label: "Ayuda con TP", color: "text-teal-400 bg-teal-400/10 border-teal-400/20" },
+  { label: "Todas", value: "Todas", color: "text-foreground bg-muted border-border/40" },
+  { label: "Preguntas", value: "question", color: "text-red-400 bg-red-400/10 border-red-400/20" },
+  { label: "Recursos", value: "resource", color: "text-accent bg-accent/10 border-accent/20" },
+  { label: "Tutorías", value: "tutoring", color: "text-blue-400 bg-blue-400/10 border-blue-400/20" },
+  { label: "Préstamos", value: "borrow", color: "text-teal-400 bg-teal-400/10 border-teal-400/20" },
+  { label: "Compra / Alquiler", value: "sell_rent", color: "text-purple-400 bg-purple-400/10 border-purple-400/20" },
 ];
 
 const popularTags = [
@@ -105,13 +110,28 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
   const [newReplyText, setNewReplyText] = useState("");
 
   // Voting state (maps thread.id to 'up' | 'down' | null)
-  const [userVotes, setUserVotes] = useState<Record<string, "up" | "down" | null>>({});
+  const [userVotes, setUserVotes] = useState<Record<string, "up" | "down" | null>>(() =>
+    Object.fromEntries(initialThreads.map((thread) => [thread.id, thread.userVote || null]))
+  );
 
   // New Thread Form States
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newSubject, setNewSubject] = useState("Programación II");
-  const [newCategory, setNewCategory] = useState("Duda Técnica");
+  const [newType, setNewType] = useState<'question' | 'resource' | 'tutoring' | 'borrow' | 'sell_rent'>("question");
+
+  // Type-specific field states
+  const [itemCondition, setItemCondition] = useState<'new' | 'used_good' | 'used_fair'>("used_good");
+  const [itemName, setItemName] = useState("");
+  const [itemAvailability, setItemAvailability] = useState("");
+  const [itemLocation, setItemLocation] = useState("");
+  const [itemPrice, setItemPrice] = useState("");
+  const [itemMode, setItemMode] = useState<'sell' | 'rent'>("sell");
+  const [tutoringSubject, setTutoringSubject] = useState("");
+  const [tutoringPriceType, setTutoringPriceType] = useState<'free' | 'paid'>("free");
+  const [tutoringPrice, setTutoringPrice] = useState("");
+  const [tutoringModality, setTutoringModality] = useState<'online' | 'present' | 'hybrid'>("online");
+  const [tutoringAvailability, setTutoringAvailability] = useState("");
 
   // Custom Toast State
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -165,7 +185,20 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
     }));
 
     try {
-      await castPostVote(threadId, direction, currentVote);
+      const response = await castPostVote(threadId, direction);
+      if (!response.success) {
+        throw new Error(response.error || "No se pudo guardar tu voto.");
+      }
+
+      setThreads((prev) =>
+        prev.map((t) => (t.id === threadId ? { ...t, upvotes: response.likes ?? t.upvotes, userVote: response.userVote ?? null } : t))
+      );
+      setSelectedThread((prev) =>
+        prev && prev.id === threadId
+          ? { ...prev, upvotes: response.likes ?? prev.upvotes, userVote: response.userVote ?? null }
+          : prev
+      );
+      setUserVotes((prev) => ({ ...prev, [threadId]: response.userVote ?? null }));
     } catch (err) {
       console.error(err);
       // Rollback on failure
@@ -177,23 +210,89 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
     }
   };
 
+  const handlePostInteraction = async (actionType: "interest" | "reserve" | "deliver" | "return") => {
+    if (!selectedThread) return;
+
+    setActionInProgress(actionType);
+    try {
+      const response = await interactWithPost(selectedThread.id, actionType);
+      if (response.success && response.updatedPost) {
+        setThreads((prev) =>
+          prev.map((t) => (t.id === selectedThread.id ? response.updatedPost! : t))
+        );
+        setSelectedThread(response.updatedPost);
+        
+        if (actionType === "interest") {
+          showToast("¡Expresaste interés! Se envió una notificación al dueño/a 🚀");
+        } else if (actionType === "reserve") {
+          showToast("¡Artículo reservado con éxito! 📦");
+        } else if (actionType === "deliver") {
+          showToast("¡Artículo marcado como entregado! 👍");
+        } else if (actionType === "return") {
+          showToast("¡Artículo devuelto! Vuelve a estar disponible 🔄");
+        }
+      } else {
+        showToast(response.error || "No se pudo realizar la acción.");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Hubo un problema de conexión.");
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
   const handleCreateThreadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newDesc.trim()) return;
 
+    let metadata: any = {};
+    if (newType === 'tutoring') {
+      metadata = {
+        subject: tutoringSubject || newSubject,
+        price_type: tutoringPriceType,
+        price: tutoringPriceType === 'paid' ? parseFloat(tutoringPrice) || 0 : undefined,
+        modality: tutoringModality,
+        availability: tutoringAvailability || "A coordinar"
+      };
+    } else if (newType === 'borrow') {
+      metadata = {
+        item_name: itemName || newTitle,
+        condition: itemCondition,
+        availability: itemAvailability || "Lunes a Viernes",
+        location: itemLocation || "Sede Central",
+        status: "available"
+      };
+    } else if (newType === 'sell_rent') {
+      metadata = {
+        item_name: itemName || newTitle,
+        price: parseFloat(itemPrice) || 0,
+        condition: itemCondition,
+        mode: itemMode,
+        location: itemLocation || "Sede Central"
+      };
+    }
+
     setActionInProgress("create-post");
     try {
-      const response = await createForumPost(newTitle, newDesc, newSubject, newCategory);
+      const response = await createForumPost(newTitle, newDesc, newSubject, newType, metadata);
       if (response.success && response.data) {
         setThreads((prev) => [response.data!, ...prev]);
         setIsCreateModalOpen(false);
-        showToast("¡Hilo publicado! Sumaste 15 puntos de Karma 🚀");
+        showToast("¡Publicación realizada! Sumaste 15 puntos de Karma 🚀");
         
         // Reset inputs
         setNewTitle("");
         setNewDesc("");
+        setItemName("");
+        setItemPrice("");
+        setItemLocation("");
+        setItemAvailability("");
+        setTutoringSubject("");
+        setTutoringPrice("");
+        setTutoringAvailability("");
       } else {
-        showToast(response.error || "Error al crear el hilo.");
+        showToast(response.error || "Error al crear la publicación.");
       }
     } catch (err) {
       console.error(err);
@@ -256,7 +355,7 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
 
   // Filter threads
   const filteredThreads = threads.filter((t) => {
-    const matchesCategory = selectedCategory === "Todas" || t.category === selectedCategory;
+    const matchesCategory = selectedCategory === "Todas" || t.type === selectedCategory;
     const matchesSearch =
       t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -332,10 +431,10 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
               </div>
               {categories.map((cat) => (
                 <button
-                  key={cat.label}
-                  onClick={() => setSelectedCategory(cat.label)}
+                  key={cat.value}
+                  onClick={() => setSelectedCategory(cat.value)}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 ${
-                    selectedCategory === cat.label
+                    selectedCategory === cat.value
                       ? "bg-accent/20 border-accent text-accent font-bold"
                       : "bg-glass border-border/30 text-muted-foreground hover:text-foreground hover:bg-muted/10"
                   }`}
@@ -457,6 +556,95 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                             <p className="text-xs md:text-sm text-muted-foreground leading-relaxed mb-4 line-clamp-2">
                               {thread.content}
                             </p>
+
+                            {/* Type-specific structured metadata layout */}
+                            {thread.type === 'tutoring' && thread.metadata && (
+                              <div className="mb-4 flex flex-wrap gap-2 text-xs bg-blue-500/5 border border-blue-500/10 rounded-xl p-3">
+                                <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                                  <GraduationCap className="w-3.5 h-3.5 text-blue-400" />
+                                  Materia: <strong className="text-foreground">{thread.metadata.subject || thread.subjectName}</strong>
+                                </span>
+                                <span className="text-muted-foreground">•</span>
+                                <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5 text-blue-400" />
+                                  Modalidad: <strong className="text-foreground">{thread.metadata.modality === 'online' ? 'Virtual' : thread.metadata.modality === 'present' ? 'Presencial' : 'Híbrido'}</strong>
+                                </span>
+                                <span className="text-muted-foreground">•</span>
+                                <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                                  <Coins className="w-3.5 h-3.5 text-blue-400" />
+                                  Costo: <strong className="text-foreground">{thread.metadata.price_type === 'free' ? 'Gratuita' : `Paga ($${thread.metadata.price})`}</strong>
+                                </span>
+                              </div>
+                            )}
+
+                            {thread.type === 'borrow' && thread.metadata && (
+                              <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-teal-500/5 border border-teal-500/10 rounded-xl p-3">
+                                <div className="space-y-1">
+                                  <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                                    <Package className="w-3.5 h-3.5 text-teal-400" />
+                                    Artículo: <strong className="text-foreground">{thread.metadata.item_name}</strong>
+                                  </span>
+                                  <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                                    <SlidersHorizontal className="w-3.5 h-3.5 text-teal-400" />
+                                    Estado: <strong className="text-foreground">{thread.metadata.condition === 'new' ? 'Nuevo' : thread.metadata.condition === 'used_good' ? 'Excelente' : 'Detalles de uso'}</strong>
+                                  </span>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                                    <MapPin className="w-3.5 h-3.5 text-teal-400" />
+                                    Ubicación: <strong className="text-foreground">{thread.metadata.location}</strong>
+                                  </span>
+                                  <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                                    <Clock className="w-3.5 h-3.5 text-teal-400" />
+                                    Disponibilidad: <strong className="text-foreground">{thread.metadata.availability}</strong>
+                                  </span>
+                                </div>
+                                <div className="col-span-1 sm:col-span-2 pt-1.5 border-t border-border/5 flex items-center justify-between">
+                                  <span className="text-[11px] font-semibold text-muted-foreground">Estado del Préstamo:</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    thread.metadata.status === 'available' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                                    thread.metadata.status === 'reserved' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
+                                    thread.metadata.status === 'delivered' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                                    'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                                  }`}>
+                                    {thread.metadata.status === 'available' ? 'Disponible' :
+                                     thread.metadata.status === 'reserved' ? 'Reservado' :
+                                     thread.metadata.status === 'delivered' ? 'Entregado' : 'Devuelto'}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                            {thread.type === 'sell_rent' && thread.metadata && (
+                              <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-purple-500/5 border border-purple-500/10 rounded-xl p-3">
+                                <div className="space-y-1">
+                                  <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                                    <Package className="w-3.5 h-3.5 text-purple-400" />
+                                    Artículo: <strong className="text-foreground">{thread.metadata.item_name}</strong>
+                                  </span>
+                                  <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                                    <SlidersHorizontal className="w-3.5 h-3.5 text-purple-400" />
+                                    Condición: <strong className="text-foreground">{thread.metadata.condition === 'new' ? 'Nuevo' : thread.metadata.condition === 'used_good' ? 'Excelente' : 'Detalles de uso'}</strong>
+                                  </span>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                                    <MapPin className="w-3.5 h-3.5 text-purple-400" />
+                                    Ubicación: <strong className="text-foreground">{thread.metadata.location}</strong>
+                                  </span>
+                                  <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                                    <Coins className="w-3.5 h-3.5 text-purple-400" />
+                                    Modo: <strong className="text-foreground">{thread.metadata.mode === 'sell' ? 'Venta' : 'Alquiler'}</strong>
+                                  </span>
+                                </div>
+                                <div className="col-span-1 sm:col-span-2 pt-1.5 border-t border-border/5 flex items-center justify-between">
+                                  <span className="text-[11px] font-bold text-purple-400">Precio de Publicación:</span>
+                                  <span className="text-xs font-mono font-black text-foreground bg-purple-500/15 border border-purple-500/20 px-2 py-0.5 rounded-lg">
+                                    ${thread.metadata.price}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
 
                             {/* Author info & Actions */}
                             <div className="flex justify-between items-center border-t border-border/10 pt-3">
@@ -628,63 +816,290 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                 </button>
               </div>
 
-              <form onSubmit={handleCreateThreadSubmit} className="space-y-4">
+              <form onSubmit={handleCreateThreadSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1 custom-scrollbar">
+                
+                {/* Choose Publication Type */}
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wider">
+                    ¿Qué querés publicar?
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+                    {[
+                      { type: 'question', label: 'Pregunta', icon: MessageSquare, desc: 'Dudas sobre materias o temas académicos' },
+                      { type: 'resource', label: 'Recurso', icon: BookOpen, desc: 'Compartir apuntes, resúmenes o libros' },
+                      { type: 'tutoring', label: 'Tutoría', icon: GraduationCap, desc: 'Ofrecer o buscar clases de apoyo' },
+                      { type: 'borrow', label: 'Préstamo', icon: Package, desc: 'Pedir prestado o prestar útiles/insumos' },
+                      { type: 'sell_rent', label: 'Compra / Alquiler', icon: Coins, desc: 'Compraventa o alquiler de recursos universitarios' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.type}
+                        type="button"
+                        onClick={() => setNewType(opt.type as any)}
+                        className={`p-3 rounded-2xl border text-left flex gap-3 transition-all duration-200 ${
+                          newType === opt.type
+                            ? 'bg-accent/15 border-accent text-accent shadow-md shadow-accent/5'
+                            : 'bg-card/45 border-border/30 text-muted-foreground hover:border-border/60 hover:text-foreground'
+                        }`}
+                      >
+                        <opt.icon className="w-5 h-5 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="text-xs font-bold block">{opt.label}</span>
+                          <span className="text-[10px] leading-tight block mt-0.5 text-muted-foreground">{opt.desc}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Common fields: Title & Body */}
                 <div>
                   <label className="block text-xs font-semibold text-muted-foreground mb-1">
-                    Título del Hilo
+                    Título de la Publicación
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Ej: ¿Cómo resolvemos el ejercicio 5 del TP2?"
+                    placeholder={
+                      newType === 'question' ? 'Ej: ¿Cómo resolvemos el ejercicio 5 del TP2?' :
+                      newType === 'resource' ? 'Ej: Resumen completo Análisis Matemático II - Primer Parcial' :
+                      newType === 'tutoring' ? 'Ej: Doy clases de apoyo para Álgebra y Programación I' :
+                      newType === 'borrow' ? 'Ej: Necesito prestada una regla T para dibujo técnico' :
+                      'Ej: Vendo calculadora científica Casio fx-95 en excelente estado'
+                    }
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                     className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-3 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
-                      Materia / Cátedra
-                    </label>
-                    <Select
-                      value={newSubject}
-                      onChange={(val) => setNewSubject(val)}
-                      options={[
-                        { value: "Análisis Matemático II", label: "Análisis Matemático II" },
-                        { value: "Programación II", label: "Programación II" },
-                        { value: "Algoritmos y Estructuras de Datos", label: "Algoritmos y Estructuras de Datos" },
-                        { value: "Sistemas Operativos", label: "Sistemas Operativos" }
-                      ]}
-                      className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
-                      Categoría
-                    </label>
-                    <Select
-                      value={newCategory}
-                      onChange={(val) => setNewCategory(val)}
-                      options={[
-                        { value: "Duda Técnica", label: "Duda Técnica" },
-                        { value: "Consejo de Cursada", label: "Consejo de Cursada" },
-                        { value: "Ayuda con TP", label: "Ayuda con TP" }
-                      ]}
-                      className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                    />
-                  </div>
-                </div>
-
+                {/* Common Materia Field */}
                 <div>
                   <label className="block text-xs font-semibold text-muted-foreground mb-1">
-                    Descripción / Cuerpo de la duda
+                    Materia Relacionada
+                  </label>
+                  <Select
+                    value={newSubject}
+                    onChange={(val) => setNewSubject(val)}
+                    options={[
+                      { value: "Análisis Matemático II", label: "Análisis Matemático II" },
+                      { value: "Programación II", label: "Programación II" },
+                      { value: "Algoritmos y Estructuras de Datos", label: "Algoritmos y Estructuras de Datos" },
+                      { value: "Sistemas Operativos", label: "Sistemas Operativos" },
+                      { value: "General", label: "General / Sin materia" }
+                    ]}
+                    className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
+                  />
+                </div>
+
+                {/* Type-specific Fields */}
+                {newType === 'tutoring' && (
+                  <div className="bg-blue-500/5 border border-blue-500/10 rounded-2xl p-4 space-y-3">
+                    <h4 className="text-xs font-bold text-blue-400">Detalles de la Tutoría</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Cátedra/Tema</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Álgebra Lineal"
+                          value={tutoringSubject}
+                          onChange={(e) => setTutoringSubject(e.target.value)}
+                          className="w-full bg-card/65 border border-border/40 rounded-xl py-1.5 px-3 text-xs text-foreground focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Modalidad</label>
+                        <Select
+                          value={tutoringModality}
+                          onChange={(val) => setTutoringModality(val as any)}
+                          options={[
+                            { value: 'online', label: 'Virtual' },
+                            { value: 'present', label: 'Presencial' },
+                            { value: 'hybrid', label: 'Híbrido' }
+                          ]}
+                          className="w-full bg-card/65 border border-border/40 rounded-xl py-1.5 px-3 text-xs text-foreground focus:outline-none"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Costo</label>
+                        <div className="flex gap-2">
+                          {['free', 'paid'].map((m) => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setTutoringPriceType(m as any)}
+                              className={`flex-1 py-1.5 rounded-lg border text-xs font-bold ${
+                                tutoringPriceType === m
+                                  ? 'bg-blue-500/10 border-blue-500 text-blue-400'
+                                  : 'bg-card/65 border-border/40 text-muted-foreground'
+                              }`}
+                            >
+                              {m === 'free' ? 'Gratuita' : 'Paga'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {tutoringPriceType === 'paid' && (
+                        <div className="col-span-2">
+                          <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Precio por Hora ($)</label>
+                          <input
+                            type="number"
+                            placeholder="Ej: 1500"
+                            value={tutoringPrice}
+                            onChange={(e) => setTutoringPrice(e.target.value)}
+                            className="w-full bg-card/65 border border-border/40 rounded-xl py-1.5 px-3 text-xs text-foreground focus:outline-none"
+                          />
+                        </div>
+                      )}
+                      <div className="col-span-2">
+                        <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Días/Horas Disponibles</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Martes y Jueves 16 a 18 hs"
+                          value={tutoringAvailability}
+                          onChange={(e) => setTutoringAvailability(e.target.value)}
+                          className="w-full bg-card/65 border border-border/40 rounded-xl py-1.5 px-3 text-xs text-foreground focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {newType === 'borrow' && (
+                  <div className="bg-teal-500/5 border border-teal-500/10 rounded-2xl p-4 space-y-3">
+                    <h4 className="text-xs font-bold text-teal-400">Detalles del Préstamo</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Nombre del Artículo</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Arduino Uno R3"
+                          value={itemName}
+                          onChange={(e) => setItemName(e.target.value)}
+                          className="w-full bg-card/65 border border-border/40 rounded-xl py-1.5 px-3 text-xs text-foreground focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Condición/Estado</label>
+                        <Select
+                          value={itemCondition}
+                          onChange={(val) => setItemCondition(val as any)}
+                          options={[
+                            { value: 'new', label: 'Nuevo' },
+                            { value: 'used_good', label: 'Excelente estado' },
+                            { value: 'used_fair', label: 'Con detalles de uso' }
+                          ]}
+                          className="w-full bg-card/65 border border-border/40 rounded-xl py-1.5 px-3 text-xs text-foreground focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Ubicación / Campus de Entrega</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Módulo de Sistemas"
+                          value={itemLocation}
+                          onChange={(e) => setItemLocation(e.target.value)}
+                          className="w-full bg-card/65 border border-border/40 rounded-xl py-1.5 px-3 text-xs text-foreground focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Disponibilidad</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Miércoles y Viernes"
+                          value={itemAvailability}
+                          onChange={(e) => setItemAvailability(e.target.value)}
+                          className="w-full bg-card/65 border border-border/40 rounded-xl py-1.5 px-3 text-xs text-foreground focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {newType === 'sell_rent' && (
+                  <div className="bg-purple-500/5 border border-purple-500/10 rounded-2xl p-4 space-y-3">
+                    <h4 className="text-xs font-bold text-purple-400">Detalles de la Transacción</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Artículo</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Calculadora Casio fx-95"
+                          value={itemName}
+                          onChange={(e) => setItemName(e.target.value)}
+                          className="w-full bg-card/65 border border-border/40 rounded-xl py-1.5 px-3 text-xs text-foreground focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Condición/Estado</label>
+                        <Select
+                          value={itemCondition}
+                          onChange={(val) => setItemCondition(val as any)}
+                          options={[
+                            { value: 'new', label: 'Nuevo' },
+                            { value: 'used_good', label: 'Excelente estado' },
+                            { value: 'used_fair', label: 'Con detalles de uso' }
+                          ]}
+                          className="w-full bg-card/65 border border-border/40 rounded-xl py-1.5 px-3 text-xs text-foreground focus:outline-none"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Modalidad</label>
+                        <div className="flex gap-2">
+                          {['sell', 'rent'].map((m) => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setItemMode(m as any)}
+                              className={`flex-1 py-1.5 rounded-lg border text-xs font-bold ${
+                                itemMode === m
+                                  ? 'bg-purple-500/10 border-purple-500 text-purple-400'
+                                  : 'bg-card/65 border-border/40 text-muted-foreground'
+                              }`}
+                            >
+                              {m === 'sell' ? 'Venta' : 'Alquiler'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Precio ($)</label>
+                        <input
+                          type="number"
+                          placeholder="Ej: 3500"
+                          value={itemPrice}
+                          onChange={(e) => setItemPrice(e.target.value)}
+                          className="w-full bg-card/65 border border-border/40 rounded-xl py-1.5 px-3 text-xs text-foreground focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Lugar de Entrega</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Módulo de Sistemas o Sede"
+                          value={itemLocation}
+                          onChange={(e) => setItemLocation(e.target.value)}
+                          className="w-full bg-card/65 border border-border/40 rounded-xl py-1.5 px-3 text-xs text-foreground focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Description Body */}
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                    Descripción / Detalles de la Publicación
                   </label>
                   <textarea
                     required
                     rows={4}
-                    placeholder="Contanos tu duda detalladamente para que tus compañeros o profesores puedan ayudarte..."
+                    placeholder={
+                      newType === 'question' ? 'Contanos tu duda detalladamente para que tus compañeros o profesores puedan ayudarte...' :
+                      newType === 'resource' ? 'Describí el recurso que estás compartiendo (de qué materia es, qué temas incluye, etc.)...' :
+                      newType === 'tutoring' ? 'Describí el formato de tus clases, temas específicos en los que podés ayudar, etc...' :
+                      newType === 'borrow' ? 'Especificá para qué vas a usar el artículo, cuándo pensás devolverlo, etc...' :
+                      'Detallá las características del artículo en venta o alquiler...'
+                    }
                     value={newDesc}
                     onChange={(e) => setNewDesc(e.target.value)}
                     className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-3 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all resize-none"
@@ -697,7 +1112,7 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                   className="w-full bg-accent text-accent-foreground font-semibold py-3 rounded-xl hover:bg-accent/90 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-accent/15 mt-6 disabled:opacity-40"
                 >
                   <BookOpen className="w-4 h-4" />
-                  Publicar Hilo Académico
+                  Publicar en el Foro Colaborativo
                 </button>
               </form>
             </motion.div>
@@ -774,6 +1189,180 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                     </span>
                   </div>
                 </div>
+
+                {/* Modal Structured Metadata */}
+                {selectedThread.type === 'tutoring' && selectedThread.metadata && (
+                  <div className="bg-blue-500/5 border border-blue-500/15 rounded-2xl p-4 space-y-2 text-xs">
+                    <h4 className="font-bold text-blue-400 flex items-center gap-1.5 text-sm">
+                      <GraduationCap className="w-4.5 h-4.5" />
+                      Detalles de la Tutoría Académica
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <div>
+                        <span className="text-muted-foreground block">Materia / Cátedra</span>
+                        <span className="text-sm font-semibold text-foreground">{selectedThread.metadata.subject}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block">Modalidad</span>
+                        <span className="text-sm font-semibold text-foreground">{selectedThread.metadata.modality === 'online' ? 'Virtual' : selectedThread.metadata.modality === 'present' ? 'Presencial' : 'Híbrido'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block">Costo de la Sesión</span>
+                        <span className="text-sm font-semibold text-foreground">{selectedThread.metadata.price_type === 'free' ? 'Gratuita' : `Paga ($${selectedThread.metadata.price})`}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block">Disponibilidad Horaria</span>
+                        <span className="text-sm font-semibold text-foreground">{selectedThread.metadata.availability}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedThread.type === 'borrow' && selectedThread.metadata && (
+                  <div className="bg-teal-500/5 border border-teal-500/15 rounded-2xl p-4 space-y-2 text-xs">
+                    <h4 className="font-bold text-teal-400 flex items-center gap-1.5 text-sm">
+                      <Package className="w-4.5 h-4.5" />
+                      Detalles del Préstamo de Recursos
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <div>
+                        <span className="text-muted-foreground block">Artículo / Insumo</span>
+                        <span className="text-sm font-semibold text-foreground">{selectedThread.metadata.item_name}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block">Condición</span>
+                        <span className="text-sm font-semibold text-foreground">{selectedThread.metadata.condition === 'new' ? 'Nuevo' : selectedThread.metadata.condition === 'used_good' ? 'Excelente' : 'Detalles de uso'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block">Ubicación / Campus</span>
+                        <span className="text-sm font-semibold text-foreground">{selectedThread.metadata.location}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block">Disponibilidad</span>
+                        <span className="text-sm font-semibold text-foreground">{selectedThread.metadata.availability}</span>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-border/5 flex items-center justify-between">
+                      <span className="font-semibold text-muted-foreground">Estado del Artículo:</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase ${
+                        selectedThread.metadata.status === 'available' ? 'bg-green-500/15 text-green-400 border border-green-500/25' :
+                        selectedThread.metadata.status === 'reserved' ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/25' :
+                        selectedThread.metadata.status === 'delivered' ? 'bg-blue-500/15 text-blue-400 border border-blue-500/25' :
+                        'bg-purple-500/15 text-purple-400 border border-purple-500/25'
+                      }`}>
+                        {selectedThread.metadata.status === 'available' ? 'Disponible' :
+                         selectedThread.metadata.status === 'reserved' ? 'Reservado' :
+                         selectedThread.metadata.status === 'delivered' ? 'Entregado' : 'Devuelto'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {selectedThread.type === 'sell_rent' && selectedThread.metadata && (
+                  <div className="bg-purple-500/5 border border-purple-500/15 rounded-2xl p-4 space-y-2 text-xs">
+                    <h4 className="font-bold text-purple-400 flex items-center gap-1.5 text-sm">
+                      <Coins className="w-4.5 h-4.5" />
+                      Detalles de Compra / Alquiler
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <div>
+                        <span className="text-muted-foreground block">Artículo / Insumo</span>
+                        <span className="text-sm font-semibold text-foreground">{selectedThread.metadata.item_name}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block">Condición</span>
+                        <span className="text-sm font-semibold text-foreground">{selectedThread.metadata.condition === 'new' ? 'Nuevo' : selectedThread.metadata.condition === 'used_good' ? 'Excelente' : 'Detalles de uso'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block">Ubicación / Campus</span>
+                        <span className="text-sm font-semibold text-foreground">{selectedThread.metadata.location}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block">Modalidad</span>
+                        <span className="text-sm font-semibold text-foreground">{selectedThread.metadata.mode === 'sell' ? 'Venta' : 'Alquiler'}</span>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-border/5 flex items-center justify-between">
+                      <span className="font-bold text-purple-400 text-sm">Precio de Oferta:</span>
+                      <span className="text-sm font-mono font-black text-foreground bg-purple-500/20 border border-purple-500/30 px-3 py-1 rounded-xl">
+                        ${selectedThread.metadata.price}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Interactive Trust Action Layer */}
+                {selectedThread.type !== 'question' && selectedThread.type !== 'resource' && (
+                  <div className="p-4 bg-glass border border-border/10 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="text-xs font-bold text-cream-bone flex items-center gap-1.5">
+                        <Sparkles className="w-4.5 h-4.5 text-accent" />
+                        Acción Colaborativa
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {selectedThread.authorName === "Tu Perfil" || selectedThread.user_id === MOCK_USER_ID
+                          ? "Gestioná los estados y reservas de tu publicación."
+                          : "Contactate con tu compañero de forma segura y directa."
+                        }
+                      </p>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-2 w-full sm:w-auto shrink-0 justify-end">
+                      {!(selectedThread.authorName === "Tu Perfil" || selectedThread.user_id === MOCK_USER_ID) && (
+                        <button
+                          onClick={() => handlePostInteraction("interest")}
+                          disabled={actionInProgress !== null}
+                          className="px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-accent/15 disabled:opacity-40"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          Me interesa
+                        </button>
+                      )}
+
+                      {selectedThread.type === 'borrow' && selectedThread.metadata && (
+                        <>
+                          {/* Borrower Actions */}
+                          {!(selectedThread.authorName === "Tu Perfil" || selectedThread.user_id === MOCK_USER_ID) && selectedThread.metadata.status === 'available' && (
+                            <button
+                              onClick={() => handlePostInteraction("reserve")}
+                              disabled={actionInProgress !== null}
+                              className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-teal-500/15 disabled:opacity-40"
+                            >
+                              <Calendar className="w-3.5 h-3.5" />
+                              Reservar artículo
+                            </button>
+                          )}
+                          
+                          {/* Owner Actions */}
+                          {(selectedThread.authorName === "Tu Perfil" || selectedThread.user_id === MOCK_USER_ID) && (
+                            <>
+                              {selectedThread.metadata.status === 'reserved' && (
+                                <button
+                                  onClick={() => handlePostInteraction("deliver")}
+                                  disabled={actionInProgress !== null}
+                                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-blue-500/15 disabled:opacity-40"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  Marcar Entregado
+                                </button>
+                              )}
+                              {selectedThread.metadata.status === 'delivered' && (
+                                <button
+                                  onClick={() => handlePostInteraction("return")}
+                                  disabled={actionInProgress !== null}
+                                  className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-purple-500/15 disabled:opacity-40"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  Marcar Devuelto
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Solved Trigger box for thread owner */}
                 {!selectedThread.is_resolved && selectedThread.authorName === "Tu Perfil" && (
@@ -875,7 +1464,7 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                 <input
                   type="text"
                   required
-                  placeholder="Escribí una respuesta con voseo..."
+                  placeholder="Escribí una respuesta..."
                   value={newReplyText}
                   onChange={(e) => setNewReplyText(e.target.value)}
                   className="flex-1 bg-card/60 border border-border/40 rounded-xl py-2.5 px-4 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
