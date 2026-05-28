@@ -17,6 +17,19 @@ This skill defines the agentic capability to interface with Supabase for data qu
 - **Row Level Security (RLS)**:
   - Keep in mind that all queries must adhere to RLS. Ensure tables have active policies allowing reads to registered students and writes only to the resource creators.
 
+## 3. Database Schema Changes & Migrations Workflow
+- **Rule of Thumb**: Schema and critical data changes MUST have a history log.
+- **Creating Migrations**:
+  - Add SQL scripts to the `supabase/migrations/` directory.
+  - Name files using the standard format: `YYYYMMDDHHMMSS_description_in_english.sql`.
+- **Executing Mutations**:
+  - **Do NOT** execute `CREATE`, `ALTER`, `DROP`, `INSERT`, `UPDATE`, or `DELETE` statements directly on the database via raw queries or Supabase MCP `execute_sql`.
+  - Always package database mutations inside a migration file.
+- **Executing Reads**:
+  - You **can** use the Supabase MCP server tools (like `execute_sql`) to inspect current table structures, schema information, run read-only `SELECT` queries, or view logs for debugging purposes.
+- **Applying Migrations**:
+  - Apply the migrations using Supabase CLI or matching MCP migration tools (`apply_migration`) to keep the remote and local environments perfectly synchronized.
+
 ---
 
 > [!CAUTION]

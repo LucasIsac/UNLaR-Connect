@@ -26,6 +26,8 @@ export interface DbUser {
   tutor_rating: number;
   total_reviews: number;
   created_at: string;
+  deleted_at?: string;
+  avatar_url?: string;
 }
 
 export interface DbSubject {
@@ -169,5 +171,15 @@ export interface DbChatMessage {
   session_id: string; // UUID
   role: 'user' | 'assistant' | 'system';
   content: string;
+  created_at: string;
+}
+
+export interface DbNotification {
+  id: string; // UUID
+  user_id: string; // UUID
+  title: string;
+  content: string;
+  type: 'tutorias' | 'karma' | 'foros' | 'sistema';
+  is_read: boolean;
   created_at: string;
 }

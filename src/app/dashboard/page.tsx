@@ -40,6 +40,8 @@ import {
   ForumPostExtended
 } from "@/actions/dashboard";
 import { DbTutorAvailability, DbPostReply } from "@/types/database";
+import { updateUserProfile, toggleTutorStatus } from "@/actions/perfil";
+import { reactivateAccountAction, signOutAction } from "@/actions/auth";
 
 // ==========================================
 // 💡 CLIENT-SIDE MOCK FEEDS
@@ -176,8 +178,14 @@ export default function DashboardPage() {
   const [dragOver, setDragOver] = useState(false);
   const [showToast, setShowToast] = useState<string | null>(null);
 
+  // Onboarding Wizard states
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(1);
+  const [onboardingCareerId, setOnboardingCareerId] = useState(1);
+  const [onboardingIsTutor, setOnboardingIsTutor] = useState(false);
+
   // Toggle this flag to swap between client-side mocks and Server Actions (Supabase)
-  const USE_CLIENT_MOCKS = true;
+  const USE_CLIENT_MOCKS = false;
 
   // Load all dashboard data on mount
   useEffect(() => {
@@ -223,6 +231,11 @@ export default function DashboardPage() {
           setStats(statsData);
           setSessions(sessionsData);
           setPosts(postsData);
+
+          // Trigger onboarding modal if user has incomplete profile (no career)
+          if (statsData.user.career_id === null && !sessionStorage.getItem("skipped_onboarding")) {
+            setIsOnboardingOpen(true);
+          }
         } catch (err) {
           console.error("Error loading dashboard data from Server Actions:", err);
         } finally {
@@ -250,6 +263,81 @@ export default function DashboardPage() {
     setTimeout(() => {
       setShowToast(null);
     }, 3000);
+  };
+
+  // Submit welcome onboarding survey
+  const handleOnboardingSubmit = async () => {
+    if (!stats) return;
+    setActionInProgress("onboarding");
+    try {
+      // 1. Update major/career
+      await updateUserProfile(stats.user.name, stats.user.last_name, onboardingCareerId);
+      
+      // 2. Register tutor mode if toggled
+      if (onboardingIsTutor) {
+        await toggleTutorStatus(true);
+      }
+
+      // 3. Update local state
+      setStats({
+        ...stats,
+        user: {
+          ...stats.user,
+          career_id: onboardingCareerId,
+          role_id: onboardingIsTutor ? 3 : 2
+        }
+      });
+
+      setIsOnboardingOpen(false);
+      triggerToast("¡Bienvenido/a oficial! Tu perfil fue configurado con éxito. 🎉");
+    } catch (err) {
+      console.error(err);
+      triggerToast("Ocurrió un error al guardar tu perfil. Intentalo de nuevo.");
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleOnboardingSkip = () => {
+    sessionStorage.setItem("skipped_onboarding", "true");
+    setIsOnboardingOpen(false);
+    triggerToast("Omitiste el paso. Podés configurar tu carrera cuando quieras en tu Perfil.");
+  };
+
+  const handleReactivateAccount = async () => {
+    setActionInProgress("reactivate");
+    try {
+      const res = await reactivateAccountAction();
+      if (res.success) {
+        // Update local stats
+        if (stats) {
+          setStats({
+            ...stats,
+            user: {
+              ...stats.user,
+              deleted_at: undefined
+            }
+          });
+        }
+        triggerToast("¡Tu cuenta fue reactivada con éxito! Volviste a la comunidad. 🎉");
+      } else {
+        triggerToast(res.error || "No pudimos reactivar tu cuenta.");
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast("Error de conexión al reactivar la cuenta.");
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOutAction();
+      window.location.href = "/login";
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // 1. Availability Modal Actions
@@ -500,6 +588,75 @@ export default function DashboardPage() {
   const nextLevelXP = stats?.nextLevelXP || 3000;
   const xpPercentage = stats?.xpPercentage || 0;
   const notificationsCount = stats?.notificationsCount || 0;
+
+  // Intercept if account is soft-deleted
+  if (stats?.user?.deleted_at) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-[#0C0A09] relative overflow-hidden px-4">
+        {/* Background Ambience Glows */}
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#F59E0B]/10 blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[#EA4335]/10 blur-[120px] pointer-events-none" />
+        
+        {/* Visual Canvas Grid */}
+        <div 
+          className="absolute inset-0 pointer-events-none opacity-20"
+          style={{
+            backgroundImage: "radial-gradient(circle, rgba(245, 158, 11, 0.08) 1px, transparent 1px)",
+            backgroundSize: "24px 24px"
+          }}
+        />
+
+        <div className="w-full max-w-md relative z-10 animate-fade-in">
+          <div className="bg-[#1C1917]/70 backdrop-blur-xl border border-[#F59E0B]/10 rounded-lg p-8 shadow-[0_8px_32px_rgba(12,10,9,0.5)] space-y-6 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-[#EA4335]/10 border border-[#ffb4ab]/20 flex items-center justify-center text-[#ffb4ab] mx-auto shadow-xl shadow-accent/5">
+              <AlertTriangle className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="font-heading text-xl font-bold text-[#e8e1df]">
+                ¡Hola de nuevo, {stats.user.name}!
+              </h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Tu cuenta está <span className="text-[#EA4335] font-semibold">programada para darse de baja</span> de forma definitiva.
+              </p>
+            </div>
+
+            <div className="p-4 bg-muted/20 border border-border/10 rounded-2xl text-left text-xs text-muted-foreground leading-relaxed space-y-2 font-sans">
+              <p>
+                Recuperá todas tus tutorías planificadas, insignias ganadas, karma acumulado y foros de discusión en un solo clic.
+              </p>
+              <p className="text-[#F59E0B] font-semibold">
+                ⏳ Todavía estás dentro de la tolerancia de 14 días para reactivarla.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handleReactivateAccount}
+                disabled={actionInProgress === "reactivate"}
+                className="w-full h-12 bg-[#F59E0B] hover:bg-[#D97707] text-[#0C0A09] font-sans font-semibold rounded-xl flex items-center justify-center gap-2 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-[0_4px_20px_rgba(245,158,11,0.2)] cursor-pointer"
+              >
+                {actionInProgress === "reactivate" ? (
+                  <span>Reactivando...</span>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Reactivar mi cuenta al toque</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={handleSignOut}
+                className="w-full h-11 border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-all cursor-pointer"
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -1090,6 +1247,126 @@ export default function DashboardPage() {
               )}
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 5. Welcome Onboarding Modal Overlay */}
+      <AnimatePresence>
+        {isOnboardingOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div 
+              className="absolute inset-0 bg-background/90 backdrop-blur-lg"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            />
+
+            {/* Wizard Box */}
+            <motion.div
+              className="bg-card border border-border/40 w-full max-w-lg rounded-3xl p-8 relative z-10 shadow-2xl space-y-6 animate-fade-in relative overflow-hidden"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", duration: 0.4 }}
+            >
+              {/* Glow accent decoration */}
+              <div className="absolute -top-24 -left-24 w-48 h-48 bg-primary/10 rounded-full blur-[80px] pointer-events-none" />
+              <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-accent/10 rounded-full blur-[80px] pointer-events-none" />
+
+              <div className="flex flex-col items-center text-center space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent shadow-xl shadow-accent/5">
+                  <Sparkles className="w-7 h-7" />
+                </div>
+                <h2 className="font-heading text-2xl font-black text-[#e8e1df]">
+                  ¡Te damos la bienvenida a UNLaR Connect!
+                </h2>
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-sm">
+                  Configurá tu perfil en un toque para empezar a interactuar con toda la comunidad universitaria.
+                </p>
+              </div>
+
+              {onboardingStep === 1 ? (
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      ¿Qué carrera estás cursando?
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={onboardingCareerId}
+                        onChange={(e) => setOnboardingCareerId(Number(e.target.value))}
+                        className="w-full bg-muted/40 border border-[#534434]/40 focus:border-accent rounded-xl py-3 px-4 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all appearance-none cursor-pointer"
+                      >
+                        <option value={1} className="bg-card text-foreground">Ingeniería en Sistemas de Información (2015)</option>
+                        <option value={2} className="bg-card text-foreground">Licenciatura en Ciencias de la Computación (2020)</option>
+                        <option value={3} className="bg-card text-foreground">Tecnicatura en Informática (2018)</option>
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2">
+                    <button
+                      onClick={handleOnboardingSkip}
+                      className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    >
+                      Omitir por ahora
+                    </button>
+                    <button
+                      onClick={() => setOnboardingStep(2)}
+                      className="h-10 px-6 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all duration-200 active:scale-95 shadow-md shadow-accent/5 cursor-pointer"
+                    >
+                      <span>Siguiente</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="space-y-3 p-5 rounded-2xl bg-muted/20 border border-border/10">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1 pr-4">
+                        <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                          ¿Querés dar clases de tutorías?
+                        </label>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          Activando esta opción podrás agendar clases, ayudar a tus compañeros de años menores y sumar puntos de Karma.
+                        </p>
+                      </div>
+
+                      {/* Switch toggle */}
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none">
+                        <input
+                          type="checkbox"
+                          checked={onboardingIsTutor}
+                          onChange={(e) => setOnboardingIsTutor(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-muted/70 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-on-primary after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent transition-colors" />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2">
+                    <button
+                      onClick={() => setOnboardingStep(1)}
+                      className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    >
+                      Volver
+                    </button>
+                    <button
+                      onClick={handleOnboardingSubmit}
+                      disabled={actionInProgress === "onboarding"}
+                      className="h-10 px-6 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all duration-200 active:scale-95 shadow-md shadow-accent/5 disabled:opacity-40 cursor-pointer"
+                    >
+                      <span>{actionInProgress === "onboarding" ? "Guardando..." : "Comenzar"}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </DashboardLayout>

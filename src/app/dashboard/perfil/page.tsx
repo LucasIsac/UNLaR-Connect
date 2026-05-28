@@ -23,6 +23,7 @@ import {
   GraduationCap
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { softDeleteAccountAction } from "@/actions/auth";
 import { 
   fetchUserProfile, 
   updateUserProfile, 
@@ -62,6 +63,7 @@ export default function PerfilPage() {
   // Modals state
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isAddScheduleOpen, setIsAddScheduleOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   
   // Edit Profile Form State
   const [editName, setEditName] = useState("");
@@ -112,6 +114,7 @@ export default function PerfilPage() {
         setEditName(profileData.name);
         setEditLastName(profileData.last_name);
         setEditCareerId(profileData.career_id || 1);
+        setEditAvatarUrl(profileData.avatar_url || "");
       } catch (err) {
         console.error("Error loading profile data:", err);
       } finally {
@@ -137,11 +140,11 @@ export default function PerfilPage() {
     if (!profile) return;
     setActionInProgress("save-profile");
     try {
-      const response = await updateUserProfile(editName, editLastName, editCareerId);
+      const response = await updateUserProfile(editName, editLastName, editCareerId, editAvatarUrl);
       if (response.success && response.data) {
         setProfile(response.data);
         setIsEditProfileOpen(false);
-        triggerToast("¡Guardamos tus datos académicos al toque!");
+        triggerToast("¡Guardamos tus datos académicos al toque! 🎉");
       } else {
         triggerToast(response.error || "No pudimos guardar los cambios.");
       }
@@ -305,12 +308,35 @@ export default function PerfilPage() {
         const result = reader.result as string;
         setEditAvatarUrl(result);
         if (profile) {
-          setProfile({ ...profile, email: result }); // Just visual temp check
+          setProfile({ ...profile, avatar_url: result });
         }
         setActionInProgress(null);
-        triggerToast("¡Foto seleccionada al toque! Hacé clic en Guardar para confirmar.");
+        triggerToast("¡Foto seleccionada al toque! Hacé clic en Guardar Cambios para confirmar.");
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  // 8. Soft Delete account request
+  const handleSoftDeleteAccount = async () => {
+    setActionInProgress("delete-account");
+    try {
+      const response = await softDeleteAccountAction();
+      if (response.success) {
+        setIsDeleteModalOpen(false);
+        triggerToast("¡Tu cuenta fue dada de baja con éxito! Te vamos a extrañar, che.");
+        // Redirect to login after a brief pause
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 2000);
+      } else {
+        triggerToast(response.error || "No pudimos procesar la baja de la cuenta.");
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast("Error de conexión al procesar la baja.");
+    } finally {
+      setActionInProgress(null);
     }
   };
 
@@ -437,8 +463,9 @@ export default function PerfilPage() {
               <span>Editar Perfil</span>
             </button>
             <button
-              onClick={() => triggerToast("¡No hay cambios pendientes! Presioná 'Editar Perfil' para modificar algo.")}
-              className="px-4 py-2 bg-accent text-accent-foreground font-semibold text-xs rounded-xl flex items-center gap-2 hover:scale-[1.01] active:scale-98 transition-all shadow-md shadow-accent/15"
+              onClick={handleSaveGeneralChanges}
+              disabled={actionInProgress === "save-profile"}
+              className="px-4 py-2 bg-accent text-accent-foreground font-semibold text-xs rounded-xl flex items-center gap-2 hover:scale-[1.01] active:scale-98 transition-all shadow-md shadow-accent/15 disabled:opacity-40"
             >
               <Check className="w-4 h-4" />
               <span>Guardar Cambios</span>
@@ -577,7 +604,7 @@ export default function PerfilPage() {
               </div>
 
             </motion.div>
-
+            
           </div>
 
           {/* ==========================================
@@ -786,6 +813,35 @@ export default function PerfilPage() {
               )}
             </AnimatePresence>
 
+            {/* Security & Account Settings (Danger Zone) */}
+            <motion.div 
+              className="bg-glass rounded-3xl p-6 relative overflow-hidden border border-[#690005]/20 hover:border-[#690005]/40 transition-all duration-300 mt-6"
+              variants={staggerItem}
+            >
+              <div className="flex items-center gap-3 mb-4 select-none">
+                <div className="w-10 h-10 rounded-2xl bg-[#690005]/10 border border-[#ffb4ab]/20 flex items-center justify-center text-[#ffb4ab] shrink-0">
+                  <AlertCircle className="w-5 h-5 text-[#ffb4ab]" />
+                </div>
+                <div>
+                  <h3 className="font-heading text-base font-bold text-cream-bone">Zona de Peligro</h3>
+                  <p className="text-xs text-muted-foreground font-semibold">Configuración de seguridad de la cuenta</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Si decidís dar de baja tu cuenta, se suspenderá tu acceso temporalmente. Tus apuntes subidos se conservarán de forma anónima para ayudar a la comunidad de la UNLaR.
+                </p>
+                <button
+                  onClick={() => setIsDeleteModalOpen(true)}
+                  className="w-full h-11 border border-[#ffb4ab]/30 hover:border-[#ffb4ab]/70 bg-[#690005]/10 hover:bg-[#690005]/30 text-[#ffb4ab] font-bold text-xs rounded-xl transition-all duration-300 flex justify-center items-center gap-2 active:scale-98 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Dar de baja mi cuenta</span>
+                </button>
+              </div>
+            </motion.div>
+
           </div>
 
         </div>
@@ -987,6 +1043,70 @@ export default function PerfilPage() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 3. Modal: Confirmar baja de cuenta (Soft Delete) */}
+      <AnimatePresence>
+        {isDeleteModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop layer */}
+            <motion.div 
+              className="absolute inset-0 bg-background/85 backdrop-blur-md"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsDeleteModalOpen(false)}
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              className="bg-card border border-border/40 w-full max-w-md rounded-3xl p-6 relative z-10 shadow-2xl space-y-5 animate-fade-in"
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: "spring", duration: 0.35 }}
+            >
+              <div className="flex justify-between items-center border-b border-border/10 pb-3">
+                <h3 className="font-heading text-base font-extrabold text-cream-bone flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-[#ffb4ab]" />
+                  <span>¿Estás seguro/a, che?</span>
+                </h3>
+                <button 
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3 font-sans">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Tu cuenta será dada de baja de forma temporal. Tendrás una tolerancia de <span className="text-[#F59E0B] font-bold">14 días</span> para iniciar sesión y reactivarla si te arrepentís.
+                </p>
+                <p className="text-xs text-[#ffb4ab] font-semibold leading-relaxed">
+                  ⚠ Transcurrido el plazo, la baja será permanente y no podrás recuperar tus tutorías, insignias ni nivel de Karma.
+                </p>
+              </div>
+
+              {/* Modal controls */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  className="flex-1 py-2.5 border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-all cursor-pointer"
+                >
+                  No, cancelar
+                </button>
+                <button
+                  onClick={handleSoftDeleteAccount}
+                  disabled={actionInProgress === "delete-account"}
+                  className="flex-1 py-2.5 bg-[#690005] hover:bg-[#93000a] text-[#ffdad6] text-xs font-bold rounded-xl transition-all disabled:opacity-40 cursor-pointer"
+                >
+                  {actionInProgress === "delete-account" ? "Procesando..." : "Sí, dar de baja"}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
