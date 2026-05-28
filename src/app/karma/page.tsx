@@ -1,15 +1,14 @@
-"use client";
+import { fetchKarmaData } from "@/actions/karma";
+import KarmaClient from "./KarmaClient";
 
-import { Award } from "lucide-react";
-import PlaceholderPage from "@/components/ui/PlaceholderPage";
+export const metadata = {
+  title: "Puntos de Karma y Medallas - UNLaR Connect",
+  description: "Tu nivel de Karma, progreso de XP e insignias oficiales en UNLaR Connect.",
+};
 
-export default function KarmaPage() {
-  return (
-    <PlaceholderPage
-      title="Gamificación y Karma"
-      subtitle="Tu colaboración tiene recompensa"
-      description="Cada vez que subas apuntes valorados, ayudes en un foro o des una tutoría, vas a ganar puntos de Karma. Subí en el ranking de la comunidad y ganá reconocimiento en tu carrera académica."
-      icon={Award}
-    />
-  );
+export default async function KarmaPage() {
+  const stats = await fetchKarmaData();
+
+  return <KarmaClient initialStats={stats} />;
 }
+

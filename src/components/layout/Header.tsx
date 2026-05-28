@@ -157,12 +157,13 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         </button>
 
         {/* Karma Points Badge */}
-        <div className="flex items-center gap-1.5 bg-accent/10 border border-accent/20 px-3 py-1.5 rounded-full hover:scale-[1.03] transition-transform duration-200 cursor-pointer select-none">
+        <Link href="/karma" className="flex items-center gap-1.5 bg-accent/10 border border-accent/20 px-3 py-1.5 rounded-full hover:scale-[1.03] transition-transform duration-200 cursor-pointer select-none">
           <Award className="w-4 h-4 text-accent animate-pulse-slow" />
           <span className="text-xs font-bold text-accent tracking-wide">
             {profile ? profile.points.toLocaleString() : "2.450"} pts
           </span>
-        </div>
+        </Link>
+
 
         {/* Notifications Icon dropdown center */}
         <div className="relative" ref={notificationsRef}>

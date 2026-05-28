@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { 
   Trophy, 
@@ -20,7 +21,8 @@ import {
   ChevronDown,
   Sparkles,
   Search,
-  GraduationCap
+  GraduationCap,
+  ArrowRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { softDeleteAccountAction } from "@/actions/auth";
@@ -579,6 +581,17 @@ export default function PerfilClient({
                   </div>
 
                 </div>
+              </div>
+
+              {/* Redirección al Dashboard de Karma */}
+              <div className="mt-5 border-t border-border/10 pt-4">
+                <Link
+                  href="/karma"
+                  className="w-full h-10 border border-border hover:border-accent bg-card/25 hover:bg-card/50 text-cream-bone font-semibold text-xs rounded-xl transition-all duration-300 flex justify-center items-center gap-2 active:scale-98 cursor-pointer"
+                >
+                  <span>Ver mi Historial de Karma y Medallas</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
               </div>
 
             </motion.div>

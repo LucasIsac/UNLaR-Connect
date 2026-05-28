@@ -9,7 +9,9 @@ import {
   MessageSquare, 
   User, 
   Plus, 
-  X 
+  X,
+  Award,
+  Trophy
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Logo from "@/components/ui/Logo";
@@ -43,6 +45,16 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       label: "Foros Estudiantiles",
       icon: MessageSquare,
       href: "/dashboard/foros",
+    },
+    {
+      label: "Karma y Medallas",
+      icon: Award,
+      href: "/karma",
+    },
+    {
+      label: "Ranking Académico",
+      icon: Trophy,
+      href: "/ranking",
     },
     {
       label: "Mi Perfil",
