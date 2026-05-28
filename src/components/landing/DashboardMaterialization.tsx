@@ -23,6 +23,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useTheme } from "@/components/ui/ThemeProvider";
+import Logo from "@/components/ui/Logo";
 
 // Static replica nav items
 const navItems = [
@@ -138,8 +139,7 @@ export default function DashboardMaterialization() {
             {/* Brand */}
             <div className="px-5 py-5 border-b border-border/10">
               <div className="flex items-center gap-2.5">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/logo.svg" alt="UNLaR-Connect" className="w-7 h-7" />
+                  <Logo className="w-7 h-7" />
                 <div>
                   <p className="font-heading font-black text-xs text-foreground leading-none">
                     UNLaR<span className="text-accent">-Connect</span>

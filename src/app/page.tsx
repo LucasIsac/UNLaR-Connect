@@ -9,6 +9,7 @@ import FinalCTA from "@/components/landing/FinalCTA";
 import Footer from "@/components/layout/Footer";
 import { CONFIG } from "@/lib/constants";
 import ThemeToggle from "@/components/ui/ThemeToggle";
+import Logo from "@/components/ui/Logo";
 
 // Canvas loaded client-side only (no SSR needed for canvas)
 const NodeCanvas = dynamic(() => import("@/components/landing/NodeCanvas"), {
@@ -35,8 +36,7 @@ export default function Home() {
         <header className="mx-auto max-w-6xl w-full rounded-2xl bg-background/50 backdrop-blur-2xl border border-border/10 dark:border-white/5 shadow-2xl shadow-[0_4px_20px_rgba(120,53,15,0.05)] dark:shadow-black/50 pointer-events-auto flex items-center justify-between px-6 py-3">
           {/* Brand */}
           <Link href={CONFIG.routes.home} className="flex items-center gap-3 group cursor-pointer">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.svg" alt="UNLaR-Connect" className="w-9 h-9 transition-transform duration-300 group-hover:scale-110" />
+            <Logo className="w-9 h-9 transition-transform duration-300 group-hover:scale-110" />
             <span className="font-heading font-black text-lg tracking-tight">
               UNLaR<span className="text-accent group-hover:text-accent/80 transition-colors">-Connect</span>
             </span>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Code2, MessageCircle, Share2 } from "lucide-react";
 import { CONFIG } from "@/lib/constants";
+import Logo from "@/components/ui/Logo";
 
 export default function Footer() {
   return (
@@ -11,8 +12,7 @@ export default function Footer() {
           {/* Brand Column */}
           <div className="md:col-span-1 flex flex-col gap-4">
             <div className="flex items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.svg" alt="UNLaR-Connect" className="w-8 h-8" />
+              <Logo className="w-8 h-8" />
               <span className="font-heading font-black text-base tracking-tight">
                 UNLaR<span className="text-accent">-Connect</span>
               </span>

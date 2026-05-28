@@ -12,6 +12,7 @@ import {
   X 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Logo from "@/components/ui/Logo";
 
 type SidebarProps = {
   isOpen?: boolean;
@@ -118,8 +119,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Brand Logo & Department */}
       <div className="flex items-center justify-between pb-6 border-b border-border/40 mb-6">
         <Link href="/dashboard" className="flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="UNLaR-Connect" className="w-9 h-9" />
+          <Logo className="w-9 h-9" />
           <div className="text-left">
             <span className="font-heading font-black text-base tracking-tight block">
               UNLaR<span className="text-accent font-bold">-Connect</span>

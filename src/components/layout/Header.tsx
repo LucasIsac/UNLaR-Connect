@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Menu, Search, Bell, Award } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
+import Logo from "../ui/Logo";
 
 type HeaderProps = {
   onMenuToggle: () => void;
@@ -15,10 +16,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
       <div className="flex flex-1 items-center gap-6">
         {/* Desktop Brand Logo */}
         <Link href="/dashboard" className="hidden md:flex items-center gap-3 shrink-0 group">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo.svg"
-            alt="UNLaR-Connect"
+          <Logo
             className="w-8 h-8 transition-transform duration-300 group-hover:scale-105"
           />
           <div className="flex flex-col text-left">

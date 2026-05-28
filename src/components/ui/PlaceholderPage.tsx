@@ -6,6 +6,7 @@ import SmoothScroll from "@/components/ui/SmoothScroll";
 import Footer from "@/components/layout/Footer";
 import { CONFIG } from "@/lib/constants";
 import dynamic from "next/dynamic";
+import Logo from "@/components/ui/Logo";
 
 const NodeCanvas = dynamic(() => import("@/components/landing/NodeCanvas"), {
   ssr: false,
@@ -38,8 +39,7 @@ export default function PlaceholderPage({
         <header className="mx-auto max-w-6xl w-full rounded-2xl bg-background/50 backdrop-blur-2xl border border-white/5 shadow-2xl shadow-black/50 pointer-events-auto flex items-center justify-between px-6 py-3">
           {/* Brand */}
           <Link href={CONFIG.routes.home} className="flex items-center gap-3 group cursor-pointer">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.svg" alt="UNLaR-Connect" className="w-9 h-9 transition-transform duration-300 group-hover:scale-110" />
+            <Logo className="w-9 h-9 transition-transform duration-300 group-hover:scale-110" />
             <span className="font-heading font-black text-lg tracking-tight">
               UNLaR<span className="text-accent group-hover:text-accent/80 transition-colors">-Connect</span>
             </span>
