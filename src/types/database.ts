@@ -183,3 +183,28 @@ export interface DbNotification {
   is_read: boolean;
   created_at: string;
 }
+
+// ============================================================
+// Consultas Express — live 1-on-1 tutoring calls
+// ============================================================
+
+export type CallRoomStatus = 'requested' | 'accepted' | 'active' | 'ended' | 'rejected' | 'missed';
+
+export interface DbCallRoom {
+  id: string; // UUID
+  subject_id: number | null;
+  student_id: string; // UUID
+  tutor_id: string; // UUID
+  status: CallRoomStatus;
+  created_at: string;
+  started_at: string | null;
+  ended_at: string | null;
+}
+
+export interface DbCallMessage {
+  id: string; // UUID
+  room_id: string; // UUID
+  sender_id: string; // UUID
+  content: string;
+  created_at: string;
+}
