@@ -19,58 +19,59 @@ const protectedRoutes = [
 const authRoutes = ["/login", "/register"];
 
 export async function middleware(request: NextRequest) {
-  // 1. Refresh the session cookie
-  let response = await updateSession(request);
+  try {
+    // 1. Refresh the session cookie
+    let response = await updateSession(request);
 
-  // 2. Instantiate a temporary client to check session status
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
+    // 2. Instantiate a temporary client to check session status
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+            response = NextResponse.next({
+              request,
+            });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            );
+          },
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({
-            request,
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
+      }
+    );
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const nextUrl = request.nextUrl;
+    const path = nextUrl.pathname;
+
+    // 3. Handle Route Guards
+    const isProtectedRoute = protectedRoutes.some((route) =>
+      path.startsWith(route)
+    );
+    const isAuthRoute = authRoutes.some((route) => path.startsWith(route));
+
+    if (isProtectedRoute && !user) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("next", path);
+      return NextResponse.redirect(loginUrl);
     }
-  );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    if (isAuthRoute && user) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
 
-  const nextUrl = request.nextUrl;
-  const path = nextUrl.pathname;
-
-  // 3. Handle Route Guards
-  const isProtectedRoute = protectedRoutes.some((route) =>
-    path.startsWith(route)
-  );
-  const isAuthRoute = authRoutes.some((route) => path.startsWith(route));
-
-  if (isProtectedRoute && !user) {
-    // User is not authenticated, redirect to login
-    const loginUrl = new URL("/login", request.url);
-    // Keep track of the original destination to redirect back after login
-    loginUrl.searchParams.set("next", path);
-    return NextResponse.redirect(loginUrl);
+    return response;
+  } catch {
+    return NextResponse.next();
   }
-
-  if (isAuthRoute && user) {
-    // User is already authenticated, redirect to dashboard
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  return response;
 }
 
 export const config = {
