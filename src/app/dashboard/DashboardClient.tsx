@@ -666,10 +666,15 @@ export default function DashboardClient({
             <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 blur-[50px] rounded-full pointer-events-none"></div>
             
             <div className="flex justify-between items-start mb-6">
-              <div>
-                <h2 className="font-heading text-lg font-bold text-cream-bone mb-1">Tu Nivel de Karma</h2>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Nivel {karmaLevel}</p>
-              </div>
+              <Link href="/karma" className="group/karma-title flex items-center gap-1.5 focus:outline-none select-none">
+                <div>
+                  <h2 className="font-heading text-lg font-bold text-cream-bone mb-1 group-hover/karma-title:text-accent transition-colors flex items-center gap-1.5">
+                    <span>Tu Nivel de Karma</span>
+                    <ArrowRight className="w-4 h-4 opacity-0 -translate-x-1 group-hover/karma-title:opacity-100 group-hover/karma-title:translate-x-0 transition-all text-accent shrink-0" />
+                  </h2>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Nivel {karmaLevel}</p>
+                </div>
+              </Link>
               <span className="text-sm font-semibold text-accent">{currentXP} / {nextLevelXP} XP</span>
             </div>
 
