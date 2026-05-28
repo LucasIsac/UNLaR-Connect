@@ -14,6 +14,7 @@ import {
   Clock,
   Sparkles,
   Lock,
+  FileText,
 } from "lucide-react";
 import { useTheme } from "@/components/ui/ThemeProvider";
 import Logo from "@/components/ui/Logo";
