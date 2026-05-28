@@ -21,6 +21,20 @@ type SidebarProps = {
   onClose?: () => void;
 };
 
+// Helper to map sidebar labels to high-end organic animations when active or parent item is hovered
+const getIconAnimationClass = (label: string, isActive: boolean) => {
+  const animations: Record<string, string> = {
+    "Dashboard": "group-hover:animate-sidebar-dashboard" + (isActive ? " animate-sidebar-dashboard" : ""),
+    "Banco de Apuntes": "group-hover:animate-sidebar-apuntes" + (isActive ? " animate-sidebar-apuntes" : ""),
+    "Asistente IA": "group-hover:animate-sidebar-ai" + (isActive ? " animate-sidebar-ai" : ""),
+    "Foros Estudiantiles": "group-hover:animate-sidebar-foros" + (isActive ? " animate-sidebar-foros" : ""),
+    "Karma y Medallas": "group-hover:animate-sidebar-karma" + (isActive ? " animate-sidebar-karma" : ""),
+    "Ranking Académico": "group-hover:animate-sidebar-ranking" + (isActive ? " animate-sidebar-ranking" : ""),
+    "Mi Perfil": "group-hover:animate-sidebar-perfil" + (isActive ? " animate-sidebar-perfil" : ""),
+  };
+  return animations[label] || "";
+};
+
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
 
@@ -80,21 +94,22 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               <Link
                 href={item.href}
                 className={cn(
-                  "group px-3 py-3 flex items-center rounded-xl text-sm font-medium transition-all duration-200 w-full overflow-hidden",
+                  "group px-4 py-3 flex items-center justify-start rounded-xl text-sm font-medium transition-all duration-200 w-full overflow-hidden",
                   isActive
-                    ? "bg-accent/15 text-accent border-r-2 border-accent font-semibold"
+                    ? "bg-accent/15 text-accent font-semibold"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/30 dark:hover:bg-muted/10"
                 )}
               >
                 <Icon 
                   className={cn(
-                    "w-5 h-5 shrink-0 transition-transform duration-200 group-hover:scale-105 mr-4",
+                    "w-5 h-5 shrink-0 transition-all duration-300 ease-in-out group-hover/sidebar:mr-4 mr-0",
                     isActive ? "text-accent" : "text-muted-foreground group-hover:text-foreground",
-                    item.isAi && "text-gradient-ai"
+                    item.isAi && "text-gradient-ai",
+                    getIconAnimationClass(item.label, isActive)
                   )} 
                 />
                 <span className={cn(
-                  "opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-300 truncate",
+                  "opacity-0 group-hover/sidebar:opacity-100 inline-block max-w-0 group-hover/sidebar:max-w-40 transition-all duration-300 ease-in-out overflow-hidden truncate",
                   item.isAi && "text-gradient-ai font-semibold"
                 )}>
                   {item.label}
@@ -111,10 +126,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           onClick={() => {
             window.dispatchEvent(new CustomEvent("open-upload-apunte-modal"));
           }}
-          className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold py-3 px-3 rounded-xl transition-colors duration-200 flex justify-center items-center gap-2 shadow-lg shadow-accent/10 overflow-hidden focus:outline-none"
+          className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold py-3 pl-[18px] pr-3 rounded-xl transition-colors duration-200 flex justify-start items-center shadow-lg shadow-accent/10 overflow-hidden focus:outline-none"
         >
-          <Plus className="w-4 h-4 shrink-0" />
-          <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-300 truncate">
+          <Plus className="w-4 h-4 shrink-0 transition-all duration-300 ease-in-out group-hover/sidebar:mr-2 mr-0" />
+          <span className="opacity-0 group-hover/sidebar:opacity-100 inline-block max-w-0 group-hover/sidebar:max-w-40 transition-all duration-300 ease-in-out overflow-hidden truncate">
             Subí tu Apunte
           </span>
         </button>
@@ -166,15 +181,16 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 className={cn(
                   "group px-4 py-3 flex items-center gap-3.5 rounded-xl text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "bg-accent/15 text-accent border-r-2 border-accent font-semibold"
+                    ? "bg-accent/15 text-accent font-semibold"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/30 dark:hover:bg-muted/10"
                 )}
               >
                 <Icon 
                   className={cn(
-                    "w-5 h-5 transition-transform duration-200 group-hover:scale-105",
+                    "w-5 h-5 transition-transform duration-200",
                     isActive ? "text-accent" : "text-muted-foreground group-hover:text-foreground",
-                    item.isAi && "text-gradient-ai"
+                    item.isAi && "text-gradient-ai",
+                    getIconAnimationClass(item.label, isActive)
                   )} 
                 />
                 <span className={cn(item.isAi && "text-gradient-ai font-semibold")}>

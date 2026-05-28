@@ -60,6 +60,7 @@ async function fetchDashboardStatsUncached(userId: string, accessToken: string):
       const name = authUser.user_metadata?.first_name || authUser.user_metadata?.name || "Estudiante";
       const lastName = authUser.user_metadata?.last_name || "";
       const email = authUser.email || "";
+      const avatarUrl = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null;
 
       const { data: insertedUser, error: insertError } = await supabase
         .from("users")
@@ -68,6 +69,7 @@ async function fetchDashboardStatsUncached(userId: string, accessToken: string):
           email: email,
           name: name,
           last_name: lastName,
+          avatar_url: avatarUrl,
           role_id: 2
         })
         .select("*")

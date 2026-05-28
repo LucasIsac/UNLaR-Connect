@@ -39,6 +39,7 @@ import {
 } from "@/actions/dashboard";
 import { DbTutorAvailability, DbPostReply } from "@/types/database";
 import { updateUserProfile, toggleTutorStatus } from "@/actions/perfil";
+import type { CombinedHeaderData } from "@/actions/perfil";
 import { reactivateAccountAction, signOutAction } from "@/actions/auth";
 import { Select } from "@/components/ui/Select";
 
@@ -46,6 +47,7 @@ type DashboardClientProps = {
   initialStats: DashboardStats;
   initialSessions: UpcomingSessionExtended[];
   initialPosts: ForumPostExtended[];
+  initialHeaderData: CombinedHeaderData;
 };
 
 // ==========================================
@@ -166,6 +168,7 @@ export default function DashboardClient({
   initialStats,
   initialSessions,
   initialPosts,
+  initialHeaderData,
 }: DashboardClientProps) {
   const [stats, setStats] = useState<DashboardStats | null>(initialStats);
   const [sessions, setSessions] = useState<UpcomingSessionExtended[]>(initialSessions);
@@ -616,7 +619,7 @@ export default function DashboardClient({
   }
 
   return (
-    <DashboardLayout>
+    <DashboardLayout initialHeaderData={initialHeaderData}>
       {/* Toast Notification Container */}
       <AnimatePresence>
         {showToast && (

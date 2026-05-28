@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
 import { createServerClient } from "@supabase/ssr";
 
 // Define paths that require authentication
@@ -20,10 +19,10 @@ const authRoutes = ["/login", "/register"];
 
 export async function middleware(request: NextRequest) {
   try {
-    // 1. Refresh the session cookie
-    let response = await updateSession(request);
+    let response = NextResponse.next({
+      request,
+    });
 
-    // 2. Instantiate a temporary client to check session status
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -52,7 +51,6 @@ export async function middleware(request: NextRequest) {
     const nextUrl = request.nextUrl;
     const path = nextUrl.pathname;
 
-    // 3. Handle Route Guards
     const isProtectedRoute = protectedRoutes.some((route) =>
       path.startsWith(route)
     );

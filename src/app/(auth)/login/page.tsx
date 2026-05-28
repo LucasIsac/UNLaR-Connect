@@ -2,13 +2,12 @@
 
 import React, { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { loginAction } from "@/actions/auth";
 import { Mail, Lock, ArrowRight, Sparkles } from "lucide-react";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const nextParam = searchParams.get("next") ?? "/dashboard";
   const errorParam = searchParams.get("error");
@@ -49,15 +48,10 @@ function LoginForm() {
       setLoading(true);
       setErrorMsg("");
 
-      const result = await loginAction({ email, password });
+      const result = await loginAction({ email, password, next: nextParam });
       
-      if (result.success) {
-        router.push(nextParam);
-        router.refresh();
-      } else {
-        setErrorMsg(result.error ?? "Las credenciales no coinciden. Verificá los datos.");
-        setLoading(false);
-      }
+      setErrorMsg(result?.error ?? "Las credenciales no coinciden. Verificá los datos.");
+      setLoading(false);
     } catch (err) {
       console.error(err);
       setErrorMsg("Hubo un error inesperado. Intentalo más tarde.");

@@ -5,18 +5,20 @@ import Link from "next/link";
 import { Menu, Search, Bell, Award, User, LogOut, Settings, Calendar, Trophy, Sparkles, Check, Trash2 } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
 import Logo from "../ui/Logo";
-import { fetchCombinedHeaderData, UserProfileExtended } from "@/actions/perfil";
+import { fetchCombinedHeaderData } from "@/actions/perfil";
+import type { CombinedHeaderData, UserProfileExtended } from "@/actions/perfil";
 import { signOutAction } from "@/actions/auth";
 import { fetchNotificationsAction, markNotificationAsReadAction, markAllNotificationsAsReadAction } from "@/actions/notifications";
 import { DbNotification } from "@/types/database";
 
 type HeaderProps = {
   onMenuToggle: () => void;
+  initialData?: CombinedHeaderData;
 };
 
-export default function Header({ onMenuToggle }: HeaderProps) {
-  const [profile, setProfile] = useState<UserProfileExtended | null>(null);
-  const [notifications, setNotifications] = useState<DbNotification[]>([]);
+export default function Header({ onMenuToggle, initialData }: HeaderProps) {
+  const [profile, setProfile] = useState<UserProfileExtended | null>(initialData?.profile ?? null);
+  const [notifications, setNotifications] = useState<DbNotification[]>(initialData?.notifications ?? []);
   
   // Dropdowns active state
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -30,7 +32,9 @@ export default function Header({ onMenuToggle }: HeaderProps) {
   useEffect(() => {
     let isCancelled = false;
 
-    async function loadData() {
+    async function loadData(attempt = 1) {
+      if (initialData) return;
+
       try {
         const { profile, notifications } = await fetchCombinedHeaderData();
         if (!isCancelled) {
@@ -39,6 +43,9 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         }
       } catch (err) {
         console.error("Error loading header metrics:", err);
+        if (!isCancelled && attempt < 3) {
+          window.setTimeout(() => loadData(attempt + 1), attempt * 350);
+        }
       }
     }
     loadData();
@@ -59,7 +66,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
       isCancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [initialData]);
 
   // Listen for clicks outside dropdown menus
   useEffect(() => {
@@ -111,9 +118,9 @@ export default function Header({ onMenuToggle }: HeaderProps) {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <header suppressHydrationWarning className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-6 md:px-10 h-16 bg-background/50 backdrop-blur-xl border-b border-border/40 shadow-sm transition-colors duration-300">
-      {/* Left: Brand Logo (desktop) & Mobile toggle & Search Bar */}
-      <div suppressHydrationWarning className="flex flex-1 items-center gap-6">
+    <header suppressHydrationWarning className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-8 md:px-20 lg:px-28 h-16 bg-background/50 backdrop-blur-xl border-b border-border/40 shadow-sm transition-colors duration-300">
+      {/* Left: Brand Logo (desktop) & Mobile toggle */}
+      <div suppressHydrationWarning className="flex items-center gap-6 shrink-0">
         {/* Desktop Brand Logo */}
         <Link suppressHydrationWarning href="/dashboard" className="hidden md:flex items-center gap-3 shrink-0 group">
           <Logo className="w-8 h-8 transition-transform duration-300 group-hover:scale-105" />
@@ -122,7 +129,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
               UNLaR<span className="text-accent font-bold">-Connect</span>
             </span>
             <span className="text-[10px] text-muted-foreground font-semibold leading-none mt-0.5">
-              Ing. en Sistemas
+              {profile?.careerName || "Ing. en Sistemas"}
             </span>
           </div>
         </Link>
@@ -135,9 +142,11 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         >
           <Menu className="w-5 h-5" />
         </button>
+      </div>
 
-        {/* Search Bar */}
-        <div className="relative w-full max-w-md hidden sm:block">
+      {/* Center Search Bar */}
+      <div className="absolute left-1/2 -translate-x-1/2 max-w-[460px] w-full hidden md:block z-10">
+        <div className="relative w-full">
           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/60 transition-colors pointer-events-none">
             <Search className="w-4 h-4" />
           </span>
@@ -150,7 +159,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
       </div>
 
       {/* Right: Actions (Points, notifications, profile, theme) */}
-      <div suppressHydrationWarning className="flex items-center gap-4">
+      <div suppressHydrationWarning className="flex items-center gap-4 z-20">
         {/* Mobile Search Button (shows only when screen is small) */}
         <button className="p-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30 sm:hidden transition-colors">
           <Search className="w-4 h-4" />
@@ -160,7 +169,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         <Link href="/karma" className="flex items-center gap-1.5 bg-accent/10 border border-accent/20 px-3 py-1.5 rounded-full hover:scale-[1.03] transition-transform duration-200 cursor-pointer select-none">
           <Award className="w-4 h-4 text-accent animate-pulse-slow" />
           <span className="text-xs font-bold text-accent tracking-wide">
-            {profile ? profile.points.toLocaleString() : "2.450"} pts
+            {profile ? profile.points.toLocaleString() : "..."} pts
           </span>
         </Link>
 
@@ -172,13 +181,13 @@ export default function Header({ onMenuToggle }: HeaderProps) {
               setIsNotificationsOpen(!isNotificationsOpen);
               setIsProfileOpen(false);
             }}
-            className={`relative p-2.5 rounded-xl transition-colors ${
+            className={`relative w-9 h-9 flex items-center justify-center rounded-xl transition-colors ${
               isNotificationsOpen ? "bg-muted/35 text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
             }`}
           >
             <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-destructive rounded-full shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" />
+              <span className="absolute top-2 right-2 w-2 h-2 bg-destructive rounded-full shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" />
             )}
           </button>
 
@@ -259,16 +268,20 @@ export default function Header({ onMenuToggle }: HeaderProps) {
               setIsProfileOpen(!isProfileOpen);
               setIsNotificationsOpen(false);
             }}
-            className={`w-9 h-9 rounded-xl overflow-hidden border transition-colors shrink-0 ${
+            className={`w-9 h-9 rounded-xl overflow-hidden border transition-colors shrink-0 flex items-center justify-center ${
               isProfileOpen ? "border-accent shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "border-border hover:border-accent"
             }`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              alt="Foto de perfil del alumno"
-              className="w-full h-full object-cover"
-              src={profile?.avatar_url || "https://lh3.googleusercontent.com/aida-public/AB6AXuDG7kZthARJWoPUqDDIShLuxuJGHxPM6eh_dFZ6vUCJpDcMLAVUhwXYCRHRWp4g2EG0IU2Rsbhy6R-fMP4njxS_VptnFuC38SCPJY9SODYThVAvnjbCK1XZUX7gGvY80048nOa5c8BLd-8sEqOcZI_3g6HnpGk6fONgBN98bB6t-7auFl5Er-3QmIJY8I86xD7vDken6cwXb1WU2S_MjlMOmKiKLHNUwHo5JTyGIRJfxWF3gwjqpONgQHZ_ti-F5V9qgMFGH0mCDQ"}
-            />
+            {profile?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                alt="Foto de perfil del alumno"
+                className="w-full h-full object-cover"
+                src={profile.avatar_url}
+              />
+            ) : (
+              <User className="w-4 h-4 text-muted-foreground" />
+            )}
           </button>
 
           {/* Profile options card */}

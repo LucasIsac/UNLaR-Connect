@@ -3,18 +3,24 @@
 import { useState } from "react";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import type { CombinedHeaderData } from "@/actions/perfil";
 
 export default function DashboardLayout({
   children,
+  initialHeaderData,
 }: {
   children: React.ReactNode;
+  initialHeaderData?: CombinedHeaderData;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
     <div suppressHydrationWarning className="relative min-h-screen bg-background text-foreground transition-colors duration-300 flex overflow-hidden">
       {/* Header toolbar */}
-      <Header onMenuToggle={() => setIsSidebarOpen(true)} />
+      <Header 
+        onMenuToggle={() => setIsSidebarOpen(true)} 
+        initialData={initialHeaderData}
+      />
 
       {/* Sidebar Navigation */}
       <Sidebar 
