@@ -188,7 +188,7 @@ let mockReplies: Record<string, DbPostReply[]> = {
       id: "reply-2",
       post_id: "post-2",
       user_id: "user-juan",
-      content: "Che, estudiale a fondo el tema de Semáforos y Monitores. Siempre toman un ejercicio práctico de concurrencia y sincronización de procesos en el examen.",
+      content: "Che, estudiale a fondo el tema de Semáforos y Monitores. Siempre toman un ejercicio práctico de concurrencia y sincronización de procesos en la cursada.",
       upvotes: 3,
       is_accepted: false,
       created_at: new Date(Date.now() - 1 * 3600000).toISOString()

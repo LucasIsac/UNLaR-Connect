@@ -63,6 +63,7 @@ export default function RecursosPage() {
   const [newCategory, setNewCategory] = useState("Sistemas Operativos");
   const [newAxis, setNewAxis] = useState("Gestión de Memoria");
   const [newType, setNewType] = useState("Apunte de Teoría");
+  const [file, setFile] = useState<File | null>(null);
 
   // Drag & drop styling state
   const [isDragging, setIsDragging] = useState(false);
@@ -130,15 +131,27 @@ export default function RecursosPage() {
 
   const handleUploadApunteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim() || !file) {
+      showToast("Por favor completá todos los campos y seleccioná un archivo.");
+      return;
+    }
 
     setActionInProgress("upload-resource");
     try {
-      const response = await uploadResource(newTitle, newCategory, newAxis, newType);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("title", newTitle);
+      formData.append("category", newCategory);
+      formData.append("thematicAxis", newAxis);
+      formData.append("type", newType);
+      formData.append("description", `Material sobre ${newAxis} (${newType}).`);
+
+      const response = await uploadResource(formData);
       if (response.success && response.data) {
         setResources((prev) => [response.data!, ...prev]);
         showToast("¡Apunte subido! Sumaste 50 puntos de Karma y ya está listo para el Asistente AI 🚀");
         setNewTitle("");
+        setFile(null);
       } else {
         showToast(response.error || "No se pudo registrar tu apunte.");
       }
@@ -612,24 +625,46 @@ export default function RecursosPage() {
                         >
                           <option>Apunte de Teoría</option>
                           <option>Trabajo Práctico Resuelto</option>
-                          <option>Examen Anterior</option>
+                          <option>Guía de Ejercicios</option>
                           <option>Otro</option>
                         </select>
                       </div>
 
-                      {/* Dashed Drag & Drop simulator */}
-                      <div
+                      {/* Dashed Drag & Drop File Selector */}
+                      <label
                         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                         onDragLeave={() => setIsDragging(false)}
-                        onDrop={(e) => { e.preventDefault(); setIsDragging(false); showToast("¡Archivo detectado! Completá el título y dale a subir."); }}
-                        className={`border-2 border-dashed rounded-xl p-5 hover:border-accent/50 transition-colors bg-card/30 cursor-pointer flex flex-col items-center justify-center text-center ${
+                        onDrop={(e) => { 
+                          e.preventDefault(); 
+                          setIsDragging(false); 
+                          const droppedFile = e.dataTransfer.files[0];
+                          if (droppedFile) setFile(droppedFile);
+                        }}
+                        className={`border-2 border-dashed rounded-xl p-5 hover:border-accent/50 transition-colors bg-card/30 cursor-pointer flex flex-col items-center justify-center text-center w-full block ${
                           isDragging ? "border-accent bg-accent/5" : "border-border/30"
                         }`}
                       >
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          onChange={(e) => {
+                            if (e.target.files?.[0]) setFile(e.target.files[0]);
+                          }}
+                          accept=".pdf,.png,.jpg,.jpeg"
+                        />
                         <CloudUpload className={`w-8 h-8 mb-2 transition-transform duration-200 ${isDragging ? "scale-110 text-accent" : "text-muted-foreground"}`} />
-                        <span className="text-xs text-foreground font-semibold mb-0.5">Arrastrá tu archivo o hacé clic acá</span>
-                        <span className="text-[10px] text-muted-foreground">PDF, DOCX (Máx 50MB)</span>
-                      </div>
+                        {file ? (
+                          <>
+                            <span className="text-xs text-accent font-bold mb-0.5 truncate max-w-full px-2">{file.name}</span>
+                            <span className="text-[10px] text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB - ¡Listo para subir!</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-xs text-foreground font-semibold mb-0.5">Arrastrá tu archivo o hacé clic acá</span>
+                            <span className="text-[10px] text-muted-foreground">PDF, PNG, JPG (Máx 10MB)</span>
+                          </>
+                        )}
+                      </label>
 
                       <button
                         type="submit"
@@ -833,7 +868,7 @@ export default function RecursosPage() {
                     <input
                       type="text"
                       required
-                      placeholder="Ej: ¿Qué temas toma el examen libre?"
+                      placeholder="Ej: ¿Me hacés un resumen de los temas más importantes?"
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
                       className="flex-1 bg-card/60 border border-border/40 rounded-xl py-2 px-3 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
