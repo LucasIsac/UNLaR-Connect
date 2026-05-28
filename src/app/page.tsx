@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
 import SmoothScroll from "@/components/ui/SmoothScroll";
 import UniConnectHero from "@/components/landing/UniConnectHero";
 import FinalCTA from "@/components/landing/FinalCTA";
@@ -9,6 +10,8 @@ import Footer from "@/components/layout/Footer";
 import { CONFIG } from "@/lib/constants";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import Logo from "@/components/ui/Logo";
+import { createBrowserClient } from "@/lib/supabase";
+import { DbUser } from "@/types/database";
 
 // Canvas loaded client-side only (no SSR needed for canvas)
 const NodeCanvas = dynamic(() => import("@/components/landing/NodeCanvas"), {
@@ -22,6 +25,26 @@ const ScreenShowcase = dynamic(
 );
 
 export default function Home() {
+  const [user, setUser] = useState<DbUser | null>(null);
+
+  useEffect(() => {
+    const supabase = createBrowserClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        supabase
+          .from("users")
+          .select("*")
+          .eq("id", data.user.id)
+          .single()
+          .then(({ data: dbUser }) => {
+            if (dbUser) {
+              setUser(dbUser as DbUser);
+            }
+          });
+      }
+    });
+  }, []);
+
   return (
     <SmoothScroll>
       {/* Fixed ambient node-link canvas background */}
@@ -61,22 +84,46 @@ export default function Home() {
           {/* Auth actions */}
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <Link
-              href={CONFIG.routes.dashboard}
-              className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors px-3 py-2"
-            >
-              Entrar
-            </Link>
-            <Link
-              href={CONFIG.routes.dashboard}
-              className="relative group px-5 py-2 text-sm font-bold rounded-xl overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-accent transition-transform duration-300 group-hover:scale-105" />
-              <div className="absolute inset-0 bg-white/20 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300 ease-out" />
-              <span className="relative z-10 text-accent-foreground shadow-sm">
-                Registrate Gratis
-              </span>
-            </Link>
+            {user ? (
+              <>
+                <Link
+                  href={CONFIG.routes.dashboard}
+                  className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors px-3 py-2"
+                >
+                  Ir al Dashboard
+                </Link>
+                <Link
+                  href={CONFIG.routes.dashboard}
+                  className="w-9 h-9 rounded-xl overflow-hidden border border-border hover:border-accent transition-all shrink-0 focus:outline-none shadow-sm block"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt={`Foto de perfil de ${user.name}`}
+                    className="w-full h-full object-cover"
+                    src={user.avatar_url || "https://lh3.googleusercontent.com/aida-public/AB6AXuDG7kZthARJWoPUqDDIShLuxuJGHxPM6eh_dFZ6vUCJpDcMLAVUhwXYCRHRWp4g2EG0IU2Rsbhy6R-fMP4njxS_VptnFuC38SCPJY9SODYThVAvnjbCK1XZUX7gGvY80048nOa5c8BLd-8sEqOcZI_3g6HnpGk6fONgBN98bB6t-7auFl5Er-3QmIJY8I86xD7vDken6cwXb1WU2S_MjlMOmKiKLHNUwHo5JTyGIRJfxWF3gwjqpONgQHZ_ti-F5V9qgMFGH0mCDQ"}
+                  />
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href={CONFIG.routes.dashboard}
+                  className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors px-3 py-2"
+                >
+                  Entrar
+                </Link>
+                <Link
+                  href="/register"
+                  className="relative group px-5 py-2 text-sm font-bold rounded-xl overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-accent transition-transform duration-300 group-hover:scale-105" />
+                  <div className="absolute inset-0 bg-white/20 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+                  <span className="relative z-10 text-accent-foreground shadow-sm">
+                    Registrate Gratis
+                  </span>
+                </Link>
+              </>
+            )}
           </div>
         </header>
       </div>

@@ -111,9 +111,9 @@ export default function Header({ onMenuToggle }: HeaderProps) {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <header suppressHydrationWarning className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-6 md:px-10 h-16 bg-background/50 backdrop-blur-xl border-b border-border/40 shadow-sm transition-colors duration-300">
-      {/* Left: Brand Logo (desktop) & Mobile toggle & Search Bar */}
-      <div suppressHydrationWarning className="flex flex-1 items-center gap-6">
+    <header suppressHydrationWarning className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-6 md:px-12 h-16 bg-background/50 backdrop-blur-xl border-b border-border/40 shadow-sm transition-colors duration-300">
+      {/* Left: Brand Logo (desktop) & Mobile toggle */}
+      <div suppressHydrationWarning className="flex items-center gap-6 shrink-0">
         {/* Desktop Brand Logo */}
         <Link suppressHydrationWarning href="/dashboard" className="hidden md:flex items-center gap-3 shrink-0 group">
           <Logo className="w-8 h-8 transition-transform duration-300 group-hover:scale-105" />
@@ -122,7 +122,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
               UNLaR<span className="text-accent font-bold">-Connect</span>
             </span>
             <span className="text-[10px] text-muted-foreground font-semibold leading-none mt-0.5">
-              Ing. en Sistemas
+              {profile?.careerName || "Ing. en Sistemas"}
             </span>
           </div>
         </Link>
@@ -135,9 +135,11 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         >
           <Menu className="w-5 h-5" />
         </button>
+      </div>
 
-        {/* Search Bar */}
-        <div className="relative w-full max-w-md hidden sm:block">
+      {/* Center Search Bar */}
+      <div className="absolute left-1/2 -translate-x-1/2 max-w-[460px] w-full hidden md:block z-10">
+        <div className="relative w-full">
           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/60 transition-colors pointer-events-none">
             <Search className="w-4 h-4" />
           </span>
@@ -150,7 +152,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
       </div>
 
       {/* Right: Actions (Points, notifications, profile, theme) */}
-      <div suppressHydrationWarning className="flex items-center gap-4">
+      <div suppressHydrationWarning className="flex items-center gap-4 z-20">
         {/* Mobile Search Button (shows only when screen is small) */}
         <button className="p-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30 sm:hidden transition-colors">
           <Search className="w-4 h-4" />
@@ -172,13 +174,13 @@ export default function Header({ onMenuToggle }: HeaderProps) {
               setIsNotificationsOpen(!isNotificationsOpen);
               setIsProfileOpen(false);
             }}
-            className={`relative p-2.5 rounded-xl transition-colors ${
+            className={`relative w-9 h-9 flex items-center justify-center rounded-xl transition-colors ${
               isNotificationsOpen ? "bg-muted/35 text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
             }`}
           >
             <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-destructive rounded-full shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" />
+              <span className="absolute top-2 right-2 w-2 h-2 bg-destructive rounded-full shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" />
             )}
           </button>
 
