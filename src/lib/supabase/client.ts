@@ -29,7 +29,7 @@ export function unsubscribeRealtimeChannel(channel: RealtimeChannel) {
     // Delay the actual network unsubscription slightly to allow the connection
     // handshake to complete, avoiding "WebSocket is closed before the connection is established" warning.
     setTimeout(() => {
-      void browserClient.removeChannel(channel);
+      void browserClient?.removeChannel(channel);
     }, 100);
     return;
   }
