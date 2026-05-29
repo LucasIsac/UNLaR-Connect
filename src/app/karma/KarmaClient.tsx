@@ -57,7 +57,7 @@ export default function KarmaClient({ initialStats }: KarmaClientProps) {
           }
 
           // Trigger toast notification
-          setShowToast(`¡Excelente! Sumaste +${xpEarned} Karma XP ${actionText} 🚀`);
+          setShowToast(`¡Excelente! Sumaste +${xpEarned} Puntos de Reputación ${actionText} 🚀`);
           setShowConfetti(true);
           setTimeout(() => setShowConfetti(false), 2000);
           setTimeout(() => setShowToast(null), 4000);
@@ -100,7 +100,7 @@ export default function KarmaClient({ initialStats }: KarmaClientProps) {
     {
       type: 'apunte' as const,
       title: "Subí un Apunte",
-      reward: "+50 Karma XP",
+      reward: "+50 Puntos",
       description: "Cargá resúmenes, guías o apuntes de examen al banco de recursos de tu materia.",
       icon: Upload,
       buttonText: "Simular Subida"
@@ -108,7 +108,7 @@ export default function KarmaClient({ initialStats }: KarmaClientProps) {
     {
       type: 'foro' as const,
       title: "Ayudá en los Foros",
-      reward: "+15 Karma XP",
+      reward: "+15 Puntos",
       description: "Respondé las dudas académicas de tus compañeros o abrí debates enriquecedores.",
       icon: MessageSquare,
       buttonText: "Simular Respuesta"
@@ -116,7 +116,7 @@ export default function KarmaClient({ initialStats }: KarmaClientProps) {
     {
       type: 'tutoria' as const,
       title: "Dictá una Tutoría P2P",
-      reward: "+100 Karma XP",
+      reward: "+100 Puntos",
       description: "Organizá un encuentro de estudio y brindá una clase virtual de apoyo a otros alumnos.",
       icon: Calendar,
       buttonText: "Simular Tutoría"
@@ -188,7 +188,7 @@ export default function KarmaClient({ initialStats }: KarmaClientProps) {
                 <ArrowLeft className="w-3.5 h-3.5" /> Volver al Dashboard
               </Link>
               <h1 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight mb-1 text-cream-bone">
-                Karma y <span className="text-accent font-bold">Recompensas</span>
+                Reputación y <span className="text-accent font-bold">Recompensas</span>
               </h1>
               <p className="text-sm text-muted-foreground">
                 Tu colaboración en la comunidad UNLaR te hace crecer. Ganá puntos, subí de nivel y coleccioná medallas.
@@ -214,7 +214,7 @@ export default function KarmaClient({ initialStats }: KarmaClientProps) {
             <div>
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h2 className="font-heading text-lg font-bold text-foreground mb-1">Puntos de Karma Obtenidos</h2>
+                  <h2 className="font-heading text-lg font-bold text-foreground mb-1">Puntos de Reputación</h2>
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">NIVEL {stats.karmaLevel}</p>
                 </div>
                 <div className="text-right">
@@ -242,7 +242,7 @@ export default function KarmaClient({ initialStats }: KarmaClientProps) {
 
             {/* How points are calculated details list */}
             <div className="bg-special-gradient rounded-2xl p-4 space-y-3">
-              <h3 className="text-xs font-bold text-accent uppercase tracking-wider">¿Cómo sumar puntos de Karma?</h3>
+              <h3 className="text-xs font-bold text-accent uppercase tracking-wider">¿Cómo sumar puntos de Reputación?</h3>
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
                 <li className="flex items-center gap-2">
                   <Zap className="w-3.5 h-3.5 text-accent shrink-0" />
@@ -365,7 +365,7 @@ export default function KarmaClient({ initialStats }: KarmaClientProps) {
                   <div className="pt-4 border-t border-border/10 mt-4 flex items-center justify-between text-[10px] font-bold">
                     <span className="text-muted-foreground">Requisito</span>
                     <span className={isLocked ? 'text-muted-foreground' : 'text-accent font-extrabold'}>
-                      {badge.required_points} Karma pts
+                      {badge.required_points} pts
                     </span>
                   </div>
                 </div>
@@ -425,7 +425,7 @@ export default function KarmaClient({ initialStats }: KarmaClientProps) {
                 {activeModalBadge.name}
               </h3>
               <span className="text-[10px] font-extrabold text-accent uppercase tracking-widest mb-4 block">
-                {activeModalBadge.required_points} puntos de Karma
+                {activeModalBadge.required_points} puntos de Reputación
               </span>
 
               <p className="text-xs text-muted-foreground leading-relaxed mb-6 bg-muted/20 border border-border/10 p-4 rounded-2xl">
@@ -437,7 +437,7 @@ export default function KarmaClient({ initialStats }: KarmaClientProps) {
                 {stats.userPoints < activeModalBadge.required_points ? (
                   <p className="text-muted-foreground flex items-center justify-center gap-1.5">
                     <Lock className="w-4 h-4 text-muted-foreground/60" />
-                    <span>Te faltan <strong>{activeModalBadge.required_points - stats.userPoints} pts</strong> de Karma para desbloquearla.</span>
+                    <span>Te faltan <strong>{activeModalBadge.required_points - stats.userPoints} pts</strong> de Reputación para desbloquearla.</span>
                   </p>
                 ) : (
                   <p className="text-green-400 flex items-center justify-center gap-1.5 select-none">
