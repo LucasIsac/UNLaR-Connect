@@ -5,9 +5,6 @@ import {
   Bot,
   Send,
   Paperclip,
-  BookOpen,
-  List,
-  HelpCircle,
   FileText,
   Presentation,
   PlusCircle,
@@ -225,31 +222,6 @@ export default function AsistenteClient() {
     <div className="flex h-[calc(100vh-4rem)] -mt-8 -mx-6 md:-ml-[240px] md:-mr-[320px] -mb-6 md:-mb-8">
       {/* Main chat column */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Document context header */}
-        <div className="px-6 py-3 border-b border-border flex items-center justify-between bg-card/60 backdrop-blur-md shrink-0">
-          <div className="flex items-center gap-3">
-            <BookOpen className="w-5 h-5 text-secondary shrink-0" />
-            <div>
-              <h2 className="font-heading text-base font-semibold text-foreground">
-                Sistemas Operativos II
-              </h2>
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mt-0.5">
-                <span className="w-2 h-2 rounded-full bg-green-500" />
-                <span>2 Documentos Activos en Contexto</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button className="px-3 py-1.5 bg-card border border-border rounded-lg text-foreground hover:bg-accent/10 transition-colors flex items-center gap-2 text-xs font-semibold">
-              <List className="w-4 h-4" />
-              Resumir Contexto
-            </button>
-            <button className="px-3 py-1.5 bg-accent/10 border border-accent/30 text-accent rounded-lg hover:bg-accent/20 transition-colors flex items-center gap-2 text-xs font-semibold">
-              <HelpCircle className="w-4 h-4" />
-              Generar Quizz
-            </button>
-          </div>
-        </div>
 
         {/* Chat area */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
