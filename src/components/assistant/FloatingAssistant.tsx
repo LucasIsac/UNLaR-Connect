@@ -298,7 +298,7 @@ export default function FloatingAssistant() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Don't show on landing page or auth pages
-  const isHidden = pathname === "/" || pathname.startsWith("/(auth)");
+  const isHidden = pathname === "/" || pathname === "/login" || pathname === "/register" || pathname.startsWith("/auth");
 
   const context = PAGE_CONTEXT[pathname] || DEFAULT_CONTEXT;
   const quickResponses = QUICK_RESPONSES[pathname] || QUICK_RESPONSES["/"];
