@@ -12,7 +12,7 @@ type CreateEventModalProps = {
   isOpen: boolean;
   onClose: () => void;
   onCreated?: (event: any) => void;
-  editEvent?: EventExtended | null;
+  editingEvent?: EventExtended | null;
 };
 
 const EVENT_TYPES = [
@@ -24,8 +24,8 @@ const EVENT_TYPES = [
   { value: "otro", label: "Otro" },
 ];
 
-export default function CreateEventModal({ isOpen, onClose, onCreated, editEvent }: CreateEventModalProps) {
-  const isEditing = !!editEvent;
+export default function CreateEventModal({ isOpen, onClose, onCreated, editingEvent }: CreateEventModalProps) {
+  const isEditing = !!editingEvent;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(editEvent?.image_url || null);
@@ -44,22 +44,22 @@ export default function CreateEventModal({ isOpen, onClose, onCreated, editEvent
     image_url: "",
   });
 
-  // Update form when editEvent changes
+  // Update form when editingEvent changes
   useEffect(() => {
-    if (editEvent) {
+    if (editingEvent) {
       setForm({
-        title: editEvent.title || "",
-        description: editEvent.description || "",
-        event_type: editEvent.event_type || "seminario",
-        start_date: editEvent.start_date ? new Date(editEvent.start_date).toISOString().slice(0, 16) : "",
-        end_date: editEvent.end_date ? new Date(editEvent.end_date).toISOString().slice(0, 16) : "",
-        registration_deadline: editEvent.registration_deadline ? new Date(editEvent.registration_deadline).toISOString().slice(0, 16) : "",
-        location: editEvent.location || "",
-        meeting_link: editEvent.meeting_link || "",
-        max_participants: editEvent.max_participants?.toString() || "",
-        image_url: editEvent.image_url || "",
+        title: editingEvent.title || "",
+        description: editingEvent.description || "",
+        event_type: editingEvent.event_type || "seminario",
+        start_date: editingEvent.start_date ? new Date(editingEvent.start_date).toISOString().slice(0, 16) : "",
+        end_date: editingEvent.end_date ? new Date(editingEvent.end_date).toISOString().slice(0, 16) : "",
+        registration_deadline: editingEvent.registration_deadline ? new Date(editingEvent.registration_deadline).toISOString().slice(0, 16) : "",
+        location: editingEvent.location || "",
+        meeting_link: editingEvent.meeting_link || "",
+        max_participants: editingEvent.max_participants?.toString() || "",
+        image_url: editingEvent.image_url || "",
       });
-      setImagePreview(editEvent.image_url || null);
+      setImagePreview(editingEvent.image_url || null);
     } else {
       setForm({
         title: "",
@@ -76,7 +76,7 @@ export default function CreateEventModal({ isOpen, onClose, onCreated, editEvent
       setImagePreview(null);
     }
     setError(null);
-  }, [editEvent]);
+  }, [editingEvent]);
 
   const updateField = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -127,7 +127,7 @@ export default function CreateEventModal({ isOpen, onClose, onCreated, editEvent
 
     try {
       if (isEditing) {
-        const result = await editEvent(editEvent.id, {
+        const result = await editEvent(editingEvent.id, {
           ...form,
           max_participants: form.max_participants ? parseInt(form.max_participants) : undefined,
         });
