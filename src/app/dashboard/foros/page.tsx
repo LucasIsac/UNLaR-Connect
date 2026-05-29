@@ -1,8 +1,11 @@
-import { fetchForumPosts } from "@/actions/foros";
+import { fetchForumPosts, getCurrentUserId } from "@/actions/foros";
 import ForosClient from "./ForosClient";
 
 export default async function ForosPage() {
-  const threads = await fetchForumPosts();
+  const [threads, currentUserId] = await Promise.all([
+    fetchForumPosts(),
+    getCurrentUserId(),
+  ]);
 
-  return <ForosClient initialThreads={threads} />;
+  return <ForosClient initialThreads={threads} currentUserId={currentUserId} />;
 }
