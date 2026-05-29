@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   X,
   Calendar,
@@ -10,6 +11,7 @@ import {
   CheckCircle2,
   Loader2,
   ExternalLink,
+  ArrowRight,
 } from "lucide-react";
 import { EventExtended, registerForEvent, cancelRegistration } from "@/actions/events";
 
@@ -20,6 +22,7 @@ type EventDetailModalProps = {
 };
 
 export default function EventDetailModal({ event, isOpen, onClose }: EventDetailModalProps) {
+  const router = useRouter();
   const [isRegistered, setIsRegistered] = useState(false);
   const [registrationCount, setRegistrationCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -208,7 +211,7 @@ export default function EventDetailModal({ event, isOpen, onClose }: EventDetail
               ) : event.isFull ? (
                 "Completo"
               ) : (
-                "Registrarme"
+                "Inscribirme"
               )}
             </button>
           )}
@@ -217,6 +220,20 @@ export default function EventDetailModal({ event, isOpen, onClose }: EventDetail
             <div className="w-full py-3 rounded-xl text-sm font-bold text-center bg-muted/50 text-muted-foreground border border-border/50">
               Inscripciones cerradas
             </div>
+          )}
+
+          {/* Go to inscription page button */}
+          {isRegistrationOpen && !event.isFull && (
+            <button
+              onClick={() => {
+                onClose();
+                router.push(`/eventos/${event.id}/inscribir`);
+              }}
+              className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all bg-muted text-muted-foreground hover:bg-muted/80 border border-border"
+            >
+              Ir a página de inscripción
+              <ArrowRight className="w-4 h-4" />
+            </button>
           )}
         </div>
       </div>

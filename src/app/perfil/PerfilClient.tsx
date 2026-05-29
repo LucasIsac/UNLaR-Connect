@@ -532,7 +532,7 @@ export default function PerfilClient({
                 <div className="space-y-1">
                   <h3 className="font-heading text-base font-bold text-cream-bone flex items-center gap-2">
                     <Trophy className="w-4 h-4 text-accent" />
-                    <span>Karma Estudiantil</span>
+                    <span>Reputación Estudiantil</span>
                   </h3>
                   <p className="text-xs text-muted-foreground font-semibold">Tu reputación académica global</p>
                 </div>
@@ -595,7 +595,7 @@ export default function PerfilClient({
                   href="/karma"
                   className="w-full h-10 border border-border hover:border-accent bg-card/25 hover:bg-card/50 text-cream-bone font-semibold text-xs rounded-xl transition-all duration-300 flex justify-center items-center gap-2 active:scale-98 cursor-pointer"
                 >
-                  <span>Ver mi Historial de Karma y Medallas</span>
+                  <span>Ver mi Historial de Reputación y Medallas</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -621,7 +621,7 @@ export default function PerfilClient({
                   </div>
                   <div>
                     <h3 className="font-heading text-base font-bold text-cream-bone">Perfil de Tutor</h3>
-                    <p className="text-xs text-muted-foreground font-semibold">Compartí tu conocimiento y ganá Karma</p>
+                    <p className="text-xs text-muted-foreground font-semibold">Compartí tu conocimiento y ganá Reputación</p>
                   </div>
                 </div>
                 
@@ -1076,7 +1076,7 @@ export default function PerfilClient({
                   Tu cuenta será dada de baja de forma temporal. Tendrás una tolerancia de <span className="text-[#F59E0B] font-bold">14 días</span> para iniciar sesión y reactivarla si te arrepentís.
                 </p>
                 <p className="text-xs text-[#ffb4ab] font-semibold leading-relaxed">
-                  ⚠ Transcurrido el plazo, la baja será permanente y no podrás recuperar tus tutorías, insignias ni nivel de Karma.
+                  ⚠ Transcurrido el plazo, la baja será permanente y no podrás recuperar tus tutorías, insignias ni nivel de Reputación.
                 </p>
               </div>
 
