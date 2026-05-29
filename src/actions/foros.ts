@@ -1,8 +1,7 @@
 "use server";
 
-import { createServerClient, createStaticClient, getVerifiedSession } from "@/lib/supabase";
+import { createServerClient } from "@/lib/supabase";
 import { DbPost, DbPostReply } from "@/types/database";
-import { unstable_cache } from "next/cache";
 import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 
 export interface ForumPostExtended extends DbPost {
@@ -11,6 +10,7 @@ export interface ForumPostExtended extends DbPost {
   authorKarma: number;
   githubUsername?: string;
   repliesCount: number;
+  userVote?: "up" | "down" | null;
   category: string;
   categoryColor: string;
   dotColor: string;
@@ -25,8 +25,16 @@ export interface ForumPostExtended extends DbPost {
 /**
  * UNCACHED: Fetch all forum posts (threads list)
  */
-async function fetchForumPostsUncached(accessToken: string): Promise<ForumPostExtended[]> {
-  const supabase = createStaticClient(accessToken);
+async function fetchForumPostsUncached(): Promise<ForumPostExtended[]> {
+  const supabase = createServerClient();
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  const authUser = authData.user;
+  if (authError || !authUser) {
+    console.error("Error fetching forum posts: authenticated session not found.");
+    return [];
+  }
+
   const { data, error } = await supabase
     .from("posts")
     .select(`
@@ -34,7 +42,8 @@ async function fetchForumPostsUncached(accessToken: string): Promise<ForumPostEx
       subject:subjects(name),
       post_type:post_types(name),
       author:users!user_id(name, last_name, points, deleted_at),
-      post_replies(id)
+      post_replies(id),
+      post_votes(user_id, direction)
     `)
     .order("created_at", { ascending: false });
 
@@ -46,17 +55,32 @@ async function fetchForumPostsUncached(accessToken: string): Promise<ForumPostEx
   return (data || [])
     .filter((post: any) => post.author && !post.author.deleted_at)
     .map((post: any) => {
-      const catColor = post.post_type?.id === 1 
-        ? "text-red-400 bg-red-400/10 border-red-400/20" 
-        : post.post_type?.id === 2 
-          ? "text-accent bg-accent/10 border-accent/20" 
-          : "text-teal-400 bg-teal-400/10 border-teal-400/20";
-      
-      const dotColor = post.post_type?.id === 1 
-        ? "bg-red-400" 
-        : post.post_type?.id === 2 
-          ? "bg-secondary" 
-          : "bg-accent";
+      const type = post.type || 'question';
+      let category = "Pregunta";
+      let catColor = "text-red-400 bg-red-400/10 border-red-400/20";
+      let dotColor = "bg-red-400";
+
+      if (type === 'resource') {
+        category = "Recurso";
+        catColor = "text-accent bg-accent/10 border-accent/20";
+        dotColor = "bg-secondary";
+      } else if (type === 'tutoring') {
+        category = "Tutoría";
+        catColor = "text-blue-400 bg-blue-400/10 border-blue-400/20";
+        dotColor = "bg-blue-400";
+      } else if (type === 'borrow') {
+        category = "Préstamo";
+        catColor = "text-teal-400 bg-teal-400/10 border-teal-400/20";
+        dotColor = "bg-teal-400";
+      } else if (type === 'sell_rent') {
+        category = "Compra / Alquiler";
+        catColor = "text-purple-400 bg-purple-400/10 border-purple-400/20";
+        dotColor = "bg-purple-400";
+      }
+
+      const voteRows = post.post_votes || [];
+      const votesScore = voteRows.reduce((sum: number, vote: { direction: number }) => sum + vote.direction, 0);
+      const currentUserVote = voteRows.find((vote: { user_id: string }) => vote.user_id === authUser.id);
 
       return {
         id: post.id,
@@ -65,38 +89,29 @@ async function fetchForumPostsUncached(accessToken: string): Promise<ForumPostEx
         post_type_id: post.post_type_id,
         title: post.title,
         content: post.content,
-        upvotes: post.upvotes || 0,
+        upvotes: (post.upvotes || 0) + votesScore,
         is_resolved: post.is_resolved || false,
         created_at: post.created_at,
         subjectName: post.subject?.name || "General",
         authorName: `${post.author.name} ${post.author.last_name || ""}`.trim(),
         authorKarma: post.author.points || 0,
         repliesCount: post.post_replies ? post.post_replies.length : 0,
-        category: post.post_type?.name || "Duda Académica",
+        userVote: currentUserVote ? (currentUserVote.direction === 1 ? "up" : "down") : null,
+        category,
         categoryColor: catColor,
         dotColor,
-        bestAnswer: null
+        bestAnswer: null,
+        type,
+        metadata: post.metadata || {}
       };
     });
 }
 
 /**
- * Fetch all forum posts (threads list) (CACHED)
+ * Fetch all forum posts (threads list)
  */
 export async function fetchForumPosts(): Promise<ForumPostExtended[]> {
-  const session = await getVerifiedSession();
-  const accessToken = session?.accessToken ?? "";
-
-  console.log("[Cache Access] fetchForumPosts");
-
-  return unstable_cache(
-    async () => fetchForumPostsUncached(accessToken),
-    ["forum-posts"],
-    {
-      tags: [CACHE_TAGS.forumPosts],
-      revalidate: 86400
-    }
-  )();
+  return fetchForumPostsUncached();
 }
 
 /**
@@ -106,7 +121,8 @@ export async function createForumPost(
   title: string,
   content: string,
   subject: string,
-  category: string
+  type: 'question' | 'resource' | 'tutoring' | 'borrow' | 'sell_rent',
+  metadata?: any
 ): Promise<{ success: boolean; data?: ForumPostExtended; error?: string }> {
   try {
     const supabase = createServerClient();
@@ -118,7 +134,7 @@ export async function createForumPost(
     }
 
     if (!title.trim() || !content.trim()) {
-      return { success: false, error: "El título y cuerpo del hilo son obligatorios." };
+      return { success: false, error: "El título y cuerpo de la publicación son obligatorios." };
     }
 
     const { data: subjectData } = await supabase
@@ -130,9 +146,9 @@ export async function createForumPost(
     const subjectId = subjectData && subjectData.length > 0 ? subjectData[0].id : 1;
 
     let post_type_id = 1;
-    if (category === "Consejo de Cursada") {
+    if (type === "resource" || type === "tutoring") {
       post_type_id = 2;
-    } else if (category === "Ayuda con TP" || category === "Compraventa") {
+    } else if (type === "borrow" || type === "sell_rent") {
       post_type_id = 3;
     }
 
@@ -145,7 +161,9 @@ export async function createForumPost(
         title: title.trim(),
         content: content.trim(),
         upvotes: 1,
-        is_resolved: false
+        is_resolved: false,
+        type,
+        metadata: metadata || {}
       })
       .select()
       .single();
@@ -169,17 +187,27 @@ export async function createForumPost(
     invalidateCache(CACHE_TAGS.dashboardStats(authUser.id));
     invalidateCache(CACHE_TAGS.userProfile(authUser.id));
 
-    const catColor = post_type_id === 1 
-      ? "text-red-400 bg-red-400/10 border-red-400/20" 
-      : post_type_id === 2 
-        ? "text-accent bg-accent/10 border-accent/20" 
-        : "text-teal-400 bg-teal-400/10 border-teal-400/20";
-    
-    const dotColor = post_type_id === 1 
-      ? "bg-red-400" 
-      : post_type_id === 2 
-        ? "bg-secondary" 
-        : "bg-accent";
+    let category = "Pregunta";
+    let catColor = "text-red-400 bg-red-400/10 border-red-400/20";
+    let dotColor = "bg-red-400";
+
+    if (type === 'resource') {
+      category = "Recurso";
+      catColor = "text-accent bg-accent/10 border-accent/20";
+      dotColor = "bg-secondary";
+    } else if (type === 'tutoring') {
+      category = "Tutoría";
+      catColor = "text-blue-400 bg-blue-400/10 border-blue-400/20";
+      dotColor = "bg-blue-400";
+    } else if (type === 'borrow') {
+      category = "Préstamo";
+      catColor = "text-teal-400 bg-teal-400/10 border-teal-400/20";
+      dotColor = "bg-teal-400";
+    } else if (type === 'sell_rent') {
+      category = "Compra / Alquiler";
+      catColor = "text-purple-400 bg-purple-400/10 border-purple-400/20";
+      dotColor = "bg-purple-400";
+    }
 
     const responseData: ForumPostExtended = {
       id: newPostData.id,
@@ -195,16 +223,114 @@ export async function createForumPost(
       authorName: authorData ? `${authorData.name} ${authorData.last_name || ""}`.trim() : "Tu Perfil",
       authorKarma: currentPoints + 15,
       repliesCount: 0,
+      userVote: null,
       category,
       categoryColor: catColor,
       dotColor,
-      bestAnswer: null
+      bestAnswer: null,
+      type,
+      metadata: newPostData.metadata || {}
     };
 
     return { success: true, data: responseData };
   } catch (error: any) {
     console.error("Error creating forum post:", error);
-    return { success: false, error: error.message || "Hubo un problema al crear tu hilo." };
+    return { success: false, error: error.message || "Hubo un problema al crear tu publicación." };
+  }
+}
+
+/**
+ * Interact with a post (Interest, Reserve, Deliver, Return)
+ */
+export async function interactWithPost(
+  postId: string,
+  actionType: "interest" | "reserve" | "deliver" | "return"
+): Promise<{ success: boolean; error?: string; updatedPost?: ForumPostExtended }> {
+  try {
+    const supabase = createServerClient();
+    const authResponse = await supabase.auth.getUser();
+    const authUser = authResponse?.data?.user;
+
+    if (!authUser) {
+      return { success: false, error: "Che, no estás autenticado/a." };
+    }
+
+    const { data: post, error: fetchError } = await supabase
+      .from("posts")
+      .select(`
+        *,
+        subject:subjects(name),
+        post_type:post_types(name),
+        author:users!user_id(id, name, last_name, points, email)
+      `)
+      .eq("id", postId)
+      .single();
+
+    if (fetchError || !post) {
+      return { success: false, error: "No se encontró la publicación." };
+    }
+
+    const currentMetadata = post.metadata || {};
+    let updatedMetadata = { ...currentMetadata };
+    let notificationTitle = "";
+    let notificationContent = "";
+    let targetUserId = post.user_id;
+
+    const currentUserFullName = `${authUser.user_metadata?.name || "Un estudiante"} ${authUser.user_metadata?.last_name || ""}`.trim();
+
+    if (actionType === "interest") {
+      notificationTitle = "¡Alguien se interesó en tu publicación!";
+      notificationContent = `${currentUserFullName} está interesado/a en tu publicación '${post.title}'. ¡Ponete en contacto!`;
+    } else if (actionType === "reserve") {
+      updatedMetadata.status = "reserved";
+      notificationTitle = "¡Artículo Reservado!";
+      notificationContent = `${currentUserFullName} reservó tu artículo '${currentMetadata.item_name || post.title}'.`;
+    } else if (actionType === "deliver") {
+      updatedMetadata.status = "delivered";
+      notificationTitle = "Artículo Entregado";
+      notificationContent = `Marcaste el artículo '${currentMetadata.item_name || post.title}' como entregado.`;
+    } else if (actionType === "return") {
+      updatedMetadata.status = "available";
+      notificationTitle = "Artículo Devuelto";
+      notificationContent = `El artículo '${currentMetadata.item_name || post.title}' fue marcado como devuelto y vuelve a estar disponible.`;
+    }
+
+    const { error: updateError } = await supabase
+      .from("posts")
+      .update({ metadata: updatedMetadata })
+      .eq("id", postId);
+
+    if (updateError) throw updateError;
+
+    if (targetUserId !== authUser.id) {
+      await supabase.from("notifications").insert({
+        user_id: targetUserId,
+        title: notificationTitle,
+        content: notificationContent,
+        type: "foros",
+        is_read: false
+      });
+    } else {
+      await supabase.from("notifications").insert({
+        user_id: authUser.id,
+        title: notificationTitle,
+        content: notificationContent,
+        type: "foros",
+        is_read: false
+      });
+    }
+
+    invalidateCache(CACHE_TAGS.forumPosts);
+    invalidateCache(CACHE_TAGS.recentForumPosts);
+
+    // Fetch refreshed posts
+    const allPosts = await fetchForumPosts();
+    const updatedPost = allPosts.find((p) => p.id === postId);
+
+    return { success: true, updatedPost };
+  } catch (error: any) {
+    console.error("Error interacting with post:", error);
+    return { success: false, error: error.message || "Hubo un error al procesar tu acción." };
   }
 }
 
@@ -213,41 +339,77 @@ export async function createForumPost(
  */
 export async function castPostVote(
   postId: string,
-  direction: "up" | "down",
-  currentVote: "up" | "down" | null
-): Promise<{ success: boolean; likes?: number; error?: string }> {
+  direction: "up" | "down"
+): Promise<{ success: boolean; likes?: number; userVote?: "up" | "down" | null; error?: string }> {
   try {
     const supabase = createServerClient();
-    
-    let diff = 0;
-    if (currentVote === direction) {
-      diff = direction === "up" ? -1 : 1;
-    } else if (currentVote) {
-      diff = direction === "up" ? 2 : -2;
-    } else {
-      diff = direction === "up" ? 1 : -1;
+
+    const authResponse = await supabase.auth.getUser();
+    const authUser = authResponse?.data?.user;
+
+    if (!authUser) {
+      return { success: false, error: "Che, no estás autenticado/a." };
     }
 
-    const { data: postData } = await supabase
+    const nextDirection = direction === "up" ? 1 : -1;
+
+    const { data: existingVote, error: voteFetchError } = await supabase
+      .from("post_votes")
+      .select("direction")
+      .eq("post_id", postId)
+      .eq("user_id", authUser.id)
+      .maybeSingle();
+
+    if (voteFetchError) throw voteFetchError;
+
+    let userVote: "up" | "down" | null = direction;
+
+    if (existingVote?.direction === nextDirection) {
+      const { error: deleteError } = await supabase
+        .from("post_votes")
+        .delete()
+        .eq("post_id", postId)
+        .eq("user_id", authUser.id);
+
+      if (deleteError) throw deleteError;
+      userVote = null;
+    } else {
+      const { error: upsertError } = await supabase
+        .from("post_votes")
+        .upsert(
+          {
+            post_id: postId,
+            user_id: authUser.id,
+            direction: nextDirection
+          },
+          { onConflict: "user_id,post_id" }
+        );
+
+      if (upsertError) throw upsertError;
+    }
+
+    const { data: postData, error: postError } = await supabase
       .from("posts")
       .select("upvotes")
       .eq("id", postId)
       .single();
 
-    const currentUpvotes = postData?.upvotes || 0;
-    const newUpvotes = currentUpvotes + diff;
+    if (postError) throw postError;
 
-    const { error } = await supabase
-      .from("posts")
-      .update({ upvotes: newUpvotes })
-      .eq("id", postId);
+    const { data: votesData, error: votesError } = await supabase
+      .from("post_votes")
+      .select("direction")
+      .eq("post_id", postId);
 
-    if (error) throw error;
+    if (votesError) throw votesError;
+
+    const votesScore = (votesData || []).reduce((sum, vote) => sum + vote.direction, 0);
+    const likes = (postData?.upvotes || 0) + votesScore;
 
     invalidateCache(CACHE_TAGS.forumPosts);
     invalidateCache(CACHE_TAGS.recentForumPosts);
 
-    return { success: true, likes: newUpvotes };
+    return { success: true, likes, userVote };
   } catch (error: any) {
     console.error("Error casting post vote:", error);
     return { success: false, error: error.message || "No se pudo registrar tu voto." };
@@ -257,8 +419,15 @@ export async function castPostVote(
 /**
  * UNCACHED: Fetch replies for a specific thread
  */
-async function fetchPostRepliesUncached(postId: string, accessToken: string): Promise<DbPostReply[]> {
-  const supabase = createStaticClient(accessToken);
+async function fetchPostRepliesUncached(postId: string): Promise<DbPostReply[]> {
+  const supabase = createServerClient();
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) {
+    console.error("Error fetching post replies: authenticated session not found.");
+    return [];
+  }
+
   const { data, error } = await supabase
     .from("post_replies")
     .select(`
@@ -287,22 +456,10 @@ async function fetchPostRepliesUncached(postId: string, accessToken: string): Pr
 }
 
 /**
- * Fetch replies for a specific thread (CACHED)
+ * Fetch replies for a specific thread
  */
 export async function fetchPostReplies(postId: string): Promise<DbPostReply[]> {
-  const session = await getVerifiedSession();
-  const accessToken = session?.accessToken ?? "";
-
-  console.log(`[Cache Access] fetchPostReplies for post: ${postId}`);
-
-  return unstable_cache(
-    async () => fetchPostRepliesUncached(postId, accessToken),
-    ["post-replies", postId],
-    {
-      tags: [CACHE_TAGS.postReplies(postId)],
-      revalidate: 86400
-    }
-  )();
+  return fetchPostRepliesUncached(postId);
 }
 
 /**

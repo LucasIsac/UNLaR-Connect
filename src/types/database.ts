@@ -115,6 +115,38 @@ export interface DbTag {
   name: string;
 }
 
+export type QuestionMetadata = Record<string, never>;
+
+export type ResourceMetadata = Record<string, never>;
+
+export interface TutoringMetadata {
+  subject: string;
+  price_type: 'free' | 'paid';
+  price?: number;
+  modality: 'online' | 'present' | 'hybrid';
+  availability: string;
+}
+
+export interface BorrowMetadata {
+  item_name: string;
+  condition: 'new' | 'used_good' | 'used_fair';
+  availability: string;
+  location: string;
+  image_url?: string;
+  status: 'available' | 'reserved' | 'delivered' | 'returned';
+}
+
+export interface SellRentMetadata {
+  item_name: string;
+  price: number;
+  condition: 'new' | 'used_good' | 'used_fair';
+  mode: 'sell' | 'rent';
+  location: string;
+  image_url?: string;
+}
+
+export type PostMetadata = QuestionMetadata | ResourceMetadata | TutoringMetadata | BorrowMetadata | SellRentMetadata;
+
 export interface DbPost {
   id: string; // UUID
   user_id: string; // UUID
@@ -125,6 +157,8 @@ export interface DbPost {
   upvotes: number;
   is_resolved: boolean;
   created_at: string;
+  type: 'question' | 'resource' | 'tutoring' | 'borrow' | 'sell_rent';
+  metadata: any; // Using any for flexible type casting in JSON fields
 }
 
 export interface DbPostTag {

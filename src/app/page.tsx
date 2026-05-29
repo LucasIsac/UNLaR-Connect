@@ -126,12 +126,18 @@ export default function Home() {
                       isProfileOpen ? "border-accent shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "border-border hover:border-accent"
                     }`}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      alt={`Foto de perfil de ${user.name}`}
-                      className="w-full h-full object-cover"
-                      src={user.avatar_url || "https://lh3.googleusercontent.com/aida-public/AB6AXuDG7kZthARJWoPUqDDIShLuxuJGHxPM6eh_dFZ6vUCJpDcMLAVUhwXYCRHRWp4g2EG0IU2Rsbhy6R-fMP4njxS_VptnFuC38SCPJY9SODYThVAvnjbCK1XZUX7gGvY80048nOa5c8BLd-8sEqOcZI_3g6HnpGk6fONgBN98bB6t-7auFl5Er-3QmIJY8I86xD7vDken6cwXb1WU2S_MjlMOmKiKLHNUwHo5JTyGIRJfxWF3gwjqpONgQHZ_ti-F5V9qgMFGH0mCDQ"}
-                    />
+                    {user.avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        alt={`Foto de perfil de ${user.name}`}
+                        className="w-full h-full object-cover"
+                        src={user.avatar_url}
+                      />
+                    ) : (
+                      <div className="w-full h-full rounded-xl flex items-center justify-center text-sm font-bold bg-accent/20 border border-accent/30 text-accent select-none">
+                        {user.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                   </button>
 
                   {/* Profile options card */}
