@@ -107,7 +107,7 @@ export function Select({
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between text-left transition-all duration-300 font-sans focus:outline-none focus:ring-1 focus:ring-accent ${
+        className={`w-full flex items-center justify-between text-left transition-all duration-300 font-sans focus:outline-none ${
           disabled
             ? "opacity-50 cursor-not-allowed"
             : "cursor-pointer hover:border-accent/60"

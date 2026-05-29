@@ -8,9 +8,29 @@ import type { CombinedHeaderData } from "@/actions/perfil";
 export default function DashboardLayout({
   children,
   initialHeaderData,
+  searchQuery,
+  onSearchChange,
+  activeScope,
+  onScopeChange,
+  selectedCategory,
+  onCategoryChange,
+  selectedStatus,
+  onStatusChange,
+  searchPlaceholder,
+  showSearch = true,
 }: {
   children: React.ReactNode;
   initialHeaderData?: CombinedHeaderData;
+  searchQuery?: string;
+  onSearchChange?: (val: string) => void;
+  activeScope?: "foro" | "apuntes" | "materias" | "todos";
+  onScopeChange?: (scope: "foro" | "apuntes" | "materias" | "todos") => void;
+  selectedCategory?: string;
+  onCategoryChange?: (category: string) => void;
+  selectedStatus?: string;
+  onStatusChange?: (status: string) => void;
+  searchPlaceholder?: string;
+  showSearch?: boolean;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -20,6 +40,16 @@ export default function DashboardLayout({
       <Header 
         onMenuToggle={() => setIsSidebarOpen(true)} 
         initialData={initialHeaderData}
+        searchQuery={searchQuery}
+        onSearchChange={onSearchChange}
+        activeScope={activeScope}
+        onScopeChange={onScopeChange}
+        selectedCategory={selectedCategory}
+        onCategoryChange={onCategoryChange}
+        selectedStatus={selectedStatus}
+        onStatusChange={onStatusChange}
+        searchPlaceholder={searchPlaceholder}
+        showSearch={showSearch}
       />
 
       {/* Sidebar Navigation */}

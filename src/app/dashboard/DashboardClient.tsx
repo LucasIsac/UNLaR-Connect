@@ -132,7 +132,9 @@ const CLIENT_MOCK_POSTS: ForumPostExtended[] = [
     created_at: new Date(Date.now() - 3 * 3600000).toISOString(),
     subjectName: "Análisis Matemático II",
     postTypeName: "Duda Académica",
-    repliesCount: 1
+    repliesCount: 1,
+    type: "question",
+    metadata: {}
   },
   {
     id: "post-2",
@@ -146,7 +148,9 @@ const CLIENT_MOCK_POSTS: ForumPostExtended[] = [
     created_at: new Date(Date.now() - 5 * 3600000).toISOString(),
     subjectName: "Sistemas Operativos",
     postTypeName: "Consejo de Cursada",
-    repliesCount: 1
+    repliesCount: 1,
+    type: "resource",
+    metadata: {}
   },
   {
     id: "post-3",
@@ -160,7 +164,15 @@ const CLIENT_MOCK_POSTS: ForumPostExtended[] = [
     created_at: new Date(Date.now() - 10 * 3600000).toISOString(),
     subjectName: "Álgebra",
     postTypeName: "Compraventa",
-    repliesCount: 0
+    repliesCount: 0,
+    type: "sell_rent",
+    metadata: {
+      item_name: "Apuntes de Álgebra",
+      price: 1500,
+      condition: "used_good",
+      mode: "sell",
+      location: "Sede Central"
+    }
   }
 ];
 
@@ -1230,7 +1242,7 @@ export default function DashboardClient({
 
             {/* Wizard Box */}
             <motion.div
-              className="bg-card border border-border/40 w-full max-w-lg rounded-3xl p-8 relative z-10 shadow-2xl space-y-6 animate-fade-in relative overflow-hidden"
+              className="bg-card border border-border/40 w-full max-w-lg rounded-3xl p-8 relative z-10 shadow-2xl space-y-6 animate-fade-in relative overflow-visible"
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -1266,7 +1278,7 @@ export default function DashboardClient({
                         { value: 2, label: "Licenciatura en Ciencias de la Computación (2020)" },
                         { value: 3, label: "Tecnicatura en Informática (2018)" }
                       ]}
-                      className="w-full bg-muted/40 border border-[#534434]/40 rounded-xl py-3 px-4 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all cursor-pointer"
+                      className="w-full bg-muted/40 border border-[#534434]/40 rounded-xl py-3 px-4 text-xs font-semibold text-foreground focus:outline-none transition-all cursor-pointer"
                     />
                   </div>
 

@@ -206,8 +206,16 @@ export async function fetchUpcomingSessions(): Promise<UpcomingSessionExtended[]
 /**
  * UNCACHED: Fetch recent forum activities or academic questions.
  */
-async function fetchRecentForumPostsUncached(accessToken: string): Promise<ForumPostExtended[]> {
-  const supabase = createStaticClient(accessToken);
+async function fetchRecentForumPostsUncached(accessToken?: string): Promise<ForumPostExtended[]> {
+  const supabase = accessToken ? createStaticClient(accessToken) : createServerClient();
+
+  if (!accessToken) {
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) {
+      console.error("Error fetching recent forum posts: authenticated session not found.");
+      return [];
+    }
+  }
   
   const { data, error } = await supabase
     .from("posts")
@@ -216,7 +224,8 @@ async function fetchRecentForumPostsUncached(accessToken: string): Promise<Forum
       subject:subjects(name),
       post_type:post_types(name),
       author:users!user_id(name, last_name, deleted_at),
-      replies:post_replies(count)
+      replies:post_replies(count),
+      post_votes(direction)
     `)
     .order("created_at", { ascending: false })
     .limit(5);
@@ -228,41 +237,41 @@ async function fetchRecentForumPostsUncached(accessToken: string): Promise<Forum
 
   const extendedPosts: ForumPostExtended[] = (data || [])
     .filter((post: any) => post.author && !post.author.deleted_at)
-    .map((post: any) => ({
-      id: post.id,
-      user_id: post.user_id,
-      subject_id: post.subject_id,
-      post_type_id: post.post_type_id,
-      title: post.title,
-      content: post.content,
-      upvotes: post.upvotes || 0,
-      is_resolved: post.is_resolved,
-      created_at: post.created_at,
-      subjectName: post.subject?.name,
-      postTypeName: post.post_type?.name || "Duda Académica",
-      repliesCount: post.replies ? post.replies[0]?.count || 0 : 0
-    }));
+    .map((post: any) => {
+      const votesScore = (post.post_votes || []).reduce(
+        (sum: number, vote: { direction: number }) => sum + vote.direction,
+        0
+      );
+
+      return {
+        id: post.id,
+        user_id: post.user_id,
+        subject_id: post.subject_id,
+        post_type_id: post.post_type_id,
+        title: post.title,
+        content: post.content,
+        upvotes: (post.upvotes || 0) + votesScore,
+        is_resolved: post.is_resolved,
+        created_at: post.created_at,
+        subjectName: post.subject?.name,
+        postTypeName: post.post_type?.name || "Duda Académica",
+        repliesCount: post.replies ? post.replies[0]?.count || 0 : 0,
+        type: post.type || 'question',
+        metadata: post.metadata || {}
+      };
+    });
 
   return extendedPosts;
 }
 
 /**
- * Fetch recent forum activities or academic questions (CACHED).
+ * Fetch recent forum activities or academic questions.
  */
 export async function fetchRecentForumPosts(): Promise<ForumPostExtended[]> {
   const session = await getVerifiedSession();
-  const accessToken = session?.accessToken ?? "";
+  if (!session) return [];
 
-  console.log("[Cache Access] fetchRecentForumPosts");
-
-  return unstable_cache(
-    async () => fetchRecentForumPostsUncached(accessToken),
-    ["recent-forum-posts"],
-    {
-      tags: [CACHE_TAGS.recentForumPosts],
-      revalidate: 86400
-    }
-  )();
+  return fetchRecentForumPostsUncached(session.accessToken);
 }
 
 /**
@@ -582,14 +591,7 @@ export async function fetchCombinedDashboardData(): Promise<CombinedDashboardDat
         revalidate: 86400
       }
     )(),
-    unstable_cache(
-      async () => fetchRecentForumPostsUncached(accessToken),
-      ["recent-forum-posts"],
-      {
-        tags: [CACHE_TAGS.recentForumPosts],
-        revalidate: 86400
-      }
-    )()
+    fetchRecentForumPostsUncached(accessToken)
   ]);
 
   return { stats, sessions, posts };
