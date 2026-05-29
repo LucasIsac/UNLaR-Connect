@@ -297,6 +297,9 @@ export default function FloatingAssistant() {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Don't show on landing page or auth pages
+  const isHidden = pathname === "/" || pathname.startsWith("/(auth)");
+
   const context = PAGE_CONTEXT[pathname] || DEFAULT_CONTEXT;
   const quickResponses = QUICK_RESPONSES[pathname] || QUICK_RESPONSES["/"];
 
@@ -331,7 +334,10 @@ export default function FloatingAssistant() {
 
   return (
     <>
-      {/* Floating Bubble */}
+      {/* Don't show on landing or auth pages */}
+      {isHidden ? null : (
+        <>
+          {/* Floating Bubble */}
       <motion.button
         onClick={() => setIsOpen(!isOpen)}
         className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${
@@ -534,6 +540,8 @@ export default function FloatingAssistant() {
           </motion.div>
         )}
       </AnimatePresence>
+      </>
+      )}
     </>
   );
 }
