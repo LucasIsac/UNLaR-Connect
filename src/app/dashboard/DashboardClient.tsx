@@ -42,12 +42,17 @@ import { updateUserProfile, toggleTutorStatus } from "@/actions/perfil";
 import type { CombinedHeaderData } from "@/actions/perfil";
 import { reactivateAccountAction, signOutAction } from "@/actions/auth";
 import { Select } from "@/components/ui/Select";
+import EventsSection from "@/components/events/EventsSection";
+import CreateEventModal from "@/components/events/CreateEventModal";
+import type { EventExtended } from "@/actions/events";
 
 type DashboardClientProps = {
   initialStats: DashboardStats;
   initialSessions: UpcomingSessionExtended[];
   initialPosts: ForumPostExtended[];
   initialHeaderData: CombinedHeaderData;
+  initialEvents?: EventExtended[];
+  canCreateEvents?: boolean;
 };
 
 // ==========================================
@@ -181,10 +186,14 @@ export default function DashboardClient({
   initialSessions,
   initialPosts,
   initialHeaderData,
+  initialEvents = [],
+  canCreateEvents = false,
 }: DashboardClientProps) {
   const [stats, setStats] = useState<DashboardStats | null>(initialStats);
   const [sessions, setSessions] = useState<UpcomingSessionExtended[]>(initialSessions);
   const [posts, setPosts] = useState<ForumPostExtended[]>(initialPosts);
+  const [events, setEvents] = useState<EventExtended[]>(initialEvents);
+  const [showCreateEvent, setShowCreateEvent] = useState(false);
   const loading = false;
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
@@ -671,6 +680,15 @@ export default function DashboardClient({
             </span>{" "}
             para hoy.
           </p>
+        </motion.section>
+
+        {/* Events Section */}
+        <motion.section variants={itemVariants}>
+          <EventsSection
+            events={events}
+            canCreate={canCreateEvents}
+            onCreateClick={() => setShowCreateEvent(true)}
+          />
         </motion.section>
 
         {/* Bento Grids Top */}
@@ -1345,6 +1363,16 @@ export default function DashboardClient({
           </div>
         )}
       </AnimatePresence>
+
+      {/* Create Event Modal */}
+      <CreateEventModal
+        isOpen={showCreateEvent}
+        onClose={() => setShowCreateEvent(false)}
+        onCreated={() => {
+          setShowCreateEvent(false);
+          // Events will refresh on next page load
+        }}
+      />
     </DashboardLayout>
   );
 }
