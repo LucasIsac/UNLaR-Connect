@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Calendar, Clock, BookOpen, Loader2, CheckCircle } from "lucide-react";
+import { X, Calendar, CalendarDays, Clock, BookOpen, Loader2, CheckCircle, MessageSquare } from "lucide-react";
 import { TutorProfileForMatching, fetchTutorAvailabilityForDate, requestScheduledTutoring } from "@/actions/tutoring-scheduled";
 import { Select } from "@/components/ui/Select";
 
