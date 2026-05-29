@@ -464,18 +464,22 @@ export default function SalaClient({
                   className={remoteHasVideo ? "w-full h-full object-cover" : "absolute w-px h-px opacity-0 pointer-events-none"}
                 />
                 {!remoteHasVideo && (
-                  <div className="text-center space-y-4 p-6">
-                    <div className="w-16 h-16 rounded-full bg-accent/15 border border-accent/25 flex items-center justify-center text-accent mx-auto font-heading font-black text-lg">
-                      {peerInitials || "UC"}
+                  <div className="text-center space-y-6 p-8 relative">
+                    <div className="relative w-24 h-24 mx-auto flex items-center justify-center">
+                      <div className="absolute inset-0 rounded-full bg-accent/10 border border-accent/30 animate-ping opacity-60"></div>
+                      <div className="absolute -inset-2 rounded-full bg-accent/5 border border-accent/20 animate-pulse"></div>
+                      <div className="w-20 h-20 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-accent font-heading font-black text-2xl shadow-xl shadow-accent/10 relative z-10">
+                        {peerInitials || "UC"}
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-heading font-bold text-base text-foreground">
-                        {remoteHasAudio ? "Audio conectado" : "Conectado sin video"}
+                    <div className="space-y-2">
+                      <h4 className="font-heading font-bold text-lg text-foreground tracking-tight">
+                        {remoteHasAudio ? "Audio Conectado" : "Llamada Establecida"}
                       </h4>
-                      <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-relaxed mt-1">
+                      <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-relaxed">
                         {remoteHasAudio
-                          ? `${peerUser?.name} está en la consulta sin cámara.`
-                          : `Esperando la cámara de ${peerUser?.name}.`}
+                          ? `${peerUser?.name} está en la tutoría (micrófono activo).`
+                          : `Esperando el flujo de video y audio de ${peerUser?.name}.`}
                       </p>
                     </div>
                   </div>
@@ -483,16 +487,19 @@ export default function SalaClient({
               </>
             ) : (
               // Loading/connecting placeholder
-              <div className="text-center space-y-4 p-6">
-                <Loader2 className="w-10 h-10 animate-spin text-accent mx-auto" />
-                <div>
-                  <h4 className="font-heading font-bold text-base text-foreground">
-                    Estableciendo conexión...
+              <div className="text-center space-y-6 p-8 relative">
+                <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+                  <div className="absolute inset-0 rounded-full bg-accent/10 border border-accent/20 animate-pulse"></div>
+                  <Loader2 className="w-10 h-10 animate-spin text-accent relative z-10" />
+                </div>
+                <div className="space-y-2">
+                  <h4 className="font-heading font-bold text-lg text-foreground tracking-tight">
+                    Conectando sala de tutoría...
                   </h4>
-                  <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-relaxed mt-1">
+                  <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-relaxed">
                     {mediaMode === "chat-only"
-                      ? `Podés usar el chat mientras esperamos a ${peerUser?.name}.`
-                      : `Conectando de forma directa y segura con ${peerUser?.name}.`}
+                      ? `Podés usar el chat y compartir apuntes mientras esperamos a ${peerUser?.name}.`
+                      : `Estableciendo videollamada directa P2P de forma segura con ${peerUser?.name}.`}
                   </p>
                 </div>
               </div>

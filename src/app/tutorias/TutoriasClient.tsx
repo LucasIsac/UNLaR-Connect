@@ -31,6 +31,7 @@ import ScheduledTutorCard from "@/components/consultas/ScheduledTutorCard";
 import RequestTutoringModal from "@/components/consultas/RequestTutoringModal";
 import TutoringCalendar from "@/components/consultas/TutoringCalendar";
 import IncomingCallBanner from "@/components/consultas/IncomingCallBanner";
+import { Select } from "@/components/ui/Select";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { 
   Video, 
@@ -88,6 +89,11 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
   const [subjects, setSubjects] = useState<DbSubject[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  const subjectOptions = [
+    { value: "", label: "Todas las materias" },
+    ...subjects.map((sub) => ({ value: sub.id, label: sub.name })),
+  ];
   
   // Realtime Presence for tutors
   const { onlineTutors, isAvailable, toggleAvailability } = useCallPresence(
@@ -575,29 +581,35 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                   />
                 </div>
 
-                <div className="relative min-w-[180px]">
-                  <select
+                <div className="min-w-[200px] w-full sm:w-auto">
+                  <Select
                     value={selectedSubjectId || ""}
-                    onChange={(e) => setSelectedSubjectId(e.target.value ? Number(e.target.value) : null)}
-                    className="w-full bg-background/50 border border-border/30 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent appearance-none"
-                  >
-                    <option value="">Todas las materias</option>
-                    {subjects.map((sub) => (
-                      <option key={sub.id} value={sub.id}>
-                        {sub.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground">
-                    ▼
-                  </div>
+                    onChange={(val) => setSelectedSubjectId(val ? Number(val) : null)}
+                    options={subjectOptions}
+                    placeholder="Todas las materias"
+                    className="bg-background/50 border border-border/30 rounded-xl px-4 py-2.5 text-sm focus-within:ring-1 focus-within:ring-accent focus:outline-none font-sans"
+                  />
                 </div>
               </div>
 
               {loadingTutors ? (
-                <div className="py-12 flex flex-col items-center justify-center text-muted-foreground">
-                  <Loader2 className="w-8 h-8 animate-spin text-accent" />
-                  <p className="text-sm mt-3">Buscando tutores activos...</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="bg-glass rounded-xl p-5 border border-border/20 space-y-4 animate-pulse">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-muted/60" />
+                        <div className="flex-1 space-y-2">
+                          <div className="h-4 bg-muted/60 rounded-md w-3/4" />
+                          <div className="h-3 bg-muted/40 rounded-md w-1/2" />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="h-6 bg-muted/30 rounded-full w-20" />
+                        <div className="h-6 bg-muted/30 rounded-full w-16" />
+                      </div>
+                      <div className="h-10 bg-muted/40 rounded-xl w-full mt-2" />
+                    </div>
+                  ))}
                 </div>
               ) : filteredAvailableTutors.length === 0 ? (
                 <div className="py-12 px-6 text-center border-2 border-dashed border-border/20 rounded-xl space-y-3 bg-muted/10">
@@ -633,8 +645,16 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
               </h3>
 
               {loadingHistory ? (
-                <div className="py-6 flex justify-center">
-                  <Loader2 className="w-5 h-5 animate-spin text-accent" />
+                <div className="grid grid-cols-1 gap-4 animate-pulse">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="bg-muted/30 border border-border/10 p-4 rounded-xl flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-muted/50 shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-5 bg-muted/60 rounded-md w-1/4" />
+                        <div className="h-3 bg-muted/40 rounded-md w-3/4" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-4">
@@ -685,8 +705,16 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
               </h3>
               
               {loadingHistory ? (
-                <div className="py-6 flex justify-center">
-                  <Loader2 className="w-5 h-5 animate-spin text-accent" />
+                <div className="space-y-2.5 animate-pulse">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="p-3 bg-muted/20 border border-border/10 rounded-xl flex items-center justify-between">
+                      <div className="space-y-1.5 flex-1">
+                        <div className="h-3.5 bg-muted/50 rounded-md w-1/2" />
+                        <div className="h-2.5 bg-muted/30 rounded-md w-1/3" />
+                      </div>
+                      <div className="w-16 h-5 bg-muted/40 rounded-full shrink-0" />
+                    </div>
+                  ))}
                 </div>
               ) : history.length === 0 ? (
                 <p className="text-sm text-muted-foreground leading-relaxed text-center py-4 bg-muted/10 rounded-xl border-2 border-dashed border-border/10">
@@ -775,30 +803,36 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                   />
                 </div>
 
-                <div className="relative min-w-[180px]">
-                  <select
+                <div className="min-w-[200px] w-full sm:w-auto">
+                  <Select
                     value={selectedSubjectId || ""}
-                    onChange={(e) => setSelectedSubjectId(e.target.value ? Number(e.target.value) : null)}
-                    className="w-full bg-background/50 border border-border/30 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent appearance-none"
-                  >
-                    <option value="">Todas las materias</option>
-                    {subjects.map((sub) => (
-                      <option key={sub.id} value={sub.id}>
-                        {sub.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground">
-                    ▼
-                  </div>
+                    onChange={(val) => setSelectedSubjectId(val ? Number(val) : null)}
+                    options={subjectOptions}
+                    placeholder="Todas las materias"
+                    className="bg-background/50 border border-border/30 rounded-xl px-4 py-2.5 text-sm focus-within:ring-1 focus-within:ring-accent focus:outline-none font-sans"
+                  />
                 </div>
               </div>
             </div>
 
             {loadingProfiles ? (
-              <div className="py-12 flex flex-col items-center justify-center text-muted-foreground">
-                <Loader2 className="w-8 h-8 animate-spin text-accent" />
-                <p className="text-sm mt-3">Buscando tutores disponibles...</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="bg-glass rounded-xl p-5 border border-border/20 space-y-4 animate-pulse">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-muted/60" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-muted/60 rounded-md w-3/4" />
+                        <div className="h-3 bg-muted/45 rounded-md w-1/2" />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <div className="h-5 bg-muted/30 rounded-full w-24" />
+                      <div className="h-5 bg-muted/30 rounded-full w-20" />
+                    </div>
+                    <div className="h-10 bg-muted/40 rounded-xl w-full mt-3" />
+                  </div>
+                ))}
               </div>
             ) : filteredTutorProfiles.length === 0 ? (
               <div className="py-12 px-6 text-center border-2 border-dashed border-border/20 rounded-xl space-y-3 bg-muted/10">
@@ -868,8 +902,22 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                 </h3>
 
                 {loadingSessions ? (
-                  <div className="py-6 flex justify-center">
-                    <Loader2 className="w-5 h-5 animate-spin text-accent" />
+                  <div className="space-y-3 animate-pulse">
+                    {[1, 2].map((i) => (
+                      <div key={i} className="p-4 rounded-xl border border-border/10 bg-muted/20 space-y-3">
+                        <div className="flex justify-between">
+                          <div className="space-y-1.5 flex-1">
+                            <div className="h-4 bg-muted/50 rounded-md w-2/3" />
+                            <div className="h-3 bg-muted/30 rounded-md w-1/2" />
+                          </div>
+                          <div className="w-16 h-5 bg-muted/40 rounded-full shrink-0" />
+                        </div>
+                        <div className="flex gap-2">
+                          <div className="h-3 bg-muted/30 rounded w-16" />
+                          <div className="h-3 bg-muted/30 rounded w-20" />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : scheduledSessions.length === 0 ? (
                   <div className="py-8 px-4 text-center border-2 border-dashed border-border/20 rounded-xl space-y-3 bg-muted/10">

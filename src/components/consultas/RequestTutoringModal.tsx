@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, Calendar, Clock, BookOpen, Loader2, CheckCircle } from "lucide-react";
 import { TutorProfileForMatching, fetchTutorAvailabilityForDate, requestScheduledTutoring } from "@/actions/tutoring-scheduled";
+import { Select } from "@/components/ui/Select";
 
 interface RequestTutoringModalProps {
   tutor: TutorProfileForMatching;
@@ -26,6 +27,11 @@ export default function RequestTutoringModal({
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const subjectOptions = tutor.subjects.map((sub) => ({
+    value: sub.id,
+    label: sub.name,
+  }));
 
   // Get minimum date (today)
   const getMinDate = () => {
@@ -162,17 +168,13 @@ export default function RequestTutoringModal({
               <BookOpen className="w-3.5 h-3.5" />
               Materia
             </label>
-            <select
+            <Select
               value={selectedSubjectId || ""}
-              onChange={(e) => setSelectedSubjectId(Number(e.target.value))}
-              className="w-full bg-background/50 border border-border/30 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent appearance-none"
-            >
-              {tutor.subjects.map((sub) => (
-                <option key={sub.id} value={sub.id}>
-                  {sub.name}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedSubjectId(val ? Number(val) : null)}
+              options={subjectOptions}
+              placeholder="Elegí la materia..."
+              className="bg-background/50 border border-border/30 rounded-xl px-4 py-2.5 text-sm focus-within:ring-1 focus-within:ring-accent focus:outline-none font-sans"
+            />
           </div>
 
           {/* Date Selection */}
