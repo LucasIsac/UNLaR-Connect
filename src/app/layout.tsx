@@ -3,6 +3,7 @@ import { Inter, Montserrat } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import ServiceWorkerRegister from "@/components/pwa/ServiceWorkerRegister";
+import FloatingAssistant from "@/components/assistant/FloatingAssistant";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -128,7 +129,7 @@ export default function RootLayout({
         <ServiceWorkerRegister />
         <ThemeProvider>
           {children}
-
+          <FloatingAssistant />
         </ThemeProvider>
       </body>
     </html>
