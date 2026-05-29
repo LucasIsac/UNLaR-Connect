@@ -25,7 +25,9 @@ import {
   Package,
   MapPin,
   Clock,
-  Sparkles
+  Sparkles,
+  Trash2,
+  Save,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -35,12 +37,20 @@ import {
   addPostReply,
   resolvePost,
   interactWithPost,
-  ForumPostExtended
+  editPost,
+  editReply,
+  deletePost,
+  deleteReply,
+  fetchUserVotes,
+  fetchTopContributors,
+  fetchPopularTags,
+  ForumPostExtended,
+  TopContributor,
+  PopularTag,
 } from "@/actions/foros";
 import { DbPostReply } from "@/types/database";
 import { Select } from "@/components/ui/Select";
-
-const MOCK_USER_ID = "123e4567-e89b-12d3-a456-426614174000";
+import { createClient } from "@/lib/supabase/client";
 
 const categories = [
   { label: "Todas", value: "Todas", color: "text-foreground bg-muted border-border/40" },
@@ -51,54 +61,20 @@ const categories = [
   { label: "Compra / Alquiler", value: "sell_rent", color: "text-purple-400 bg-purple-400/10 border-purple-400/20" },
 ];
 
-const popularTags = [
-  "#DudaTécnica",
-  "#AyudaConTP",
-  "#ConsejoDeCursada",
-  "#MaterialDeEstudio",
-  "#IngSistemas",
-];
-
-const topContributors = [
-  { 
-    name: "Prof. A. Martinez", 
-    role: "Profesor Adjunto", 
-    career: "Análisis Matemático II", 
-    points: 8450, 
-    rank: 1,
-    badges: ["Docente Destacado", "Mentor de Oro", "Respuesta Sabia"],
-    type: "Docente"
-  },
-  { 
-    name: "Carla S.", 
-    role: "Ayudante Alumna", 
-    career: "Ingeniería en Sistemas", 
-    points: 5120, 
-    rank: 2,
-    badges: ["Colaborador de Bronce", "Ayudante Pro", "Veloz en Código"],
-    type: "Ayudante"
-  },
-  { 
-    name: "Tu Perfil", 
-    role: "Estudiante", 
-    career: "Ingeniería en Sistemas", 
-    points: 2450, 
-    rank: 3,
-    badges: ["Colaborador Activo", "Lector Veloz"],
-    type: "Estudiante"
-  },
-];
-
 type ForosClientProps = {
   initialThreads: ForumPostExtended[];
+  currentUserId: string | null;
 };
 
-export default function ForosClient({ initialThreads }: ForosClientProps) {
+export default function ForosClient({ initialThreads, currentUserId: initialUserId }: ForosClientProps) {
   const [threads, setThreads] = useState<ForumPostExtended[]>(initialThreads);
   const loading = false;
   const [selectedCategory, setSelectedCategory] = useState("Todas");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(initialUserId);
+  const [topContributors, setTopContributors] = useState<TopContributor[]>([]);
+  const [popularTags, setPopularTags] = useState<PopularTag[]>([]);
 
   const handleScopeChange = (scope: "foro" | "apuntes" | "materias" | "todos") => {
     if (scope === "apuntes") {
@@ -113,7 +89,6 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedThread, setSelectedThread] = useState<ForumPostExtended | null>(null);
-  const [selectedContributor, setSelectedContributor] = useState<typeof topContributors[0] | null>(null);
   
   // Thread comments loading state
   const [replies, setReplies] = useState<DbPostReply[]>([]);
@@ -144,16 +119,52 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
   const [tutoringModality, setTutoringModality] = useState<'online' | 'present' | 'hybrid'>("online");
   const [tutoringAvailability, setTutoringAvailability] = useState("");
 
-  // Custom Toast State
+  // Edit states
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editPostTitle, setEditPostTitle] = useState("");
+  const [editPostContent, setEditPostContent] = useState("");
+  const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
+  const [editReplyContent, setEditReplyContent] = useState("");
+
+  // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4000);
+    setTimeout(() => setToastMessage(null), 4000);
   };
+
+  // Load user ID, votes, contributors and tags on mount
+  useEffect(() => {
+    async function loadInit() {
+      try {
+        // Try to get userId from client-side Supabase if server-side failed
+        let userId = initialUserId;
+        if (!userId) {
+          const supabase = createClient();
+          const { data } = await supabase.auth.getUser();
+          userId = data?.user?.id ?? null;
+          setCurrentUserId(userId);
+        }
+
+        const [contribs, tags] = await Promise.all([
+          fetchTopContributors(),
+          fetchPopularTags(),
+        ]);
+        setTopContributors(contribs);
+        setPopularTags(tags);
+
+        if (userId && initialThreads.length > 0) {
+          const votes = await fetchUserVotes(initialThreads.map((t) => t.id));
+          setUserVotes(votes);
+        }
+      } catch (err) {
+        console.error("Error loading forum init data:", err);
+      }
+    }
+    loadInit();
+  }, []);
 
   // Fetch replies when thread is selected
   useEffect(() => {
@@ -187,13 +198,11 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
       diff = direction === "up" ? 1 : -1;
     }
 
+    const newVote = currentVote === direction ? null : direction;
     setThreads((prev) =>
       prev.map((t) => (t.id === threadId ? { ...t, upvotes: t.upvotes + diff } : t))
     );
-    setUserVotes((prev) => ({
-      ...prev,
-      [threadId]: currentVote === direction ? null : direction,
-    }));
+    setUserVotes((prev) => ({ ...prev, [threadId]: newVote }));
 
     try {
       const response = await castPostVote(threadId, direction);
@@ -212,7 +221,6 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
       setUserVotes((prev) => ({ ...prev, [threadId]: response.userVote ?? null }));
     } catch (err) {
       console.error(err);
-      // Rollback on failure
       setThreads((prev) =>
         prev.map((t) => (t.id === threadId ? { ...t, upvotes: t.upvotes - diff } : t))
       );
@@ -379,6 +387,87 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
 
     return matchesCategory && matchesSearch && matchesStatus;
   });
+
+  // Delete handlers
+  const handleDeletePost = async (postId: string) => {
+    if (!confirm("¿Borrás este hilo? No se puede deshacer.")) return;
+    setActionInProgress("delete-" + postId);
+    const result = await deletePost(postId);
+    if (result.success) {
+      setThreads((prev) => prev.filter((t) => t.id !== postId));
+      setSelectedThread(null);
+      showToast("Hilo borrado.");
+    } else {
+      showToast(result.error || "No se pudo borrar.");
+    }
+    setActionInProgress(null);
+  };
+
+  const handleDeleteReply = async (replyId: string) => {
+    if (!confirm("¿Borrás esta respuesta?")) return;
+    setActionInProgress("delete-reply-" + replyId);
+    const result = await deleteReply(replyId);
+    if (result.success) {
+      setReplies((prev) => prev.filter((r) => r.id !== replyId));
+      showToast("Respuesta borrada.");
+    } else {
+      showToast(result.error || "No se pudo borrar.");
+    }
+    setActionInProgress(null);
+  };
+
+  // Edit handlers
+  const startEditPost = (thread: ForumPostExtended) => {
+    setEditingPostId(thread.id);
+    setEditPostTitle(thread.title);
+    setEditPostContent(thread.content);
+  };
+
+  const handleSaveEditPost = async () => {
+    if (!editingPostId || !editPostTitle.trim() || !editPostContent.trim()) return;
+    setActionInProgress("edit-post");
+    const result = await editPost(editingPostId, editPostTitle, editPostContent);
+    if (result.success) {
+      setThreads((prev) =>
+        prev.map((t) =>
+          t.id === editingPostId ? { ...t, title: editPostTitle.trim(), content: editPostContent.trim() } : t
+        )
+      );
+      setSelectedThread((prev) =>
+        prev && prev.id === editingPostId
+          ? { ...prev, title: editPostTitle.trim(), content: editPostContent.trim() }
+          : prev
+      );
+      setEditingPostId(null);
+      showToast("Hilo editado.");
+    } else {
+      showToast(result.error || "No se pudo editar.");
+    }
+    setActionInProgress(null);
+  };
+
+  const startEditReply = (reply: DbPostReply) => {
+    setEditingReplyId(reply.id);
+    setEditReplyContent(reply.content);
+  };
+
+  const handleSaveEditReply = async () => {
+    if (!editingReplyId || !editReplyContent.trim()) return;
+    setActionInProgress("edit-reply");
+    const result = await editReply(editingReplyId, editReplyContent);
+    if (result.success) {
+      setReplies((prev) =>
+        prev.map((r) =>
+          r.id === editingReplyId ? { ...r, content: editReplyContent.trim() } : r
+        )
+      );
+      setEditingReplyId(null);
+      showToast("Respuesta editada.");
+    } else {
+      showToast(result.error || "No se pudo editar.");
+    }
+    setActionInProgress(null);
+  };
 
   return (
     <DashboardLayout
@@ -672,9 +761,6 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                                 <div className="flex flex-col">
                                   <span className="text-xs font-semibold text-foreground flex items-center gap-1">
                                     {thread.authorName}
-                                    {thread.githubUsername && (
-                                      <span className="text-[9px] bg-accent/20 px-1 py-0.2 rounded text-accent font-bold">Colaborador</span>
-                                    )}
                                   </span>
                                   <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
                                     <Flame className="w-3 h-3 text-accent" />
@@ -705,9 +791,6 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                                   <div className="flex items-center gap-1.5 mb-1 text-[11px]">
                                     <span className="font-bold text-accent">
                                       {thread.bestAnswer.author}
-                                    </span>
-                                    <span className="text-[8px] bg-accent-foreground/10 text-accent-foreground px-1 py-0.2 rounded font-mono">
-                                      {thread.bestAnswer.role}
                                     </span>
                                   </div>
                                   <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
@@ -749,47 +832,49 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                   <div className="flex flex-wrap gap-1.5">
                     {popularTags.map((tag) => (
                       <button
-                        key={tag}
-                        onClick={() => setSearchQuery(tag)}
+                        key={tag.tag}
+                        onClick={() => setSearchQuery(`#${tag.tag}`)}
                         className="bg-card hover:bg-muted/15 border border-border/30 text-[11px] text-muted-foreground px-2.5 py-1 rounded-full transition-colors focus:outline-none"
                       >
-                        {tag}
+                        #{tag.tag}
+                        <span className="ml-1 text-[9px] opacity-60">{tag.count}</span>
                       </button>
                     ))}
+                    {popularTags.length === 0 && (
+                      <p className="text-[11px] text-muted-foreground">No hay etiquetas aún.</p>
+                    )}
                   </div>
                 </div>
 
-                {/* Top Contributors list with interactive modal profile triggers */}
+                {/* Top Contributors */}
                 <div className="bg-glass rounded-2xl p-5 border border-border/10">
                   <h4 className="font-heading text-xs font-bold text-cream-bone uppercase tracking-wider mb-3">
                     Top Contribuyentes
                   </h4>
                   <div className="space-y-3">
-                    {topContributors.map((contrib) => (
+                    {topContributors.map((contrib, idx) => (
                       <div
-                        key={contrib.name}
-                        onClick={() => setSelectedContributor(contrib)}
-                        className="flex justify-between items-center bg-card/30 p-2.5 rounded-xl border border-border/5 hover:border-accent/25 transition-all duration-200 cursor-pointer"
-                        title="Ver Perfil Académico"
+                        key={contrib.id}
+                        className="flex justify-between items-center bg-card/30 p-2.5 rounded-xl border border-border/5 hover:border-accent/25 transition-all duration-200"
                       >
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center text-[10px] font-bold text-accent">
-                            {contrib.rank}
+                            {idx + 1}
                           </div>
                           <div>
                             <span className="text-xs font-semibold text-foreground block">
                               {contrib.name}
                             </span>
                             <span className="text-[9px] text-muted-foreground font-mono">
-                              {contrib.role}
+                              {contrib.points.toLocaleString()} pts
                             </span>
                           </div>
                         </div>
-                        <span className="text-[9px] bg-accent/15 border border-accent/25 text-accent font-bold px-1.5 py-0.5 rounded">
-                          {contrib.type}
-                        </span>
                       </div>
                     ))}
+                    {topContributors.length === 0 && (
+                      <p className="text-[11px] text-muted-foreground">No hay contribuyentes aún.</p>
+                    )}
                   </div>
                 </div>
               </>
@@ -1157,7 +1242,7 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
             >
               {/* Modal Header */}
               <div className="flex justify-between items-start gap-4 mb-4 border-b border-border/10 pb-4">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-1.5">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${selectedThread.categoryColor}`}>
                       {selectedThread.category}
@@ -1174,16 +1259,62 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                       </span>
                     )}
                   </div>
-                  <h2 className="font-heading text-lg md:text-xl font-bold text-cream-bone leading-tight">
-                    {selectedThread.title}
-                  </h2>
+                  {editingPostId === selectedThread.id ? (
+                    <input
+                      type="text"
+                      value={editPostTitle}
+                      onChange={(e) => setEditPostTitle(e.target.value)}
+                      className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-3 text-lg font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                    />
+                  ) : (
+                    <h2 className="font-heading text-lg md:text-xl font-bold text-cream-bone leading-tight">
+                      {selectedThread.title}
+                    </h2>
+                  )}
                 </div>
-                <button
-                  onClick={() => setSelectedThread(null)}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/10 transition-colors focus:outline-none shrink-0"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  {selectedThread.authorId === currentUserId && editingPostId !== selectedThread.id && (
+                    <>
+                      <button
+                        onClick={() => startEditPost(selectedThread)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-accent hover:bg-muted/10 transition-colors"
+                        title="Editar hilo"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeletePost(selectedThread.id)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                        title="Borrar hilo"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                  {editingPostId === selectedThread.id && (
+                    <div className="flex gap-1">
+                      <button
+                        onClick={handleSaveEditPost}
+                        disabled={actionInProgress === "edit-post"}
+                        className="px-3 py-1.5 bg-accent text-accent-foreground rounded-lg text-[10px] font-bold flex items-center gap-1"
+                      >
+                        <Save className="w-3 h-3" /> Guardar
+                      </button>
+                      <button
+                        onClick={() => setEditingPostId(null)}
+                        className="px-3 py-1.5 bg-muted text-muted-foreground rounded-lg text-[10px] font-bold"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => { setSelectedThread(null); setEditingPostId(null); }}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/10 transition-colors focus:outline-none"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               {/* Scrollable thread content */}
@@ -1191,9 +1322,18 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                 
                 {/* Main post body */}
                 <div className="space-y-4">
-                  <p className="text-sm text-foreground/90 leading-relaxed bg-card/25 p-4 rounded-xl border border-border/5">
-                    {selectedThread.content}
-                  </p>
+                  {editingPostId === selectedThread.id ? (
+                    <textarea
+                      value={editPostContent}
+                      onChange={(e) => setEditPostContent(e.target.value)}
+                      className="w-full bg-card/25 border border-border/40 rounded-xl py-3 px-4 text-sm text-foreground/90 focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+                      rows={6}
+                    />
+                  ) : (
+                    <p className="text-sm text-foreground/90 leading-relaxed bg-card/25 p-4 rounded-xl border border-border/5">
+                      {selectedThread.content}
+                    </p>
+                  )}
                   
                   <div className="flex justify-between items-center text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5">
@@ -1316,7 +1456,7 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                         Acción Colaborativa
                       </p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {selectedThread.authorName === "Tu Perfil" || selectedThread.user_id === MOCK_USER_ID
+                        {selectedThread.authorName === "Tu Perfil" || selectedThread.user_id === currentUserId
                           ? "Gestioná los estados y reservas de tu publicación."
                           : "Contactate con tu compañero de forma segura y directa."
                         }
@@ -1324,7 +1464,7 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                     </div>
                     
                     <div className="flex flex-wrap gap-2 w-full sm:w-auto shrink-0 justify-end">
-                      {!(selectedThread.authorName === "Tu Perfil" || selectedThread.user_id === MOCK_USER_ID) && (
+                      {!(selectedThread.authorName === "Tu Perfil" || selectedThread.user_id === currentUserId) && (
                         <button
                           onClick={() => handlePostInteraction("interest")}
                           disabled={actionInProgress !== null}
@@ -1338,7 +1478,7 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                       {selectedThread.type === 'borrow' && selectedThread.metadata && (
                         <>
                           {/* Borrower Actions */}
-                          {!(selectedThread.authorName === "Tu Perfil" || selectedThread.user_id === MOCK_USER_ID) && selectedThread.metadata.status === 'available' && (
+                          {!(selectedThread.authorName === "Tu Perfil" || selectedThread.user_id === currentUserId) && selectedThread.metadata.status === 'available' && (
                             <button
                               onClick={() => handlePostInteraction("reserve")}
                               disabled={actionInProgress !== null}
@@ -1350,7 +1490,7 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                           )}
                           
                           {/* Owner Actions */}
-                          {(selectedThread.authorName === "Tu Perfil" || selectedThread.user_id === MOCK_USER_ID) && (
+                          {(selectedThread.authorName === "Tu Perfil" || selectedThread.user_id === currentUserId) && (
                             <>
                               {selectedThread.metadata.status === 'reserved' && (
                                 <button
@@ -1381,7 +1521,7 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                 )}
 
                 {/* Solved Trigger box for thread owner */}
-                {!selectedThread.is_resolved && selectedThread.authorName === "Tu Perfil" && (
+                {!selectedThread.is_resolved && selectedThread.authorId === currentUserId && (
                   <div className="p-4 bg-accent/5 border border-accent/25 rounded-2xl flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-5 h-5 text-accent animate-bounce" />
@@ -1435,10 +1575,7 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                               <div className="flex justify-between items-center mb-2">
                                 <div className="flex items-center gap-1.5">
                                   <span className="text-xs font-bold text-accent">
-                                    {reply.user_id === "user-prof-garcia" ? "Prof. García" : reply.user_id === MOCK_USER_ID ? "Tu Perfil" : "Estudiante"}
-                                  </span>
-                                  <span className="text-[9px] bg-muted px-1.5 py-0.2 rounded text-muted-foreground font-mono">
-                                    {reply.user_id === "user-prof-garcia" ? "Profesor" : "Estudiante"}
+                                    {reply.user_id === currentUserId ? "Tu Perfil" : "Estudiante"}
                                   </span>
                                   {reply.is_accepted && (
                                     <span className="flex items-center gap-1 text-[9px] text-accent bg-accent-foreground/10 px-2 py-0.2 rounded-full font-bold">
@@ -1451,20 +1588,67 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                                   {new Date(reply.created_at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
                                 </span>
                               </div>
-                              <p className="text-xs text-muted-foreground leading-relaxed mb-2">
-                                {reply.content}
-                              </p>
-                              
-                              {/* Accept comment buttons for original owner */}
-                              {!selectedThread.is_resolved && selectedThread.authorName === "Tu Perfil" && reply.user_id !== MOCK_USER_ID && (
-                                <button
-                                  onClick={() => handleMarkAsSolved(reply.id)}
-                                  className="text-[10px] text-accent hover:text-accent/80 font-bold flex items-center gap-1 focus:outline-none"
-                                >
-                                  <Star className="w-3.5 h-3.5" />
-                                  Aceptar como mejor respuesta
-                                </button>
+
+                              {editingReplyId === reply.id ? (
+                                <div className="space-y-2">
+                                  <textarea
+                                    value={editReplyContent}
+                                    onChange={(e) => setEditReplyContent(e.target.value)}
+                                    className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+                                    rows={3}
+                                  />
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={handleSaveEditReply}
+                                      disabled={actionInProgress === "edit-reply"}
+                                      className="px-3 py-1 bg-accent text-accent-foreground rounded-lg text-[10px] font-bold flex items-center gap-1"
+                                    >
+                                      <Save className="w-3 h-3" /> Guardar
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingReplyId(null)}
+                                      className="px-3 py-1 bg-muted text-muted-foreground rounded-lg text-[10px] font-bold"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-muted-foreground leading-relaxed mb-2">
+                                  {reply.content}
+                                </p>
                               )}
+
+                              <div className="flex items-center gap-3 mt-1">
+                                {/* Accept as best answer */}
+                                {!selectedThread.is_resolved && selectedThread.authorId === currentUserId && reply.user_id !== currentUserId && (
+                                  <button
+                                    onClick={() => handleMarkAsSolved(reply.id)}
+                                    className="text-[10px] text-accent hover:text-accent/80 font-bold flex items-center gap-1 focus:outline-none"
+                                  >
+                                    <Star className="w-3.5 h-3.5" />
+                                    Aceptar como mejor respuesta
+                                  </button>
+                                )}
+                                {/* Edit own reply */}
+                                {reply.user_id === currentUserId && editingReplyId !== reply.id && (
+                                  <button
+                                    onClick={() => startEditReply(reply)}
+                                    className="text-[10px] text-muted-foreground hover:text-foreground font-bold flex items-center gap-1"
+                                  >
+                                    <Pencil className="w-3 h-3" /> Editar
+                                  </button>
+                                )}
+                                {/* Delete own reply */}
+                                {reply.user_id === currentUserId && (
+                                  <button
+                                    onClick={() => handleDeleteReply(reply.id)}
+                                    className="text-[10px] text-red-400/70 hover:text-red-400 font-bold flex items-center gap-1"
+                                  >
+                                    <Trash2 className="w-3 h-3" /> Borrar
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1493,78 +1677,6 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
                   <Send className="w-4 h-4" />
                 </button>
               </form>
-
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* 3. Top Contributor profile details modal */}
-      <AnimatePresence>
-        {selectedContributor && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              className="absolute inset-0 bg-background/80 backdrop-blur-md"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedContributor(null)}
-            />
-
-            <motion.div
-              className="bg-glass rounded-3xl p-6 border border-accent/20 w-full max-w-sm relative z-10 shadow-2xl text-center flex flex-col items-center"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ type: "spring", duration: 0.3 }}
-            >
-              <button
-                onClick={() => setSelectedContributor(null)}
-                className="absolute top-4 right-4 p-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="w-16 h-16 rounded-full bg-accent/25 border-2 border-accent flex items-center justify-center text-accent font-black text-xl mb-4 shadow-lg shadow-accent/10">
-                {selectedContributor.name.charAt(0)}
-              </div>
-
-              <h3 className="font-heading text-lg font-bold text-cream-bone mb-1">
-                {selectedContributor.name}
-              </h3>
-              
-              <span className="px-2 py-0.5 bg-muted rounded text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-4 border border-border/10">
-                {selectedContributor.role}
-              </span>
-
-              <div className="w-full grid grid-cols-2 gap-3 mb-6">
-                <div className="bg-card/45 p-3 rounded-xl border border-border/5">
-                  <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Cátedra</span>
-                  <span className="text-xs font-semibold text-foreground block truncate mt-0.5">{selectedContributor.career}</span>
-                </div>
-                <div className="bg-card/45 p-3 rounded-xl border border-border/5">
-                  <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">Ranking</span>
-                  <span className="text-xs font-semibold text-accent block mt-0.5 font-mono">#{selectedContributor.rank} Global</span>
-                </div>
-              </div>
-
-              {/* Contributor Badges details */}
-              <div className="w-full space-y-2.5 text-left border-t border-border/10 pt-4">
-                <h4 className="font-heading text-xs font-bold text-cream-bone flex items-center gap-1.5">
-                  <Award className="w-4 h-4 text-accent" />
-                  Insignias Académicas
-                </h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedContributor.badges.map((badge) => (
-                    <span
-                      key={badge}
-                      className="bg-accent/10 border border-accent/25 text-accent text-[10px] font-bold px-2 py-1 rounded-lg"
-                    >
-                      {badge}
-                    </span>
-                  ))}
-                </div>
-              </div>
 
             </motion.div>
           </div>
