@@ -1,80 +1,64 @@
 # UNLaR-Connect
 
-UNLaR-Connect es una aplicación web monolítica premium diseñada para estudiantes y tutores de la Universidad Nacional de La Rioja (UNLaR). Al combinar herramientas modernas de colaboración con inteligencia artificial localizada, la plataforma permite a los estudiantes compartir recursos de estudio, participar en foros específicos de materias, programar sesiones de tutoría entre pares (P2P) y chatear directamente con sus apuntes de clase en formato PDF.
+**UNLaR-Connect** es una plataforma web monolítica de alta fidelidad diseñada específicamente para estudiantes y tutores de la **Universidad Nacional de La Rioja (UNLaR)**. El proyecto fue desarrollado para resolver los desafíos planteados en el **Eje 3: Red Colaborativa Estudiantil (Intercambio de Conocimientos y Recursos)** de la Hackathon UNLaR.
+
+---
+
+## La Problemática (Eje 3 de la Hackathon)
+
+A lo largo de su trayectoria universitaria, los estudiantes se enfrentan a dos grandes barreras estructurales:
+1.  **Dificultad académica en materias filtro**: Asignaturas complejas donde la tasa de recursado es alta y la falta de apoyo continuo genera deserción.
+2.  **Falta de acceso a insumos tecnológicos costosos**: La necesidad de equipamiento especializado (como placas Arduino, cámaras réflex, herramientas físicas, instrumental de laboratorio o licencias de software caras) que los estudiantes no siempre pueden costear.
+3.  **El caos de los grupos masivos de WhatsApp**: Aunque en la comunidad universitaria abunda la buena voluntad de compañeros dispuestos a dar tutorías o prestar/alquilar el equipamiento que tienen guardado, la falta de un canal seguro, organizado e indexado hace que este flujo de ayuda se pierda por completo en el ruido diario de las redes sociales informales.
+
+---
+
+## La Solución: ¿Cómo lo resuelve UNLaR-Connect?
+
+UNLaR-Connect transforma la interacción informal en una red académica estructurada, segura y gamificada:
+
+### 1. Consultas Express y Tutorías en Vivo (Peer-to-Peer)
+*   **Enlace de Audio/Video por WebRTC**: Los estudiantes con dificultades académicas pueden ver qué tutores certificados están en línea y solicitar una "Consulta Express" al instante. La plataforma inicia una llamada 1-on-1 segura, directa y con fallback inteligente para redes móviles.
+*   **Descarga Contextual e Interacción**: Durante la llamada, los estudiantes chatean en tiempo real y acceden a los apuntes de la materia seleccionada sin salir de la sala.
+
+### 2. Biblioteca Compartida e Inteligencia Artificial Localizada (RAG)
+*   **Chat Interactivo con Apuntes**: Los estudiantes suben recursos de estudio (PDF, TXT, MD) que son segmentados y vectorizados en una base de datos local (`pgvector`). Un asistente de IA integrado permite "chatear" directamente con los apuntes utilizando terminología y **voseo argentino rioplatense** ("mirá", "tenés", "comentame").
+*   **Filtros Inteligentes**: Búsquedas contextuales por carrera, materia y eje temático para encontrar apuntes de manera inmediata.
+
+### 3. Red Organizada de Intercambio de Insumos y Recursos
+*   **Foro Académico Estructurado**: Un espacio categorizado por materias y temas, reemplazando el desorden de WhatsApp. Los estudiantes pueden publicar dudas, responder hilos y coordinar préstamos o alquileres de insumos y herramientas tecnológicas que tienen guardadas.
+*   **Seguridad e Indexación**: Cada recurso y publicación está asociado a un perfil verificado de la UNLaR, con trazabilidad completa.
+
+### 4. Sistema de Reputación y Gamificación (Karma Ledger)
+*   **Incentivo Real a la Colaboración**: Para motivar el intercambio de apuntes, la resolución de dudas en el foro y la disponibilidad para tutorías, la plataforma implementa un sistema transaccional de **Karma**.
+*   **Niveles e Insignias**: Los estudiantes ganan puntos y desbloquean insignias reales (*Mentor Colaborativo*, *Participante Activo*) visibles en el ranking universitario, transformando el altruismo en un mérito académico reconocido.
 
 ---
 
 ## Stack Tecnológico y Arquitectura
 
-UNLaR-Connect está desarrollado como un monolito altamente eficiente, con tipado estricto y cohesivo:
-
-*   **Frontend y Enrutamiento**: Next.js 14 (App Router, React 18, TypeScript)
-*   **Estilos**: Tailwind CSS con una paleta de colores premium (Amethyst Deep, Radiant Teal y tarjetas con efecto Glassmorphism de alta fidelidad)
-*   **Backend Invisible**: Server Actions de Next.js (`src/actions/`) actuando como los controladores transaccionales del backend (sin la sobrecarga de APIs REST)
-*   **Base de Datos y Seguridad**: Supabase (PostgreSQL, seguridad a nivel de fila - RLS, eventos en tiempo real y autenticación basada en cookies de sesión)
-*   **Procesamiento de IA (RAG)**: Procesamiento vectorial local utilizando pgvector y búsqueda semántica a través de embeddings provistos por FreeLLMAPI
+UNLaR-Connect se concibe como un monolito altamente eficiente y con tipado estricto:
+*   **Frontend**: Next.js 14 (App Router, React 18, TypeScript) con estilos Tailwind CSS y efecto *Glassmorphism* premium (Lumina Amber / Warm Obsidian).
+*   **Backend Invisible**: Next.js Server Actions (`src/actions/`) para transacciones directas y seguras sin la latencia de APIs REST tradicionales.
+*   **Base de Datos y Seguridad**: Supabase (PostgreSQL, seguridad Row-Level Security (RLS) y suscripciones en tiempo real).
+*   **Procesamiento de IA (RAG)**: Búsqueda vectorial mediante `pgvector` combinando embeddings de **Google Gemini** (`text-embedding-004`) y procesamiento lingüístico con **Groq** (`llama-3.1-8b-instant`).
 
 ---
 
-## Estructura de Directorios del Proyecto
+## Documentación del Sistema
 
-```text
-unlar-connect/
-├── .agents/                 # DIRECTRICES ESPECÍFICAS PARA AGENTES DE IA
-│   ├── rules/               # Estilo de código, localización y estándares de componentes
-│   ├── skills/              # Integraciones con Supabase, pgvector y LLM
-│   └── workflows/           # Configuración de autenticación y flujos de RAG
-│
-├── public/                  # Archivos estáticos públicos
-│   ├── favicon.ico
-│   └── logo-unlar-connect.svg
-│
-├── src/
-│   ├── actions/             # SERVER ACTIONS (El "Backend Invisible")
-│   │   ├── auth.ts          # Acciones de autenticación del servidor mediante Supabase
-│   │   ├── documents.ts     # Procesamiento de PDFs, división en fragmentos (chunking) y metadatos
-│   │   ├── embeddings.ts    # Generación de vectores de FreeLLMAPI y búsqueda semántica
-│   │   └── forums.ts        # Transacciones de foros de discusión y programación de tutorías
-│   │
-│   ├── app/                 # RUTAS Y VISTAS (El UI del Frontend)
-│   │   ├── (auth)/          # Páginas de autenticación (ingreso, registro)
-│   │   ├── dashboard/       # Portal principal para el estudiante
-│   │   ├── apuntes/         # Biblioteca de recursos y chatbot interactivo para PDFs (RAG)
-│   │   ├── foros/           # Foros de discusión académica organizados por materia
-│   │   ├── tutorias/        # Programación de tutorías entre pares (P2P)
-│   │   ├── globals.css      # Variables globales de Tailwind y estilos glassmorphism
-│   │   └── layout.tsx       # Estructura principal (fuentes Outfit e Inter, rejillas adaptables)
-│   │
-│   ├── components/          # COMPONENTES DE INTERFAZ REUTILIZABLES
-│   │   ├── ui/              # Componentes base como botones, modales e inputs (shadcn/ui)
-│   │   ├── layout/          # Barra de navegación lateral para escritorio y barra inferior para móvil
-│   │   ├── documents/       # Áreas de carga de archivos (Drag & Drop)
-│   │   └── chat/            # Paneles del asistente de IA e interfaces de transmisión de texto
-│   │
-│   ├── lib/                 # UTILIDADES E INICIALIZACIONES DE CLIENTES
-│   │   ├── supabase.ts      # Cliente de autenticación y base de datos de Supabase
-│   │   ├── freellmapi.ts    # Conexiones a modelos de embeddings y procesamiento
-│   │   └── utils.ts         # Combinador estándar de clases de Tailwind CSS
-│   │
-│   └── types/               # ESQUEMAS DE TIPADO
-│       ├── database.ts      # Tipado automático generado desde las tablas de Supabase
-│       └── index.ts         # Tipos de datos para usuarios, documentos y mensajes
-│
-├── AGENTS.md                # Manual de inducción para agentes de IA
-├── tailwind.config.ts       # Configuraciones de temas y animaciones
-├── tsconfig.json            # Reglas de configuración estrictas de TypeScript
-└── package.json             # Manifiesto de dependencias del proyecto
-```
+Toda la estructura técnica y de directorios detallada está documentada en la carpeta [/docs](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/docs):
+
+*   **[Arquitectura y Estructura](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/docs/architecture.md)**: Detalle del diseño monolítico de Server Actions, estructura de carpetas y directrices de diseño responsive móvil.
+*   **[Esquema de Base de Datos y Seguridad](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/docs/database_schema.md)**: Glosario de tablas de Supabase, triggers PostgreSQL automatizados para el karma y políticas RLS.
+*   **[Procesamiento Vectorial y RAG](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/docs/rag_ai_pipeline.md)**: Flujos de ingesta de archivos, división semántica (*sliding-window chunking*), embeddings y búsquedas de similitud.
+*   **[Guía de Pruebas y Verificación](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/docs/testing_and_verification.md)**: Instrucciones detalladas de control de calidad para probar llamadas WebRTC, chatbot RAG y sistema de karma.
 
 ---
 
 ## Directrices e Inducción para Agentes de IA
 
-Este repositorio está optimizado para la programación en pareja asistida por agentes autónomos de IA:
-*   **Inducción**: Consulte [AGENTS.md](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/AGENTS.md) para obtener una visión general de la estructura, reglas y guías de desarrollo.
-*   **Política de Idioma Dual**:
-    *   Los archivos orientados al **desarrollador** (como planes de implementación, tareas, comentarios de código y archivos `.md` del sistema) se escriben en **inglés**.
-    *   La interfaz orientada al **usuario** (como botones, textos de ayuda, notificaciones y respuestas de chatbot de IA) se escribe en **español rioplatense (argentino)** de manera natural utilizando el voseo (*"Iniciá sesión"*, *"Subí tu PDF al toque"*, *"¿Buscás apuntes?"*).
+Este repositorio está optimizado para el trabajo asistido por inteligencia artificial. Consulte [AGENTS.md](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/AGENTS.md) para alinearse con los estándares de desarrollo.
 
 ---
 
@@ -96,7 +80,7 @@ npm install
 ```
 
 ### 3. Configuración de Variables de Entorno
-Cree un archivo `.env.local` en la raíz del proyecto con los parámetros de conexión de sus servicios locales:
+Cree un archivo `.env.local` en la raíz del proyecto con los parámetros de conexión de sus servicios:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=tu_url_de_proyecto_supabase
 NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_clave_anonima_supabase
@@ -108,10 +92,10 @@ Inicie el servidor de desarrollo local:
 ```bash
 npm run dev
 ```
-Abra [http://localhost:3000](http://localhost:3000) en su navegador para ver la página de inicio en funcionamiento.
+Abra [http://localhost:3000](http://localhost:3000) en su navegador para ver la página en funcionamiento.
 
 ### 5. Compilación para Producción
-Verifique que el proyecto compile correctamente y cumpla con las directrices de ESLint:
+Verifique la compilación y el cumplimiento de ESLint:
 ```bash
 npm run build
 ```
