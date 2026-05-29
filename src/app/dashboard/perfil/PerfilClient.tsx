@@ -471,13 +471,19 @@ export default function PerfilClient({
               
               {/* Profile image with camera upload button */}
               <div className="relative group shrink-0">
-                <div className="w-24 h-24 rounded-full border-2 border-accent/20 p-1 bg-card/30 overflow-hidden relative shadow-lg">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    alt={`Foto de perfil de ${profile.name}`}
-                    className="w-full h-full object-cover rounded-full"
-                    src={editAvatarUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuDG7kZthARJWoPUqDDIShLuxuJGHxPM6eh_dFZ6vUCJpDcMLAVUhwXYCRHRWp4g2EG0IU2Rsbhy6R-fMP4njxS_VptnFuC38SCPJY9SODYThVAvnjbCK1XZUX7gGvY80048nOa5c8BLd-8sEqOcZI_3g6HnpGk6fONgBN98bB6t-7auFl5Er-3QmIJY8I86xD7vDken6cwXb1WU2S_MjlMOmKiKLHNUwHo5JTyGIRJfxWF3gwjqpONgQHZ_ti-F5V9qgMFGH0mCDQ"}
-                  />
+                <div className="w-24 h-24 rounded-full border-2 border-accent/20 p-1 bg-card/30 overflow-hidden relative shadow-lg flex items-center justify-center">
+                  {editAvatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      alt={`Foto de perfil de ${profile.name}`}
+                      className="w-full h-full object-cover rounded-full"
+                      src={editAvatarUrl}
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-full flex items-center justify-center text-3xl font-black bg-accent/20 border border-accent/30 text-accent select-none">
+                      {profile.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                 </div>
                 
                 {/* Simulated file upload trigger overlay */}

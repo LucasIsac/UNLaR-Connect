@@ -530,7 +530,9 @@ export default function Header({
                 src={profile.avatar_url}
               />
             ) : (
-              <User className="w-4 h-4 text-muted-foreground" />
+              <div className="w-full h-full rounded-xl flex items-center justify-center text-sm font-bold bg-accent/20 border border-accent/30 text-accent select-none">
+                {profile?.name ? profile.name.charAt(0).toUpperCase() : "?"}
+              </div>
             )}
           </button>
 
