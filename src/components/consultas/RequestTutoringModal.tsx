@@ -3,11 +3,9 @@
 import { useState, useEffect } from "react";
 import { X, Calendar, Clock, BookOpen, Loader2, CheckCircle } from "lucide-react";
 import { TutorProfileForMatching, fetchTutorAvailabilityForDate, requestScheduledTutoring } from "@/actions/tutoring-scheduled";
-import { DbSubject } from "@/types/database";
 
 interface RequestTutoringModalProps {
   tutor: TutorProfileForMatching;
-  subjects: DbSubject[];
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -16,7 +14,6 @@ const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Vierne
 
 export default function RequestTutoringModal({
   tutor,
-  subjects,
   onClose,
   onSuccess,
 }: RequestTutoringModalProps) {

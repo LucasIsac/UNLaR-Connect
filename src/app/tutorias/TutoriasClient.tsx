@@ -119,7 +119,6 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
   const [scheduledSessions, setScheduledSessions] = useState<ScheduledSessionExtended[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [calendarEvents, setCalendarEvents] = useState<TutoringCalendarEvent[]>([]);
-  const [loadingCalendar, setLoadingCalendar] = useState(true);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
 
   // ==================== DATA LOADING ====================
@@ -160,7 +159,6 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
         setLoadingHistory(false);
         setLoadingProfiles(false);
         setLoadingSessions(false);
-        setLoadingCalendar(false);
       }
     }
 
@@ -466,7 +464,6 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
       {showRequestModal && selectedTutor && (
         <RequestTutoringModal
           tutor={selectedTutor}
-          subjects={subjects}
           onClose={() => {
             setShowRequestModal(false);
             setSelectedTutor(null);
