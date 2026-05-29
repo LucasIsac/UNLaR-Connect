@@ -129,14 +129,11 @@ export function Select({
       {/* Options Panel Dropdown */}
       <ul
         ref={listRef}
-        className={`absolute left-0 right-0 mt-2 z-50 bg-[#1A1614]/95 border border-accent/20 rounded-2xl shadow-[0_8px_32px_rgba(12,10,9,0.7)] backdrop-blur-md max-h-60 overflow-y-auto custom-scrollbar p-1.5 focus:outline-none transition-all duration-150 ease-out origin-top ${
+        className={`absolute left-0 right-0 top-full mt-2 z-50 bg-[#1A1614]/95 border border-accent/20 rounded-2xl shadow-[0_8px_32px_rgba(12,10,9,0.7)] backdrop-blur-md max-h-60 overflow-y-auto custom-scrollbar p-1.5 focus:outline-none transition-all duration-150 ease-out origin-top ${
           isOpen
             ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
             : "opacity-0 -translate-y-2 scale-98 pointer-events-none"
         }`}
-        style={{
-          scrollbarWidth: "thin",
-        }}
       >
         {options.map((option, idx) => {
           const isSelected = option.value === value;

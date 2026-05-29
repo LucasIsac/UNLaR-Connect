@@ -31,7 +31,7 @@ const getIconAnimationClass = (label: string, isActive: boolean) => {
     "Asistente IA": "group-hover:animate-sidebar-ai" + (isActive ? " animate-sidebar-ai" : ""),
     "Tutorías": "group-hover:animate-sidebar-apuntes" + (isActive ? " animate-sidebar-apuntes" : ""),
     "Foros Estudiantiles": "group-hover:animate-sidebar-foros" + (isActive ? " animate-sidebar-foros" : ""),
-    "Karma y Medallas": "group-hover:animate-sidebar-karma" + (isActive ? " animate-sidebar-karma" : ""),
+    "Reputación": "group-hover:animate-sidebar-karma" + (isActive ? " animate-sidebar-karma" : ""),
     "Ranking Académico": "group-hover:animate-sidebar-ranking" + (isActive ? " animate-sidebar-ranking" : ""),
     "Eventos": "group-hover:animate-sidebar-events" + (isActive ? " animate-sidebar-events" : ""),
     "Mi Perfil": "group-hover:animate-sidebar-perfil" + (isActive ? " animate-sidebar-perfil" : ""),
@@ -56,7 +56,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     {
       label: "Asistente IA",
       icon: Bot,
-      href: "/asistente",
+      href: "/chat",
       isAi: true,
     },
     {
@@ -71,7 +71,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       href: "/foro",
     },
     {
-      label: "Karma y Medallas",
+      label: "Reputación",
       icon: Award,
       href: "/karma",
     },

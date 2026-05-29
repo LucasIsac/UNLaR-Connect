@@ -161,6 +161,7 @@ export interface DbPost {
   created_at: string;
   type: 'question' | 'resource' | 'tutoring' | 'borrow' | 'sell_rent';
   metadata: any; // Using any for flexible type casting in JSON fields
+  image_url?: string;
 }
 
 export interface DbPostTag {
@@ -176,6 +177,7 @@ export interface DbPostReply {
   upvotes: number;
   is_accepted: boolean;
   created_at: string;
+  image_url?: string;
 }
 
 export interface DbBadge {

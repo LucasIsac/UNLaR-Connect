@@ -3,6 +3,8 @@
 import { createServerClient, getVerifiedSession } from "@/lib/supabase";
 import { DbPost, DbPostReply } from "@/types/database";
 import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
+import { awardPoints } from "@/actions/reputation";
+import { POINT_VALUES } from "@/lib/reputation-constants";
 
 // ==========================================
 // TYPES
@@ -225,7 +227,8 @@ export async function createForumPost(
   content: string,
   subject: string,
   type: 'question' | 'resource' | 'tutoring' | 'borrow' | 'sell_rent',
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
+  imageUrl?: string
 ): Promise<{ success: boolean; data?: ForumPostExtended; error?: string }> {
   try {
     const supabase = createServerClient();
@@ -259,18 +262,16 @@ export async function createForumPost(
         upvotes: 1,
         is_resolved: false,
         type,
-        metadata: metadata || {}
+        metadata: metadata || {},
+        image_url: imageUrl || null,
       })
       .select()
       .single();
 
     if (insertError) throw insertError;
 
-    // Award karma
-    const { data: authorData } = await supabase
-      .from("users").select("points").eq("id", authUser.id).single();
-    const currentPoints = authorData?.points || 0;
-    await supabase.from("users").update({ points: currentPoints + 15 }).eq("id", authUser.id);
+    // Award +15 points for creating a post
+    await awardPoints(authUser.id, POINT_VALUES.FORO_POST, "foro_post", "Publicó un hilo en el foro", newPost.id);
 
     // Auto-upvote own post
     await supabase.from("post_votes").insert({
@@ -312,7 +313,7 @@ export async function createForumPost(
         subjectName: subject,
         authorName: "Tu Perfil",
         authorId: authUser.id,
-        authorKarma: currentPoints + 15,
+        authorKarma: 0, // Will be refreshed on next page load
         repliesCount: 0,
         userVote: null,
         category,
@@ -442,6 +443,10 @@ export async function castPostVote(
       return { success: false, error: "Che, no estás autenticado/a." };
     }
 
+    // Get the post author to award them points
+    const { data: postAuthor } = await supabase
+      .from("posts").select("user_id").eq("id", postId).single();
+
     const nextDirection = direction === "up" ? 1 : -1;
 
     const { data: existingVote, error: voteFetchError } = await supabase
@@ -454,6 +459,7 @@ export async function castPostVote(
     if (voteFetchError) throw voteFetchError;
 
     let userVote: "up" | "down" | null = direction;
+    let pointsAwarded = 0;
 
     if (existingVote?.direction === nextDirection) {
       const { error: deleteError } = await supabase
@@ -477,6 +483,12 @@ export async function castPostVote(
         );
 
       if (upsertError) throw upsertError;
+
+      // Award +5 points to post author for receiving an upvote (not self-upvote)
+      if (direction === "up" && postAuthor && postAuthor.user_id !== authUser.id) {
+        await awardPoints(postAuthor.user_id, POINT_VALUES.RESOURCE_UPVOTE, "resource_upvote", "Recibió un like en su publicación", postId);
+        pointsAwarded = POINT_VALUES.RESOURCE_UPVOTE;
+      }
     }
 
     const { data: postData, error: postError } = await supabase
@@ -551,14 +563,15 @@ export async function fetchPostReplies(postId: string): Promise<DbPostReply[]> {
 
 export async function addPostReply(
   postId: string,
-  content: string
+  content: string,
+  imageUrl?: string
 ): Promise<{ success: boolean; data?: DbPostReply[]; error?: string }> {
   try {
     const supabase = createServerClient();
     const { data: authRes } = await supabase.auth.getUser();
     const user = authRes?.user;
     if (!user) return { success: false, error: "No estás autenticado/a." };
-    if (!content.trim()) return { success: false, error: "La respuesta no puede estar vacía." };
+    if (!content.trim() && !imageUrl) return { success: false, error: "La respuesta no puede estar vacía." };
 
     const { error } = await supabase.from("post_replies").insert({
       post_id: postId,
@@ -566,8 +579,12 @@ export async function addPostReply(
       content: content.trim(),
       upvotes: 0,
       is_accepted: false,
+      image_url: imageUrl || null,
     });
     if (error) throw error;
+
+    // Award +10 points for replying
+    await awardPoints(user.id, POINT_VALUES.FORO_REPLY, "foro_reply", "Respondió una pregunta en el foro", postId);
 
     invalidateCache(CACHE_TAGS.postReplies(postId));
     invalidateCache(CACHE_TAGS.forumPosts);
@@ -588,6 +605,9 @@ export async function resolvePost(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = createServerClient();
+    const { data: authRes } = await supabase.auth.getUser();
+    const user = authRes?.user;
+
     const { error: postError } = await supabase
       .from("posts").update({ is_resolved: true }).eq("id", postId);
     if (postError) throw postError;
@@ -596,6 +616,19 @@ export async function resolvePost(
       const { error: replyError } = await supabase
         .from("post_replies").update({ is_accepted: true }).eq("id", replyId);
       if (replyError) throw replyError;
+
+      // Get the reply author to award them points
+      const { data: reply } = await supabase
+        .from("post_replies").select("user_id").eq("id", replyId).single();
+
+      if (reply && reply.user_id !== user?.id) {
+        // Award +50 to the winner
+        await awardPoints(reply.user_id, POINT_VALUES.BEST_ANSWER_WINNER, "best_answer_winner", "Su respuesta fue seleccionada como mejor", postId);
+        // Award +25 to the selector
+        if (user) {
+          await awardPoints(user.id, POINT_VALUES.BEST_ANSWER_SELECTOR, "best_answer_selector", "Seleccionó la mejor respuesta", postId);
+        }
+      }
     }
 
     invalidateCache(CACHE_TAGS.forumPosts);

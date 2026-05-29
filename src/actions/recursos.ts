@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase";
 import { DbDocument } from "@/types/database";
 import { revalidatePath } from "next/cache";
 import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
+import { ingestDocumentAction } from "@/actions/ingest";
 
 export interface ResourceExtended extends DbDocument {
   category: string; // Map from topic/subject
@@ -165,6 +166,11 @@ export async function uploadResource(formData: FormData): Promise<{ success: boo
       await supabase.storage.from('apuntes').remove([filePath]);
       return { success: false, error: "Error al guardar los datos del apunte." };
     }
+
+    // Ingest the document in the background to generate chunks and embeddings
+    ingestDocumentAction(dbData.id).catch((err) => {
+      console.error(`Background Ingest failed for document ${dbData.id}:`, err);
+    });
 
     revalidatePath("/recursos");
 
