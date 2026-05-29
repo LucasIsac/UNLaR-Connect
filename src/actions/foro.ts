@@ -225,7 +225,7 @@ export async function createForumPost(
   content: string,
   subject: string,
   type: 'question' | 'resource' | 'tutoring' | 'borrow' | 'sell_rent',
-  metadata?: any
+  metadata?: Record<string, unknown>
 ): Promise<{ success: boolean; data?: ForumPostExtended; error?: string }> {
   try {
     const supabase = createServerClient();

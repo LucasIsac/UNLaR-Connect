@@ -19,7 +19,6 @@ import {
   X, 
   Calendar, 
   AlertCircle,
-  ChevronDown,
   Sparkles,
   Search,
   GraduationCap,
@@ -66,8 +65,8 @@ export default function PerfilClient({
   const [profile, setProfile] = useState<UserProfileExtended | null>(initialProfile);
   const [tutorSubjects, setTutorSubjects] = useState<DbSubject[]>(initialTutorSubjects);
   const [availability, setAvailability] = useState<DbTutorAvailability[]>(initialAvailability);
-  const [careers, setCareers] = useState<DbCareer[]>(initialCareers);
-  const [allSubjects, setAllSubjects] = useState<DbSubject[]>(initialSubjects);
+  const [careers] = useState<DbCareer[]>(initialCareers);
+  const [allSubjects] = useState<DbSubject[]>(initialSubjects);
   
   const loading = false;
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
@@ -387,7 +386,6 @@ export default function PerfilClient({
   }
 
   // Formatting values
-  const career = careers.find(c => c.id === editCareerId);
   const currentLevel = Math.floor(profile.points / 200) || 12;
   const targetXp = 3000;
   const progressPercentage = Math.min((profile.points / targetXp) * 100, 100);
@@ -423,7 +421,7 @@ export default function PerfilClient({
           variants={staggerItem}
         >
           <div>
-            <h1 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight mb-2 text-cream-bone">
+            <h1 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight mb-1 text-cream-bone">
               Mi Perfil Académico
             </h1>
             <p className="text-sm text-muted-foreground">

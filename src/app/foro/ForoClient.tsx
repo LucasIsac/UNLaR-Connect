@@ -20,7 +20,6 @@ import {
   MessageCircle,
   GraduationCap,
   Calendar,
-  Award,
   Coins,
   Package,
   MapPin,
@@ -47,7 +46,7 @@ import {
   ForumPostExtended,
   TopContributor,
   PopularTag,
-} from "@/actions/foros";
+} from "@/actions/foro";
 import { DbPostReply } from "@/types/database";
 import { Select } from "@/components/ui/Select";
 import { createClient } from "@/lib/supabase/client";
@@ -61,12 +60,12 @@ const categories = [
   { label: "Compra / Alquiler", value: "sell_rent", color: "text-purple-400 bg-purple-400/10 border-purple-400/20" },
 ];
 
-type ForosClientProps = {
+type ForoClientProps = {
   initialThreads: ForumPostExtended[];
   currentUserId: string | null;
 };
 
-export default function ForosClient({ initialThreads, currentUserId: initialUserId }: ForosClientProps) {
+export default function ForoClient({ initialThreads, currentUserId: initialUserId }: ForoClientProps) {
   const [threads, setThreads] = useState<ForumPostExtended[]>(initialThreads);
   const loading = false;
   const [selectedCategory, setSelectedCategory] = useState("Todas");
@@ -78,11 +77,11 @@ export default function ForosClient({ initialThreads, currentUserId: initialUser
 
   const handleScopeChange = (scope: "foro" | "apuntes" | "materias" | "todos") => {
     if (scope === "apuntes") {
-      window.location.href = "/dashboard/recursos";
+      window.location.href = "/recursos";
     } else if (scope === "foro") {
-      window.location.href = "/dashboard/foros";
+      window.location.href = "/foro";
     } else if (scope === "materias") {
-      window.location.href = "/dashboard/materias";
+      window.location.href = "/materias";
     }
   };
   
@@ -265,7 +264,7 @@ export default function ForosClient({ initialThreads, currentUserId: initialUser
     e.preventDefault();
     if (!newTitle.trim() || !newDesc.trim()) return;
 
-    let metadata: any = {};
+    let metadata: Record<string, unknown> = {};
     if (newType === 'tutoring') {
       metadata = {
         subject: tutoringSubject || newSubject,
@@ -501,24 +500,26 @@ export default function ForosClient({ initialThreads, currentUserId: initialUser
         </AnimatePresence>
 
         {/* Header Section */}
-        <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight mb-1 text-cream-bone">
-              Foro Estudiantil
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Resolvé tus dudas académicas, compartí tus conocimientos y ganá puntos de karma.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {/* Action button */}
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold px-4 py-2 rounded-xl text-xs flex items-center gap-2 hover:scale-[1.02] active:scale-98 transition-all shrink-0 shadow-lg shadow-accent/10"
-            >
-              <Plus className="w-4 h-4" />
-              Creá un hilo
-            </button>
+        <div className="mb-8 flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight mb-1 text-cream-bone">
+                Foro Estudiantil
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Resolvé tus dudas académicas, compartí tus conocimientos y ganá puntos de karma.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto shrink-0 select-none">
+              {/* Action button */}
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold px-4 py-2 rounded-xl text-xs flex items-center gap-2 hover:scale-[1.02] active:scale-98 transition-all shrink-0 shadow-lg shadow-accent/10 self-start sm:self-auto"
+              >
+                <Plus className="w-4 h-4" />
+                Creá un hilo
+              </button>
+            </div>
           </div>
         </div>
 
@@ -925,17 +926,17 @@ export default function ForosClient({ initialThreads, currentUserId: initialUser
                     ¿Qué querés publicar?
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
-                    {[
+                    {([
                       { type: 'question', label: 'Pregunta', icon: MessageSquare, desc: 'Dudas sobre materias o temas académicos' },
                       { type: 'resource', label: 'Recurso', icon: BookOpen, desc: 'Compartir apuntes, resúmenes o libros' },
                       { type: 'tutoring', label: 'Tutoría', icon: GraduationCap, desc: 'Ofrecer o buscar clases de apoyo' },
                       { type: 'borrow', label: 'Préstamo', icon: Package, desc: 'Pedir prestado o prestar útiles/insumos' },
                       { type: 'sell_rent', label: 'Compra / Alquiler', icon: Coins, desc: 'Compraventa o alquiler de recursos universitarios' },
-                    ].map((opt) => (
+                    ] as const).map((opt) => (
                       <button
                         key={opt.type}
                         type="button"
-                        onClick={() => setNewType(opt.type as any)}
+                        onClick={() => setNewType(opt.type)}
                         className={`p-3 rounded-2xl border text-left flex gap-3 transition-all duration-200 ${
                           newType === opt.type
                             ? 'bg-accent/15 border-accent text-accent shadow-md shadow-accent/5'
@@ -980,7 +981,7 @@ export default function ForosClient({ initialThreads, currentUserId: initialUser
                   </label>
                   <Select
                     value={newSubject}
-                    onChange={(val) => setNewSubject(val)}
+                    onChange={(val) => setNewSubject(String(val))}
                     options={[
                       { value: "Análisis Matemático II", label: "Análisis Matemático II" },
                       { value: "Programación II", label: "Programación II" },
@@ -1011,7 +1012,7 @@ export default function ForosClient({ initialThreads, currentUserId: initialUser
                         <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Modalidad</label>
                         <Select
                           value={tutoringModality}
-                          onChange={(val) => setTutoringModality(val as any)}
+                          onChange={(val) => setTutoringModality(val as 'online' | 'present' | 'hybrid')}
                           options={[
                             { value: 'online', label: 'Virtual' },
                             { value: 'present', label: 'Presencial' },
@@ -1023,11 +1024,11 @@ export default function ForosClient({ initialThreads, currentUserId: initialUser
                       <div className="col-span-2">
                         <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Costo</label>
                         <div className="flex gap-2">
-                          {['free', 'paid'].map((m) => (
+                          {(['free', 'paid'] as const).map((m) => (
                             <button
                               key={m}
                               type="button"
-                              onClick={() => setTutoringPriceType(m as any)}
+                              onClick={() => setTutoringPriceType(m)}
                               className={`flex-1 py-1.5 rounded-lg border text-xs font-bold ${
                                 tutoringPriceType === m
                                   ? 'bg-blue-500/10 border-blue-500 text-blue-400'
@@ -1083,7 +1084,7 @@ export default function ForosClient({ initialThreads, currentUserId: initialUser
                         <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Condición/Estado</label>
                         <Select
                           value={itemCondition}
-                          onChange={(val) => setItemCondition(val as any)}
+                          onChange={(val) => setItemCondition(val as 'new' | 'used_good' | 'used_fair')}
                           options={[
                             { value: 'new', label: 'Nuevo' },
                             { value: 'used_good', label: 'Excelente estado' },
@@ -1134,7 +1135,7 @@ export default function ForosClient({ initialThreads, currentUserId: initialUser
                         <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Condición/Estado</label>
                         <Select
                           value={itemCondition}
-                          onChange={(val) => setItemCondition(val as any)}
+                          onChange={(val) => setItemCondition(val as 'new' | 'used_good' | 'used_fair')}
                           options={[
                             { value: 'new', label: 'Nuevo' },
                             { value: 'used_good', label: 'Excelente estado' },
@@ -1146,11 +1147,11 @@ export default function ForosClient({ initialThreads, currentUserId: initialUser
                       <div className="col-span-2">
                         <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Modalidad</label>
                         <div className="flex gap-2">
-                          {['sell', 'rent'].map((m) => (
+                          {(['sell', 'rent'] as const).map((m) => (
                             <button
                               key={m}
                               type="button"
-                              onClick={() => setItemMode(m as any)}
+                              onClick={() => setItemMode(m)}
                               className={`flex-1 py-1.5 rounded-lg border text-xs font-bold ${
                                 itemMode === m
                                   ? 'bg-purple-500/10 border-purple-500 text-purple-400'

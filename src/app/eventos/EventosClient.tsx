@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Calendar, Plus, Loader2, Trash2, Pencil } from "lucide-react";
+import { Calendar, Plus, Trash2, Pencil } from "lucide-react";
 import { EventExtended, cancelEvent } from "@/actions/events";
 import EventCard from "@/components/events/EventCard";
 import EventDetailModal from "@/components/events/EventDetailModal";
@@ -58,24 +58,26 @@ export default function EventosClient({ initialEvents, canCreate }: EventosClien
         )}
 
         {/* Header */}
-        <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight mb-1 text-cream-bone">
-              Eventos UNLaR
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Seminarios, capacitaciones, diplomaturas y más.
-            </p>
+        <div className="mb-8 flex flex-col gap-4 border-b border-border/10 pb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight mb-1 text-cream-bone">
+                Eventos UNLaR
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Seminarios, capacitaciones, diplomaturas y más.
+              </p>
+            </div>
+            {canCreate && (
+              <button
+                onClick={() => { setEditingEvent(null); setShowCreateModal(true); }}
+                className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold px-4 py-2 rounded-xl text-xs flex items-center gap-2 hover:scale-[1.02] active:scale-98 transition-all shadow-lg shadow-accent/10 shrink-0 select-none self-start sm:self-auto"
+              >
+                <Plus className="w-4 h-4" />
+                Crear Evento
+              </button>
+            )}
           </div>
-          {canCreate && (
-            <button
-              onClick={() => { setEditingEvent(null); setShowCreateModal(true); }}
-              className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold px-4 py-2 rounded-xl text-xs flex items-center gap-2 hover:scale-[1.02] active:scale-98 transition-all shadow-lg shadow-accent/10"
-            >
-              <Plus className="w-4 h-4" />
-              Crear Evento
-            </button>
-          )}
         </div>
 
         {/* Events Grid */}

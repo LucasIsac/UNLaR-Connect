@@ -484,21 +484,21 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
         />
       )}
 
-      {/* Header section with Tabs and Tutor toggle */}
-      <div className="bg-glass p-4 px-5 rounded-2xl border border-border/40 shadow-lg space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* Page Header */}
+      <div className="mb-8 flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="font-heading font-black text-xl text-foreground flex items-center gap-2">
-              <Video className="w-6 h-6 text-accent animate-pulse" />
+            <h1 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight mb-1 text-cream-bone flex items-center gap-2">
+              <Video className="w-6 h-6 text-accent animate-pulse shrink-0" />
               Tutorías P2P
             </h1>
-            <p className="text-muted-foreground mt-0.5 leading-relaxed text-xs">
+            <p className="text-sm text-muted-foreground">
               Conectate con compañeros para resolver dudas en vivo o agendar tutorías programadas.
             </p>
           </div>
 
           {isTutor && (
-            <div className="flex items-center gap-2 bg-muted/40 py-1.5 px-3 rounded-lg border border-border/20 shrink-0">
+            <div className="flex items-center gap-2 bg-glass py-1.5 px-3 rounded-xl border border-border/40 shrink-0 select-none">
               <div className="text-right">
                 <span className="text-[10px] text-muted-foreground block font-semibold uppercase tracking-wider">
                   Tu disponibilidad
@@ -522,34 +522,36 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-1.5 p-0.5 bg-muted/30 rounded-lg border border-border/20">
-          <button
-            onClick={() => setActiveTab("live")}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-              activeTab === "live"
-                ? "bg-accent text-accent-foreground shadow-md shadow-accent/10"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            }`}
-          >
-            <Video className="w-3.5 h-3.5" />
-            En vivo
-          </button>
-          <button
-            onClick={() => setActiveTab("scheduled")}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all relative ${
-              activeTab === "scheduled"
-                ? "bg-accent text-accent-foreground shadow-md shadow-accent/10"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            Programadas
-            {pendingSessionsCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center">
-                {pendingSessionsCount}
-              </span>
-            )}
-          </button>
+        <div className="pt-3 border-t border-border/10">
+          <div className="flex gap-1.5 p-0.5 bg-muted/30 rounded-xl border border-border/20 max-w-xs select-none">
+            <button
+              onClick={() => setActiveTab("live")}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === "live"
+                  ? "bg-accent text-accent-foreground shadow-md shadow-accent/10 animate-fade-in"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              <Video className="w-3.5 h-3.5" />
+              En vivo
+            </button>
+            <button
+              onClick={() => setActiveTab("scheduled")}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all relative ${
+                activeTab === "scheduled"
+                  ? "bg-accent text-accent-foreground shadow-md shadow-accent/10 animate-fade-in"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              Programadas
+              {pendingSessionsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {pendingSessionsCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 

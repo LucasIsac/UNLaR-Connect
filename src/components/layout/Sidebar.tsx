@@ -51,12 +51,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     {
       label: "Banco de Apuntes",
       icon: FolderOpen,
-      href: "/dashboard/recursos",
+      href: "/recursos",
     },
     {
       label: "Asistente IA",
       icon: Bot,
-      href: "/dashboard/asistente",
+      href: "/asistente",
       isAi: true,
     },
     {
@@ -68,7 +68,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     {
       label: "Foros Estudiantiles",
       icon: MessageSquare,
-      href: "/dashboard/foros",
+      href: "/foro",
     },
     {
       label: "Karma y Medallas",
@@ -83,12 +83,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     {
       label: "Eventos",
       icon: Calendar,
-      href: "/dashboard/eventos",
+      href: "/eventos",
     },
     {
       label: "Mi Perfil",
       icon: User,
-      href: "/dashboard/perfil",
+      href: "/perfil",
     },
   ];
 

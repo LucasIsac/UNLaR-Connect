@@ -346,7 +346,7 @@ export default function RecursosPage() {
         </AnimatePresence>
 
         {/* Page Header */}
-        <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div className="mb-8 flex flex-col gap-4">
           <div>
             <h1 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight mb-1 text-cream-bone">
               Banco de Recursos
@@ -357,7 +357,7 @@ export default function RecursosPage() {
           </div>
 
           {/* Quick Filters Row */}
-          <div className="flex flex-wrap items-center gap-2 select-none">
+          <div className="flex flex-wrap items-center gap-2 select-none pt-3 border-t border-border/10">
             
             {/* Search Input bar */}
             <div className="relative">

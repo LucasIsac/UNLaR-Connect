@@ -143,7 +143,7 @@ export async function uploadResource(formData: FormData): Promise<{ success: boo
       return { success: false, error: "Error al guardar los datos del apunte." };
     }
 
-    revalidatePath("/dashboard/recursos");
+    revalidatePath("/recursos");
 
     // We must return the mapped 'data' so the dashboard optimistic UI works
     let catColor = "text-accent bg-accent/10 border-accent/20";
@@ -228,7 +228,7 @@ export async function deleteResource(id: string, storageUrl: string): Promise<{ 
       return { success: false, error: "Permisos insuficientes o apunte no encontrado (Falla de RLS)." };
     }
 
-    revalidatePath("/dashboard/recursos");
+    revalidatePath("/recursos");
     return { success: true };
   } catch (error) {
     console.error("Unexpected delete error:", error);
