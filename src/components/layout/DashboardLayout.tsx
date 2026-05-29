@@ -61,7 +61,7 @@ export default function DashboardLayout({
       {/* Main Page Content Wrapper - Offset by top header height */}
       <div className="flex-1 flex flex-col min-w-0 pt-16 h-screen overflow-hidden">
         {/* Scrollable page content */}
-        <main className="flex-1 overflow-y-auto custom-scrollbar p-6 md:py-8 md:px-80 relative">
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-6 md:py-8 md:px-12 lg:px-20 xl:px-32 2xl:px-48 max-w-[1920px] mx-auto w-full relative">
           <div className="w-full">
             {children}
           </div>

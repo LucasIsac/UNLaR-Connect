@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Menu, Search, Bell, Award, User, LogOut, Settings, Calendar, Trophy, Sparkles, Check, Trash2, X, ArrowLeft, SlidersHorizontal } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import ThemeToggle from "../ui/ThemeToggle";
 import Logo from "../ui/Logo";
 import { fetchCombinedHeaderData } from "@/actions/perfil";
@@ -49,6 +50,12 @@ export default function Header({
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   
   // Global search center state
+  // unreadCount is derived dynamically below, no state needed
+  
+  // States for points animation
+  const [pointsDiff, setPointsDiff] = useState<number | null>(null);
+  const [prevPoints, setPrevPoints] = useState<number | null>(initialData?.profile?.points ?? null);
+  
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   
@@ -63,41 +70,51 @@ export default function Header({
   useEffect(() => {
     let isCancelled = false;
 
-    async function loadData(attempt = 1) {
-      if (initialData) return;
-
+    async function loadData() {
       try {
-        const { profile, notifications } = await fetchCombinedHeaderData();
+        const { profile: newProfile, notifications: newNotifications } = await fetchCombinedHeaderData();
         if (!isCancelled) {
-          setProfile(profile);
-          setNotifications(notifications);
+          if (newProfile) {
+            setProfile(newProfile);
+            
+            // Handle points animation
+            if (prevPoints !== null && newProfile.points > prevPoints) {
+              setPointsDiff(newProfile.points - prevPoints);
+            }
+            setPrevPoints(newProfile.points);
+          }
+          if (newNotifications) {
+            setNotifications(newNotifications);
+          }
         }
       } catch (err) {
         console.error("Error loading header metrics:", err);
-        if (!isCancelled && attempt < 3) {
-          window.setTimeout(() => loadData(attempt + 1), attempt * 350);
-        }
       }
     }
+    
+    // Si no tenemos datos iniciales o queremos refrescar
     loadData();
 
-    // Poll notifications every 30 seconds for live updates
-    const interval = setInterval(async () => {
-      try {
-        const fresh = await fetchNotificationsAction();
-        if (!isCancelled) {
-          setNotifications(fresh);
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }, 30000);
+    // Poll notifications and points every 30 seconds for live updates
+    const interval = setInterval(loadData, 30000);
+
+    // Listen to manual triggers from other components
+    window.addEventListener("points-updated", loadData);
 
     return () => {
       isCancelled = true;
       clearInterval(interval);
+      window.removeEventListener("points-updated", loadData);
     };
-  }, [initialData]);
+  }, [prevPoints, initialData]);
+
+  // Clear points animation automatically
+  useEffect(() => {
+    if (pointsDiff !== null) {
+      const timer = setTimeout(() => setPointsDiff(null), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [pointsDiff]);
 
   // Listen for clicks outside dropdown menus
   useEffect(() => {
@@ -417,12 +434,30 @@ export default function Header({
         )}
 
         {/* Karma Points Badge */}
-        <Link href="/karma" className="flex items-center gap-1.5 bg-accent/10 border border-accent/20 px-3 py-1.5 rounded-full hover:scale-[1.03] transition-transform duration-200 cursor-pointer select-none">
-          <Award className="w-4 h-4 text-accent animate-pulse-slow" />
-          <span className="text-xs font-bold text-accent tracking-wide">
-            {profile ? profile.points.toLocaleString() : "..."} pts
-          </span>
-        </Link>
+        <div className="relative">
+          <Link href="/karma" className="flex items-center gap-1.5 bg-accent/10 border border-accent/20 px-3 py-1.5 rounded-full hover:scale-[1.03] transition-transform duration-200 cursor-pointer select-none">
+            <Award className="w-4 h-4 text-accent animate-pulse-slow" />
+            <span className="text-xs font-bold text-accent tracking-wide">
+              {profile ? profile.points.toLocaleString() : "..."} pts
+            </span>
+          </Link>
+
+          <AnimatePresence>
+            {pointsDiff !== null && (
+              <motion.div
+                key="points-anim"
+                initial={{ opacity: 0, x: -10, scale: 1 }}
+                animate={{ opacity: 1, x: -25, scale: 1 }}
+                exit={{ opacity: 0, x: -35, scale: 1 }}
+                transition={{ duration: 1.5, ease: "easeOut" }}
+                className="absolute top-1/2 -translate-y-1/2 -left-4 text-accent font-semibold text-sm pointer-events-none drop-shadow-md z-50 flex items-center gap-0.5"
+              >
+                +{pointsDiff}
+                <Sparkles className="w-3 h-3 text-accent animate-pulse" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
 
         {/* Notifications Icon dropdown center */}

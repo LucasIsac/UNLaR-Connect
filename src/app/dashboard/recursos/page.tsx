@@ -33,14 +33,15 @@ import {
   deleteResource,
   ResourceExtended
 } from "@/actions/recursos";
-import { fetchSubjects } from "@/actions/perfil";
-import { DbSubject } from "@/types/database";
+import { fetchSubjects, fetchCareers } from "@/actions/perfil";
+import { DbSubject, DbCareer } from "@/types/database";
 
-const tabs = ["Recientes", "Más Valorados", "Mis Guardados"];
+const tabs = ["Recientes", "Más Valorados", "Mis Guardados", "Mis Apuntes"];
 
 export default function RecursosPage() {
   const [resources, setResources] = useState<ResourceExtended[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(9); // Pagination state
   const [activeTab, setActiveTab] = useState(0);
   const [gridView, setGridView] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,6 +53,7 @@ export default function RecursosPage() {
   const [filterMateria, setFilterMateria] = useState("Todas");
   const [filterTipo, setFilterTipo] = useState("Todos");
   const [subjectsDataList, setSubjectsDataList] = useState<DbSubject[]>([]);
+  const [carrerasList, setCarrerasList] = useState<DbCareer[]>([]);
 
   // AI Active Context states (keeps a list of Resource objects currently active)
   const [aiContextList, setAiContextList] = useState<ResourceExtended[]>([]);
@@ -68,8 +70,8 @@ export default function RecursosPage() {
 
   // Sidebar Form States
   const [newTitle, setNewTitle] = useState("");
-  const [newCategory, setNewCategory] = useState("Sistemas Operativos");
-  const [newAxis, setNewAxis] = useState("Gestión de Memoria");
+  const [newCategory, setNewCategory] = useState("");
+  const [newAxis, setNewAxis] = useState("");
   const [newType, setNewType] = useState("Apunte de Teoría");
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [isMateriaDropdownOpen, setIsMateriaDropdownOpen] = useState(false);
@@ -78,10 +80,10 @@ export default function RecursosPage() {
   const [ejeFilter, setEjeFilter] = useState("");
   const [file, setFile] = useState<File | null>(null);
 
-  const normalizeString = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const normalizeString = (str: string) => (str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
   const [predefinedMaterias, setPredefinedMaterias] = useState<string[]>(["Cargando materias..."]);
-  const predefinedEjes = ["Gestión de Memoria", "Consultas SQL", "Integrales Múltiples", "Programación Funcional"];
+  const [predefinedEjes, setPredefinedEjes] = useState<string[]>(["Cargando ejes..."]);
 
   // Drag & drop styling state
   const [isDragging, setIsDragging] = useState(false);
@@ -102,17 +104,45 @@ export default function RecursosPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [data, subjectsData] = await Promise.all([
+        const [data, subjectsData, careersData] = await Promise.all([
           fetchResources(),
-          fetchSubjects()
+          fetchSubjects(),
+          fetchCareers()
         ]);
         setResources(data);
         
+        if (careersData) {
+          setCarrerasList(careersData);
+        }
+        
         if (subjectsData && subjectsData.length > 0) {
-          setPredefinedMaterias(subjectsData.map((s) => s.name));
+          const uniqueMap = new Map<string, string>();
+          subjectsData.forEach((s) => {
+            if (!s.name) return;
+            const norm = (s.name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            if (!uniqueMap.has(norm)) {
+              uniqueMap.set(norm, s.name.trim());
+            }
+          });
+          setPredefinedMaterias(Array.from(uniqueMap.values()));
           setSubjectsDataList(subjectsData);
         } else {
           setPredefinedMaterias(["Sistemas Operativos", "Bases de Datos", "Paradigmas de Programación"]);
+        }
+
+        // Dynamically extract unique thematic axes from resources
+        if (data && data.length > 0) {
+          const uniqueEjesMap = new Map<string, string>();
+          data.forEach((r) => {
+            if (!r.thematicAxis || r.thematicAxis === "General") return;
+            const norm = r.thematicAxis.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            if (!uniqueEjesMap.has(norm)) {
+              uniqueEjesMap.set(norm, r.thematicAxis.trim());
+            }
+          });
+          setPredefinedEjes(Array.from(uniqueEjesMap.values()));
+        } else {
+          setPredefinedEjes(["Gestión de Memoria", "Consultas SQL"]);
         }
 
         // Set second item as initial active context
@@ -138,7 +168,6 @@ export default function RecursosPage() {
       }
     ]);
     setChatInput("");
-    setCurrentPage(1);
   }, [selectedResource]);
 
   const handleToggleAiContext = (rsc: ResourceExtended, e: React.MouseEvent) => {
@@ -168,20 +197,55 @@ export default function RecursosPage() {
 
     setActionInProgress("upload-resource");
     try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData.user;
+      if (!user) {
+        showToast("No estás autenticado.", "error");
+        setActionInProgress(null);
+        return;
+      }
+
+      showToast("Subiendo archivo, aguardá un momento...", "info");
+      
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      const { error: storageError } = await supabase.storage
+        .from('apuntes')
+        .upload(filePath, file, { contentType: file.type });
+        
+      if (storageError) {
+        console.error("Client Upload error:", storageError);
+        showToast("Error al subir el archivo (verificá tu conexión).", "error");
+        setActionInProgress(null);
+        return;
+      }
+
       const formData = new FormData();
-      formData.append("file", file);
       formData.append("title", newTitle);
+      formData.append("filePath", filePath);
       formData.append("category", newCategory);
       formData.append("thematicAxis", newAxis || "General");
       formData.append("type", newType);
       formData.append("description", newAxis ? `Material sobre ${newAxis} (${newType}).` : `Material de tipo ${newType}.`);
 
       const response = await uploadResource(formData);
-      if (response.success && response.data) {
-        setResources((prev) => [response.data!, ...prev]);
-        showToast("¡Apunte subido con éxito! Listo para la IA.", "success");
+      if (response.success) {
+        showToast("¡Apunte subido exitosamente!", "success");
         setNewTitle("");
         setFile(null);
+        setNewType("");
+        setIsUploadModalOpen(false);
+        // Force Header points to update instantly
+        window.dispatchEvent(new Event("points-updated"));
+        
+        // Optimistically add to list (simplificado)
+        if (response.data) {
+          setResources((prev) => [response.data!, ...prev]);
+        }
       } else {
         showToast(response.error || "No se pudo registrar tu apunte.", "error");
       }
@@ -196,14 +260,24 @@ export default function RecursosPage() {
   const handleLikeResourceSubmit = async (rscId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     
-    // Optimistic UI Update
+    // Optimistic UI Update: Toggle likes based on hasVoted status
     setResources((prev) =>
-      prev.map((r) => (r.id === rscId ? { ...r, likes: r.likes + 1 } : r))
+      prev.map((r) => {
+        if (r.id === rscId) {
+          return { ...r, likes: r.hasVoted ? r.likes - 1 : r.likes + 1, hasVoted: !r.hasVoted };
+        }
+        return r;
+      })
     );
-    showToast("¡Gracias por tu valoración! Aportás a la comunidad.");
 
     try {
-      await castResourceVote(rscId);
+      const response = await castResourceVote(rscId);
+      if (response.success && response.newScore !== undefined) {
+        // Sync absolute truth from server in case of race conditions
+        setResources((prev) =>
+          prev.map((r) => (r.id === rscId ? { ...r, likes: response.newScore } : r))
+        );
+      }
     } catch (err) {
       console.error(err);
     }
@@ -242,12 +316,46 @@ export default function RecursosPage() {
       } else {
         showToast(response.error || "No se pudo eliminar el apunte.", "error");
         // Revert optimistic update
-        const fetchMissing = await fetchResources();
-        setResources(fetchMissing);
+        const fetchAll = async () => {
+          setLoading(true);
+          try {
+            const data = await fetchResources();
+            setResources(data);
+            setVisibleCount(9); // Reset pagination on full reload
+          } catch (err) {
+            console.error(err);
+            showToast("Error al cargar los recursos.", "error");
+          } finally { 
+            setLoading(false);
+          }
+        };
+        fetchAll();
       }
     } catch (err) {
       console.error(err);
       showToast("Error inesperado al eliminar.", "error");
+    }
+  };
+
+  const handleDownloadResource = async (rsc: ResourceExtended) => {
+    try {
+      showToast("Preparando descarga...", "info");
+      const response = await fetch(rsc.storage_url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      // Get extension from URL or fallback
+      const ext = rsc.storage_url.split('.').pop() || "pdf";
+      a.download = `${rsc.title}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      showToast("¡Descarga completada con éxito!", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Error al intentar descargar el archivo.", "error");
     }
   };
 
@@ -286,6 +394,7 @@ export default function RecursosPage() {
   const filteredResources = resources.filter((rsc) => {
     // 1. Tab filter
     if (activeTab === 2 && !rsc.saved) return false; // "Mis Guardados"
+    if (activeTab === 3 && !rsc.isOwner) return false; // "Mis Apuntes"
     
     // 2. Search query filter
     const matchesSearch =
@@ -295,7 +404,8 @@ export default function RecursosPage() {
       rsc.authorName.toLowerCase().includes(searchQuery.toLowerCase());
       
     // 3. Carrera filter
-    const matchesCarrera = filterCarrera === "Todas" || filterCarrera === "Sistemas"; // Defaults to Sistemas for now
+    // Note: If a subject has no assigned careers (orphan), we show it in ALL filters as requested.
+    const matchesCarrera = filterCarrera === "Todas" || rsc.careers.length === 0 || rsc.careers.includes(filterCarrera);
 
     // 4. Año filter
     let matchesAno = filterAno === "Todos";
@@ -318,8 +428,10 @@ export default function RecursosPage() {
     return b.id.localeCompare(a.id); // "Recientes" (fallback ID sort)
   });
 
+  const paginatedResources = filteredResources.slice(0, visibleCount);
+
   return (
-    <DashboardLayout>
+    <DashboardLayout activeItem="/dashboard/recursos">
       <div className="animate-fade-in dashboard-bg min-h-full pb-10">
         
         {/* Dynamic Premium Toast */}
@@ -347,48 +459,50 @@ export default function RecursosPage() {
         </AnimatePresence>
 
         {/* Page Header */}
-        <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-          <div>
-            <h1 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight mb-1 text-cream-bone">
-              Banco de Recursos
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Buscá, descargá y compartí apuntes oficiales de la comunidad estudiantil.
-            </p>
+        <div className="mb-6">
+          <h1 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight mb-2 text-cream-bone">
+            Banco de Recursos
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Buscá, descargá y compartí apuntes oficiales de la comunidad estudiantil.
+          </p>
+        </div>
+
+        {/* Toolbar: Search and Filters */}
+        <div className="mb-8 bg-glass p-3 md:p-4 rounded-2xl border border-border/20 shadow-sm flex flex-col lg:flex-row lg:items-center gap-4 select-none">
+          
+          {/* Search Input bar */}
+          <div className="relative w-full lg:w-80 shrink-0">
+            <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscá apuntes, materias..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-background/50 border border-border/40 rounded-xl text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
+            />
           </div>
 
-          {/* Quick Filters Row */}
-          <div className="flex flex-wrap items-center gap-2 select-none">
-            
-            {/* Search Input bar */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Buscá apuntes, materias..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-4 py-1.5 bg-glass border border-border/40 rounded-full text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-              />
-            </div>
+          <div className="hidden lg:block w-px h-8 bg-border/40 shrink-0"></div>
 
+          <div className="flex flex-wrap items-center gap-3 w-full">
             {/* Carrera Filter */}
             <div className="relative">
               <button
                 onClick={() => setOpenFilter(openFilter === "carrera" ? null : "carrera")}
-                className="px-3 py-1.5 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 bg-background/50 border border-border/40 text-muted-foreground rounded-xl text-sm font-semibold hover:bg-muted/10 transition-colors flex items-center gap-2"
               >
                 Carrera: <span className="text-accent">{filterCarrera}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openFilter === "carrera" ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-4 h-4 transition-transform ${openFilter === "carrera" ? "rotate-180" : ""}`} />
               </button>
               <AnimatePresence>
                 {openFilter === "carrera" && (
                   <motion.div
                     initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
-                    className="absolute top-full left-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col min-w-[120px]"
+                    className="absolute top-full left-0 mt-2 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col min-w-[150px]"
                   >
-                    {["Todas", "Sistemas"].map(opt => (
-                      <button key={opt} onClick={() => { setFilterCarrera(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${filterCarrera === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
+                    {["Todas", ...carrerasList.map(c => c.name)].map(opt => (
+                      <button key={opt} onClick={() => { setFilterCarrera(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-sm hover:bg-accent/15 transition-colors ${filterCarrera === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
                         {opt}
                       </button>
                     ))}
@@ -401,19 +515,19 @@ export default function RecursosPage() {
             <div className="relative">
               <button
                 onClick={() => setOpenFilter(openFilter === "ano" ? null : "ano")}
-                className="px-3 py-1.5 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 bg-background/50 border border-border/40 text-muted-foreground rounded-xl text-sm font-semibold hover:bg-muted/10 transition-colors flex items-center gap-2"
               >
                 Año: <span className="text-accent">{filterAno}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openFilter === "ano" ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-4 h-4 transition-transform ${openFilter === "ano" ? "rotate-180" : ""}`} />
               </button>
               <AnimatePresence>
                 {openFilter === "ano" && (
                   <motion.div
                     initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
-                    className="absolute top-full left-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col min-w-[100px]"
+                    className="absolute top-full left-0 mt-2 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col min-w-[100px]"
                   >
                     {["Todos", "1", "2", "3", "4", "5"].map(opt => (
-                      <button key={opt} onClick={() => { setFilterAno(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${filterAno === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
+                      <button key={opt} onClick={() => { setFilterAno(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-sm hover:bg-accent/15 transition-colors ${filterAno === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
                         {opt}
                       </button>
                     ))}
@@ -426,22 +540,22 @@ export default function RecursosPage() {
             <div className="relative">
               <button
                 onClick={() => setOpenFilter(openFilter === "materia" ? null : "materia")}
-                className="px-3 py-1.5 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 transition-colors flex items-center gap-1.5 max-w-[200px] truncate"
+                className="px-4 py-2 bg-background/50 border border-border/40 text-muted-foreground rounded-xl text-sm font-semibold hover:bg-muted/10 transition-colors flex items-center gap-2 max-w-[250px] truncate"
               >
                 Materia: <span className="text-accent truncate">{filterMateria}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform shrink-0 ${openFilter === "materia" ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-4 h-4 transition-transform shrink-0 ${openFilter === "materia" ? "rotate-180" : ""}`} />
               </button>
               <AnimatePresence>
                 {openFilter === "materia" && (
                   <motion.div
                     initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
-                    className="absolute top-full right-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-y-auto max-h-60 custom-scrollbar z-20 flex flex-col min-w-[200px]"
+                    className="absolute top-full right-0 mt-2 bg-card border border-border/40 rounded-xl shadow-xl overflow-y-auto max-h-60 custom-scrollbar z-20 flex flex-col min-w-[200px]"
                   >
-                    <button onClick={() => { setFilterMateria("Todas"); setOpenFilter(null); }} className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${filterMateria === "Todas" ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
+                    <button onClick={() => { setFilterMateria("Todas"); setOpenFilter(null); }} className={`text-left px-3 py-2 text-sm hover:bg-accent/15 transition-colors ${filterMateria === "Todas" ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
                       Todas
                     </button>
                     {predefinedMaterias.map(opt => (
-                      <button key={opt} onClick={() => { setFilterMateria(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${filterMateria === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
+                      <button key={opt} onClick={() => { setFilterMateria(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-sm hover:bg-accent/15 transition-colors ${filterMateria === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
                         {opt}
                       </button>
                     ))}
@@ -454,19 +568,19 @@ export default function RecursosPage() {
             <div className="relative">
               <button
                 onClick={() => setOpenFilter(openFilter === "tipo" ? null : "tipo")}
-                className="px-3 py-1.5 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 bg-background/50 border border-border/40 text-muted-foreground rounded-xl text-sm font-semibold hover:bg-muted/10 transition-colors flex items-center gap-2"
               >
                 Tipo: <span className="text-accent">{filterTipo}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openFilter === "tipo" ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-4 h-4 transition-transform ${openFilter === "tipo" ? "rotate-180" : ""}`} />
               </button>
               <AnimatePresence>
                 {openFilter === "tipo" && (
                   <motion.div
                     initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
-                    className="absolute top-full right-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col min-w-[180px]"
+                    className="absolute top-full right-0 mt-2 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col min-w-[180px]"
                   >
-                    {["Todos", "Apunte de Teoría", "Trabajo Práctico Resuelto", "Guía de Ejercicios", "Examen Final", "Otro"].map(opt => (
-                      <button key={opt} onClick={() => { setFilterTipo(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${filterTipo === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
+                    {["Todos", "Apunte de Teoría", "Trabajo Práctico Resuelto", "Guía de Ejercicios", "Resumen", "Otro"].map(opt => (
+                      <button key={opt} onClick={() => { setFilterTipo(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-sm hover:bg-accent/15 transition-colors ${filterTipo === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
                         {opt}
                       </button>
                     ))}
@@ -478,10 +592,10 @@ export default function RecursosPage() {
         </div>
 
         {/* Main Columns Container */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
           
           {/* Left / Center Content: Resource list and tabs */}
-          <div className="lg:col-span-3 space-y-4">
+          <div className="lg:col-span-7 xl:col-span-8 space-y-4">
             
             {/* Navigation Tabs and Grid Layout Switcher */}
             <div className="flex items-center gap-4 border-b border-border/10 pb-2 mb-4 overflow-x-auto select-none">
@@ -558,11 +672,11 @@ export default function RecursosPage() {
                   layout
                   className={
                     gridView
-                      ? "grid grid-cols-1 md:grid-cols-2 gap-4"
+                      ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
                       : "space-y-3"
                   }
                 >
-                  {filteredResources.map((rsc) => {
+                  {paginatedResources.map((rsc) => {
                     const isActiveInContext = aiContextList.some((item) => item.id === rsc.id);
                     return (
                       <motion.div
@@ -572,14 +686,15 @@ export default function RecursosPage() {
                         className="bg-glass rounded-2xl p-5 flex flex-col hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer hover:border-accent/25 relative border border-primary/5"
                       >
                         <div className="flex justify-between items-start mb-3">
-                          <div className="flex flex-col gap-0.5">
+                          <div className="flex flex-col gap-0.5 flex-1 min-w-0 pr-4">
                             <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider inline-block w-max ${rsc.categoryColor}`}
+                              title={rsc.category}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider inline-block max-w-full truncate ${rsc.categoryColor}`}
                             >
                               {rsc.category}
                             </span>
                             {rsc.thematicAxis && (
-                              <span className="text-[10px] text-muted-foreground font-semibold">
+                              <span title={`Eje: ${rsc.thematicAxis}`} className="text-[10px] text-muted-foreground font-semibold truncate max-w-full">
                                 Eje: {rsc.thematicAxis}
                               </span>
                             )}
@@ -624,13 +739,13 @@ export default function RecursosPage() {
                           </div>
                           
                           <div className="flex items-center gap-3 text-muted-foreground">
-                            <button
+                            <button 
                               onClick={(e) => handleLikeResourceSubmit(rsc.id, e)}
-                              className="flex items-center gap-1 hover:text-accent transition-colors group/btn text-xs"
-                              title="Valorar apunte"
+                              className={`p-1.5 rounded hover:bg-muted/10 transition-colors flex items-center gap-1.5 ${rsc.hasVoted ? "text-accent" : "text-muted-foreground"}`}
+                              title={rsc.hasVoted ? "Quitar Me gusta" : "Me gusta"}
                             >
-                              <ThumbsUp className="w-3.5 h-3.5" />
-                              <span className="text-[11px]">{rsc.likes}</span>
+                              <ThumbsUp className={`w-3.5 h-3.5 ${rsc.hasVoted ? "fill-accent text-accent" : ""}`} />
+                              <span className="text-xs font-semibold">{rsc.likes}</span>
                             </button>
                             <button
                               onClick={(e) => handleToggleSaveResourceSubmit(rsc.id, e)}
@@ -650,20 +765,22 @@ export default function RecursosPage() {
             )}
 
             {/* Load more button */}
-            <div className="flex justify-center pt-4">
-              <button 
-                onClick={() => showToast("Cargando más apuntes oficiales de la nube...")}
-                className="px-5 py-2 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 hover:text-foreground active:scale-95 transition-all flex items-center gap-2"
-              >
-                Cargar Más
-                <RefreshCw className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            {visibleCount < filteredResources.length && (
+              <div className="flex justify-center pt-4">
+                <button 
+                  onClick={() => setVisibleCount(v => v + 9)}
+                  className="px-5 py-2 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 hover:text-foreground active:scale-95 transition-all flex items-center gap-2"
+                >
+                  Cargar Más
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
 
           </div>
 
           {/* Right sidebar column: Upload zone and AI active context list */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-5 xl:col-span-4 space-y-6">
 
             {/* Loading placeholder sidebars if true */}
             {loading ? (
@@ -801,7 +918,9 @@ export default function RecursosPage() {
                                       </button>
                                     ))
                                   ) : (
-                                    <div className="px-3 py-2 text-xs text-muted-foreground italic">Presioná enter para agregar &quot;{newCategory}&quot;</div>
+                                    <div className="px-3 py-2 text-xs text-muted-foreground italic">
+                                      {newCategory ? `Se registrará "${newCategory}" como materia nueva` : "Escribí para buscar o crear"}
+                                    </div>
                                   )}
                                 </motion.div>
                               )}
@@ -877,7 +996,7 @@ export default function RecursosPage() {
                                 exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
                                 className="absolute top-full left-0 right-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col"
                               >
-                                {["Apunte de Teoría", "Trabajo Práctico Resuelto", "Guía de Ejercicios", "Otro"].map((type) => (
+                                {["Apunte de Teoría", "Trabajo Práctico Resuelto", "Guía de Ejercicios", "Resumen", "Otro"].map((type) => (
                                   <button
                                     key={type}
                                     type="button"
@@ -1041,20 +1160,22 @@ export default function RecursosPage() {
 
                   {/* Actions buttons */}
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => setResourceToDelete({ id: selectedResource.id, storageUrl: selectedResource.storage_url, title: selectedResource.title })}
-                      className="px-4 rounded-xl border border-destructive/20 text-destructive hover:bg-destructive/10 transition-all flex items-center justify-center gap-1.5 text-xs font-semibold"
-                      title="Eliminar apunte"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {selectedResource.isOwner && (
+                      <button
+                        onClick={() => setResourceToDelete({ id: selectedResource.id, storageUrl: selectedResource.storage_url, title: selectedResource.title })}
+                        className="px-4 rounded-xl border border-destructive/20 text-destructive hover:bg-destructive/10 transition-all flex items-center justify-center gap-1.5 text-xs font-semibold"
+                        title="Eliminar apunte"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
 
                     <button
-                      onClick={() => showToast("¡Apunte descargado! Guardado en descargas local.")}
+                      onClick={() => handleDownloadResource(selectedResource)}
                       className="flex-1 bg-accent text-accent-foreground font-semibold py-2.5 rounded-xl hover:bg-accent/90 transition-all text-xs flex items-center justify-center gap-2 shadow-lg shadow-accent/15"
                     >
                       <Download className="w-4 h-4" />
-                      Descargar PDF Completo
+                      Descargar Archivo Original
                     </button>
                     
                     <button
