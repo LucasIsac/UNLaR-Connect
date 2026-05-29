@@ -52,7 +52,7 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={handleToggle}
-      className="p-2.5 rounded-xl border border-border/40 hover:border-border bg-card/40 backdrop-blur-md text-foreground/80 hover:text-foreground transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+      className="w-9 h-9 flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-all duration-200 focus:outline-none"
       aria-label="Cambiar tema de color"
     >
       <div className="relative w-5 h-5 flex items-center justify-center overflow-hidden">

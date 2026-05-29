@@ -71,7 +71,7 @@ export default function PlaceholderPage({
               Entrar
             </Link>
             <Link
-              href={CONFIG.routes.dashboard}
+              href="/register"
               className="relative group px-5 py-2 text-sm font-bold rounded-xl overflow-hidden"
             >
               <div className="absolute inset-0 bg-accent transition-transform duration-300 group-hover:scale-105" />

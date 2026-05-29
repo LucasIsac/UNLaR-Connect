@@ -26,6 +26,8 @@ export interface DbUser {
   tutor_rating: number;
   total_reviews: number;
   created_at: string;
+  deleted_at?: string;
+  avatar_url?: string;
 }
 
 export interface DbSubject {
@@ -113,6 +115,38 @@ export interface DbTag {
   name: string;
 }
 
+export type QuestionMetadata = Record<string, never>;
+
+export type ResourceMetadata = Record<string, never>;
+
+export interface TutoringMetadata {
+  subject: string;
+  price_type: 'free' | 'paid';
+  price?: number;
+  modality: 'online' | 'present' | 'hybrid';
+  availability: string;
+}
+
+export interface BorrowMetadata {
+  item_name: string;
+  condition: 'new' | 'used_good' | 'used_fair';
+  availability: string;
+  location: string;
+  image_url?: string;
+  status: 'available' | 'reserved' | 'delivered' | 'returned';
+}
+
+export interface SellRentMetadata {
+  item_name: string;
+  price: number;
+  condition: 'new' | 'used_good' | 'used_fair';
+  mode: 'sell' | 'rent';
+  location: string;
+  image_url?: string;
+}
+
+export type PostMetadata = QuestionMetadata | ResourceMetadata | TutoringMetadata | BorrowMetadata | SellRentMetadata;
+
 export interface DbPost {
   id: string; // UUID
   user_id: string; // UUID
@@ -123,6 +157,9 @@ export interface DbPost {
   upvotes: number;
   is_resolved: boolean;
   created_at: string;
+  type: 'question' | 'resource' | 'tutoring' | 'borrow' | 'sell_rent';
+  metadata: any; // Using any for flexible type casting in JSON fields
+  image_url?: string;
 }
 
 export interface DbPostTag {
@@ -138,6 +175,7 @@ export interface DbPostReply {
   upvotes: number;
   is_accepted: boolean;
   created_at: string;
+  image_url?: string;
 }
 
 export interface DbBadge {
@@ -170,4 +208,67 @@ export interface DbChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   created_at: string;
+}
+
+export interface DbNotification {
+  id: string; // UUID
+  user_id: string; // UUID
+  title: string;
+  content: string;
+  type: 'tutorias' | 'karma' | 'foros' | 'sistema';
+  is_read: boolean;
+  created_at: string;
+}
+
+// ============================================================
+// Consultas Express — live 1-on-1 tutoring calls
+// ============================================================
+
+export type CallRoomStatus = 'requested' | 'accepted' | 'active' | 'ended' | 'rejected' | 'missed';
+
+export interface DbCallRoom {
+  id: string; // UUID
+  subject_id: number | null;
+  student_id: string; // UUID
+  tutor_id: string; // UUID
+  status: CallRoomStatus;
+  created_at: string;
+  started_at: string | null;
+  ended_at: string | null;
+}
+
+export interface DbCallMessage {
+  id: string; // UUID
+  room_id: string; // UUID
+  sender_id: string; // UUID
+  content: string;
+  created_at: string;
+}
+
+// ==========================================
+// Events System
+// ==========================================
+
+export interface DbEvent {
+  id: string; // UUID
+  title: string;
+  description: string;
+  event_type: 'seminario' | 'capacitacion' | 'diplomatura' | 'taller' | 'conferencia' | 'otro';
+  start_date: string; // TIMESTAMPTZ
+  end_date: string;
+  registration_deadline: string;
+  location: string;
+  meeting_link?: string;
+  image_url?: string;
+  created_by: string; // UUID
+  max_participants?: number;
+  status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
+  created_at: string;
+}
+
+export interface DbEventRegistration {
+  id: string; // UUID
+  event_id: string; // UUID
+  user_id: string; // UUID
+  registered_at: string;
 }

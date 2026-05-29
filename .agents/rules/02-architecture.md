@@ -39,3 +39,4 @@ UNLaR-Connect uses a monolithic structure where API routes are replaced by **Nex
 
 > [!IMPORTANT]
 > Never mix server-only packages inside components marked with `"use client"`. Always delegate data-mutation to Server Actions.
+
