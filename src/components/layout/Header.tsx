@@ -55,6 +55,7 @@ export default function Header({
   // States for points animation
   const [pointsDiff, setPointsDiff] = useState<number | null>(null);
   const [prevPoints, setPrevPoints] = useState<number | null>(initialData?.profile?.points ?? null);
+  const [displayedPoints, setDisplayedPoints] = useState<number | null>(initialData?.profile?.points ?? null);
   
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
@@ -115,6 +116,31 @@ export default function Header({
       return () => clearTimeout(timer);
     }
   }, [pointsDiff]);
+
+  // Tick up the displayed points smoothly to match the actual points
+  useEffect(() => {
+    if (profile && displayedPoints !== null && profile.points > displayedPoints) {
+      const diff = profile.points - displayedPoints;
+      const duration = 1500; // ms
+      const frameRate = 30; // ms
+      const steps = duration / frameRate;
+      const stepValue = diff / steps;
+      let current = displayedPoints;
+      
+      const timer = setInterval(() => {
+        current += stepValue;
+        if (current >= profile.points) {
+          setDisplayedPoints(profile.points);
+          clearInterval(timer);
+        } else {
+          setDisplayedPoints(Math.floor(current));
+        }
+      }, frameRate);
+      return () => clearInterval(timer);
+    } else if (profile && displayedPoints === null) {
+      setDisplayedPoints(profile.points);
+    }
+  }, [profile?.points]);
 
   // Listen for clicks outside dropdown menus
   useEffect(() => {
@@ -434,11 +460,11 @@ export default function Header({
         )}
 
         {/* Karma Points Badge */}
-        <div className="relative">
+        <div className="relative z-50">
           <Link href="/karma" className="flex items-center gap-1.5 bg-accent/10 border border-accent/20 px-3 py-1.5 rounded-full hover:scale-[1.03] transition-transform duration-200 cursor-pointer select-none">
             <Award className="w-4 h-4 text-accent animate-pulse-slow" />
             <span className="text-xs font-bold text-accent tracking-wide">
-              {profile ? profile.points.toLocaleString() : "..."} pts
+              {displayedPoints !== null ? displayedPoints.toLocaleString() : "..."} pts
             </span>
           </Link>
 
@@ -446,14 +472,14 @@ export default function Header({
             {pointsDiff !== null && (
               <motion.div
                 key="points-anim"
-                initial={{ opacity: 0, x: -10, scale: 1 }}
-                animate={{ opacity: 1, x: -25, scale: 1 }}
-                exit={{ opacity: 0, x: -35, scale: 1 }}
-                transition={{ duration: 1.5, ease: "easeOut" }}
-                className="absolute top-1/2 -translate-y-1/2 -left-4 text-accent font-semibold text-sm pointer-events-none drop-shadow-md z-50 flex items-center gap-0.5"
+                initial={{ opacity: 0, y: 25, x: "-50%", scale: 0.8 }}
+                animate={{ opacity: 1, y: 0, x: "-50%", scale: 1.1 }}
+                exit={{ opacity: 0, y: -25, x: "-50%", scale: 0.9 }}
+                transition={{ duration: 1.2, ease: "easeOut" }}
+                className="absolute top-full left-1/2 text-accent font-black text-sm pointer-events-none drop-shadow-lg flex items-center gap-1"
               >
                 +{pointsDiff}
-                <Sparkles className="w-3 h-3 text-accent animate-pulse" />
+                <Sparkles className="w-3 h-3 text-accent animate-spin-slow" />
               </motion.div>
             )}
           </AnimatePresence>
