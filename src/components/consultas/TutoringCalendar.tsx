@@ -168,27 +168,34 @@ export default function TutoringCalendar({ events, onEventClick }: TutoringCalen
             <div
               key={index}
               onClick={() => item.date && setSelectedDate(item.date)}
-              className={`relative min-h-[60px] p-1 rounded-lg border transition-all ${
+              className={`relative min-h-[64px] p-1.5 rounded-xl border transition-all flex flex-col ${
                 !item.day
                   ? "border-transparent"
                   : isSelectedDate
-                  ? "border-accent bg-accent/10"
+                  ? "border-accent bg-accent/10 shadow-[0_0_12px_rgba(var(--accent),0.1)]"
                   : isTodayDate
-                  ? "border-accent/50 bg-accent/5"
-                  : "border-border/20 hover:border-border/40 hover:bg-muted/20"
+                  ? "border-accent/40 bg-accent/5"
+                  : "border-border/20 hover:border-border/40 hover:bg-muted/10"
               } ${item.day ? "cursor-pointer" : ""}`}
             >
               {item.day && (
-                <>
-                  <span className={`text-xs font-semibold ${
-                    isTodayDate ? "text-accent" : "text-foreground"
-                  }`}>
-                    {item.day}
-                  </span>
+                <div className={`flex-1 flex flex-col ${hasEvents ? "justify-between" : "justify-center items-center"}`}>
+                  {/* Day Number */}
+                  <div className={`flex justify-center items-center ${hasEvents ? "w-full mb-1" : ""}`}>
+                    <span className={`text-xs font-semibold w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+                      isTodayDate
+                        ? "bg-accent/20 text-accent font-bold"
+                        : isSelectedDate
+                        ? "text-accent font-bold"
+                        : "text-foreground"
+                    }`}>
+                      {item.day}
+                    </span>
+                  </div>
                   
                   {/* Event indicators */}
                   {hasEvents && (
-                    <div className="mt-1 space-y-0.5">
+                    <div className="w-full space-y-0.5">
                       {dayEvents.slice(0, 2).map((event, eventIndex) => (
                         <div
                           key={eventIndex}
@@ -196,7 +203,7 @@ export default function TutoringCalendar({ events, onEventClick }: TutoringCalen
                             e.stopPropagation();
                             onEventClick?.(event);
                           }}
-                          className={`px-1 py-0.5 rounded text-[8px] font-bold truncate border ${
+                          className={`px-1.5 py-0.5 rounded text-[8px] font-bold truncate border ${
                             getStatusColor(event.status)
                           }`}
                           title={event.title}
@@ -205,13 +212,13 @@ export default function TutoringCalendar({ events, onEventClick }: TutoringCalen
                         </div>
                       ))}
                       {dayEvents.length > 2 && (
-                        <span className="text-[8px] text-muted-foreground block text-center">
+                        <span className="text-[8px] text-muted-foreground block text-center font-medium">
                           +{dayEvents.length - 2}
                         </span>
                       )}
                     </div>
                   )}
-                </>
+                </div>
               )}
             </div>
           );
