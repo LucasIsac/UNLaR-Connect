@@ -16,6 +16,7 @@ import {
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { LeaderboardEntry } from "@/actions/karma";
 import Link from "next/link";
+import Image from "next/image";
 
 interface RankingClientProps {
   initialLeaderboard: LeaderboardEntry[];
@@ -231,11 +232,12 @@ export default function RankingClient({ initialLeaderboard, currentUserId }: Ran
                         : 'bg-muted/50 border-border text-muted-foreground'
                     }`}>
                       {student.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img 
+                        <Image 
                           src={student.avatarUrl} 
                           alt="Foto de perfil del alumno en podio" 
                           className="w-full h-full object-cover rounded-2xl"
+                          width={56}
+                          height={56}
                         />
                       ) : (
                         <span>{avatarName}</span>
@@ -294,11 +296,12 @@ export default function RankingClient({ initialLeaderboard, currentUserId }: Ran
                           isMe ? 'bg-accent/15 border-accent text-accent' : 'bg-muted/60 border-border text-muted-foreground'
                         }`}>
                           {student.avatarUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img 
+                            <Image 
                               src={student.avatarUrl} 
                               alt="Foto de perfil de la tabla" 
                               className="w-full h-full object-cover rounded-lg"
+                              width={32}
+                              height={32}
                             />
                           ) : (
                             <span>{avatarName}</span>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Menu, Search, Bell, Award, User, LogOut, Settings, Calendar, Trophy, Sparkles, Check, Trash2, X, ArrowLeft, SlidersHorizontal } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
 import Logo from "../ui/Logo";
@@ -523,11 +524,12 @@ export default function Header({
             }`}
           >
             {profile?.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 alt="Foto de perfil del alumno"
                 className="w-full h-full object-cover"
                 src={profile.avatar_url}
+                width={36}
+                height={36}
               />
             ) : (
               <div className="w-full h-full rounded-xl flex items-center justify-center text-sm font-bold bg-accent/20 border border-accent/30 text-accent select-none">

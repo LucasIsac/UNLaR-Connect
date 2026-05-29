@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { 
   Trophy, 
@@ -473,11 +474,12 @@ export default function PerfilClient({
               <div className="relative group shrink-0">
                 <div className="w-24 h-24 rounded-full border-2 border-accent/20 p-1 bg-card/30 overflow-hidden relative shadow-lg flex items-center justify-center">
                   {editAvatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                       alt={`Foto de perfil de ${profile.name}`}
                       className="w-full h-full object-cover rounded-full"
                       src={editAvatarUrl}
+                      width={96}
+                      height={96}
                     />
                   ) : (
                     <div className="w-full h-full rounded-full flex items-center justify-center text-3xl font-black bg-accent/20 border border-accent/30 text-accent select-none">

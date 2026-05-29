@@ -47,7 +47,7 @@ export default function ThreeHeroCanvas() {
       alpha: true,
       powerPreference: "high-performance",
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap at 2 for performance
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Cap at 1.5 for performance
     renderer.setSize(width, height);
     renderer.setClearColor(0x000000, 0); // Transparent canvas background
 
@@ -397,7 +397,7 @@ export default function ThreeHeroCanvas() {
       camera.updateProjectionMatrix();
 
       renderer.setSize(width, height);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     }
 
     window.addEventListener("resize", handleResize);
