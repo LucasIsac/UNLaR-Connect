@@ -121,14 +121,15 @@ export default function EventosClient({ initialEvents, canCreate }: EventosClien
         <CreateEventModal
           isOpen={showCreateModal}
           onClose={handleModalClose}
-          editEvent={editingEvent}
+          editingEvent={editingEvent}
           onCreated={(event) => {
             if (event) {
               setEvents((prev) => [event, ...prev]);
               showToast("¡Evento creado!");
             } else if (editingEvent) {
-              setEvents((prev) => prev.map((e) => e.id === editingEvent.id ? { ...e, ...editingEvent } : e));
               showToast("Evento actualizado!");
+              // Reload events to get fresh data from server
+              window.location.reload();
             }
             handleModalClose();
           }}

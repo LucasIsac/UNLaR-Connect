@@ -313,9 +313,10 @@ export async function editEvent(
       .eq("id", eventId);
 
     if (error) throw error;
+    console.log("[editEvent] Success for eventId:", eventId);
     return { success: true };
   } catch (error: any) {
-    console.error("Error editing event:", error);
+    console.error("[editEvent] Error:", error);
     return { success: false, error: error.message || "No se pudo editar el evento." };
   }
 }
