@@ -172,7 +172,7 @@ export async function uploadResource(formData: FormData): Promise<{ success: boo
 /**
  * Favorite or save a resource (Placeholder for now)
  */
-export async function toggleSaveResource(): Promise<{ success: boolean; saved?: boolean; error?: string }> {
+export async function toggleSaveResource(id: string): Promise<{ success: boolean; saved?: boolean; error?: string }> {
   try {
     await new Promise(resolve => setTimeout(resolve, 300));
     return { success: true, saved: true };
@@ -184,7 +184,7 @@ export async function toggleSaveResource(): Promise<{ success: boolean; saved?: 
 /**
  * Cast a vote on a resource (Placeholder for now)
  */
-export async function castResourceVote(): Promise<{ success: boolean; newScore?: number; error?: string }> {
+export async function castResourceVote(id: string): Promise<{ success: boolean; newScore?: number; error?: string }> {
   try {
     await new Promise(resolve => setTimeout(resolve, 300));
     return { success: true, newScore: 2 };

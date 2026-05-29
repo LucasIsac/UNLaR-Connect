@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Montserrat } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
-import LogoSwitcher from "@/components/ui/LogoSwitcher";
+
 
 const inter = Inter({
   subsets: ["latin"],
@@ -54,7 +54,7 @@ export default function RootLayout({
       <body className="font-sans antialiased custom-scrollbar" suppressHydrationWarning>
         <ThemeProvider>
           {children}
-          <LogoSwitcher />
+
         </ThemeProvider>
       </body>
     </html>
