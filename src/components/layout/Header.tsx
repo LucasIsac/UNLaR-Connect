@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Menu, Search, Bell, Award, User, LogOut, Settings, Calendar, Trophy, Sparkles, Check, Trash2 } from "lucide-react";
+import { Menu, Search, Bell, Award, User, LogOut, Settings, Calendar, Trophy, Sparkles, Check, Trash2, X, ArrowLeft, SlidersHorizontal } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
 import Logo from "../ui/Logo";
 import { fetchCombinedHeaderData } from "@/actions/perfil";
@@ -14,9 +14,32 @@ import { DbNotification } from "@/types/database";
 type HeaderProps = {
   onMenuToggle: () => void;
   initialData?: CombinedHeaderData;
+  searchQuery?: string;
+  onSearchChange?: (val: string) => void;
+  activeScope?: "foro" | "apuntes" | "materias" | "todos";
+  onScopeChange?: (scope: "foro" | "apuntes" | "materias" | "todos") => void;
+  selectedCategory?: string;
+  onCategoryChange?: (category: string) => void;
+  selectedStatus?: string;
+  onStatusChange?: (status: string) => void;
+  searchPlaceholder?: string;
+  showSearch?: boolean;
 };
 
-export default function Header({ onMenuToggle, initialData }: HeaderProps) {
+export default function Header({
+  onMenuToggle,
+  initialData,
+  searchQuery,
+  onSearchChange,
+  activeScope,
+  onScopeChange,
+  selectedCategory,
+  onCategoryChange,
+  selectedStatus,
+  onStatusChange,
+  searchPlaceholder,
+  showSearch = true,
+}: HeaderProps) {
   const [profile, setProfile] = useState<UserProfileExtended | null>(initialData?.profile ?? null);
   const [notifications, setNotifications] = useState<DbNotification[]>(initialData?.notifications ?? []);
   
@@ -24,9 +47,16 @@ export default function Header({ onMenuToggle, initialData }: HeaderProps) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   
+  // Global search center state
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  
   // Ref hooks for click outside listeners
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
   // Load user profile & notifications on mount
   useEffect(() => {
@@ -77,9 +107,35 @@ export default function Header({ onMenuToggle, initialData }: HeaderProps) {
       if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
         setIsNotificationsOpen(false);
       }
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setIsSearchFocused(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Listen for global keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const isInput = document.activeElement && (
+        document.activeElement.tagName === "INPUT" ||
+        document.activeElement.tagName === "TEXTAREA" ||
+        document.activeElement.getAttribute("contenteditable") === "true"
+      );
+
+      if (e.key === "/" && !isInput) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        setIsSearchFocused(true);
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        setIsSearchFocused(true);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   // Handle Logout
@@ -145,25 +201,219 @@ export default function Header({ onMenuToggle, initialData }: HeaderProps) {
       </div>
 
       {/* Center Search Bar */}
-      <div className="absolute left-1/2 -translate-x-1/2 max-w-[460px] w-full hidden md:block z-10">
-        <div className="relative w-full">
-          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/60 transition-colors pointer-events-none">
-            <Search className="w-4 h-4" />
-          </span>
-          <input
-            type="text"
-            placeholder="Buscá apuntes, materias o dudas..."
-            className="w-full bg-card/30 hover:bg-card/50 focus:bg-card/70 border border-border/40 focus:border-accent rounded-full py-2 pl-10 pr-4 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all placeholder-muted-foreground/60"
-          />
+      {showSearch && (
+        <div ref={searchContainerRef} className="absolute left-1/2 -translate-x-1/2 max-w-[460px] w-full hidden md:block z-50">
+          <div className="relative w-full">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/60 transition-colors pointer-events-none">
+              <Search className="w-4 h-4" />
+            </span>
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder={searchPlaceholder || "Buscá apuntes, materias o dudas..."}
+              value={searchQuery ?? ""}
+              onFocus={() => setIsSearchFocused(true)}
+              onChange={(e) => onSearchChange?.(e.target.value)}
+              className="w-full bg-card/30 hover:bg-card/50 focus:bg-card/70 border border-border/40 focus:border-accent rounded-full py-2 pl-10 pr-20 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all placeholder-muted-foreground/60 shadow-inner"
+            />
+            {/* Action buttons inside search bar: Clear & Keyboard indicator */}
+            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+              {searchQuery && onSearchChange && (
+                <button
+                  onClick={() => onSearchChange("")}
+                  className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                  title="Limpiar búsqueda"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <span className="hidden sm:inline-block text-[10px] font-bold text-muted-foreground/60 bg-muted/40 px-1.5 py-0.5 rounded border border-border/20 shadow-sm font-mono select-none pointer-events-none">
+                /
+              </span>
+            </div>
+          </div>
+
+          {/* Bento Filters Panel (Popover) */}
+          {isSearchFocused && (
+            <div className="absolute left-0 right-0 mt-2 bg-card/90 backdrop-blur-2xl border border-border/30 rounded-2xl shadow-2xl p-4 space-y-4 animate-fade-in z-50">
+              {/* Scope Row */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                  Filtrar en:
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { key: "foro", label: "Foro" },
+                    { key: "apuntes", label: "Apuntes y Recursos" },
+                    { key: "materias", label: "Materias" },
+                  ].map((scope) => {
+                    const isActive = activeScope === scope.key;
+                    return (
+                      <button
+                        key={scope.key}
+                        onClick={() => onScopeChange?.(scope.key as any)}
+                        disabled={!onScopeChange}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-200 ${
+                          isActive
+                            ? "bg-accent/15 border-accent text-accent font-bold shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+                            : "bg-muted/20 border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                        }`}
+                      >
+                        {scope.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Dynamic Context Parameters (Accordion-like slide down) */}
+              {activeScope === "foro" && (
+                <div className="pt-3 border-t border-border/10 space-y-3.5 animate-fade-in">
+                  {/* Category Filter */}
+                  {onCategoryChange && (
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                        Categoría del Hilo:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { value: "Todas", label: "Todas" },
+                          { value: "question", label: "Preguntas" },
+                          { value: "resource", label: "Recursos" },
+                          { value: "tutoring", label: "Tutorías" },
+                          { value: "borrow", label: "Préstamos" },
+                          { value: "sell_rent", label: "Compra/Alquiler" },
+                        ].map((cat) => {
+                          const isActive = selectedCategory === cat.value;
+                          return (
+                            <button
+                              key={cat.value}
+                              onClick={() => onCategoryChange(cat.value)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                                isActive
+                                  ? "bg-accent/20 border-accent text-accent font-bold"
+                                  : "bg-card border-border/40 text-muted-foreground hover:text-foreground hover:bg-muted/25"
+                              }`}
+                            >
+                              {cat.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Status Filter */}
+                  {onStatusChange && (
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                        Estado de Publicación:
+                      </span>
+                      <div className="flex gap-1.5">
+                        {[
+                          { value: "all", label: "Todas" },
+                          { value: "resolved", label: "Solucionadas" },
+                          { value: "open", label: "Abiertas (Sin resolver)" },
+                        ].map((stat) => {
+                          const isActive = selectedStatus === stat.value;
+                          return (
+                            <button
+                              key={stat.value}
+                              onClick={() => onStatusChange(stat.value)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                                isActive
+                                  ? "bg-accent/20 border-accent text-accent font-bold"
+                                  : "bg-card border-border/40 text-muted-foreground hover:text-foreground hover:bg-muted/25"
+                              }`}
+                            >
+                              {stat.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeScope === "apuntes" && (
+                <div className="pt-3 border-t border-border/10 space-y-3 animate-fade-in">
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                      Tipo de Apunte:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {["Todos", "Resúmenes", "Exámenes", "Trabajos Prácticos"].map((t) => (
+                        <button
+                          key={t}
+                          className="px-2.5 py-1 rounded-lg text-xs font-medium border border-border/40 bg-card text-muted-foreground/60 cursor-not-allowed"
+                          disabled
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                      Año de Carrera:
+                    </span>
+                    <div className="flex gap-1.5">
+                      {["1° Año", "2° Año", "3° Año", "4° Año", "5° Año"].map((yr) => (
+                        <button
+                          key={yr}
+                          className="px-2.5 py-1 rounded-lg text-xs font-medium border border-border/40 bg-card text-muted-foreground/60 cursor-not-allowed"
+                          disabled
+                        >
+                          {yr}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Bottom Actions */}
+              <div className="flex justify-between items-center border-t border-border/15 pt-3.5 text-xs">
+                {(searchQuery || selectedCategory !== "Todas" || (selectedStatus && selectedStatus !== "all")) ? (
+                  <button
+                    onClick={() => {
+                      if (onSearchChange) onSearchChange("");
+                      if (onCategoryChange) onCategoryChange("Todas");
+                      if (onStatusChange) onStatusChange("all");
+                    }}
+                    className="text-accent hover:text-accent/80 font-bold transition-colors"
+                  >
+                    Limpiar filtros
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground">
+                    Atajo: Presioná <kbd className="bg-muted px-1 py-0.5 rounded font-mono font-bold">/</kbd> para buscar
+                  </span>
+                )}
+                <button
+                  onClick={() => setIsSearchFocused(false)}
+                  className="px-3 py-1 bg-muted hover:bg-muted/70 text-foreground font-semibold rounded-lg transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* Right: Actions (Points, notifications, profile, theme) */}
       <div suppressHydrationWarning className="flex items-center gap-4 z-20">
         {/* Mobile Search Button (shows only when screen is small) */}
-        <button className="p-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30 sm:hidden transition-colors">
-          <Search className="w-4 h-4" />
-        </button>
+        {showSearch && (
+          <button
+            onClick={() => setIsMobileSearchOpen(true)}
+            className="p-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30 md:hidden transition-colors"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+        )}
 
         {/* Karma Points Badge */}
         <Link href="/karma" className="flex items-center gap-1.5 bg-accent/10 border border-accent/20 px-3 py-1.5 rounded-full hover:scale-[1.03] transition-transform duration-200 cursor-pointer select-none">
@@ -326,6 +576,187 @@ export default function Header({ onMenuToggle, initialData }: HeaderProps) {
               </button>
             </div>
           )}
+      {/* Mobile Search Overlay */}
+      {isMobileSearchOpen && showSearch && (
+        <div className="fixed inset-0 z-[100] bg-background flex flex-col animate-fade-in md:hidden">
+          {/* Top Search Input Bar */}
+          <div className="h-16 px-4 border-b border-border/40 flex items-center gap-3 bg-card/60 backdrop-blur-xl">
+            <button
+              onClick={() => setIsMobileSearchOpen(false)}
+              className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            
+            <div className="relative flex-1">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/60">
+                <Search className="w-4 h-4" />
+              </span>
+              <input
+                ref={mobileSearchInputRef}
+                type="text"
+                autoFocus
+                placeholder={searchPlaceholder || "Buscá apuntes, materias..."}
+                value={searchQuery ?? ""}
+                onChange={(e) => onSearchChange?.(e.target.value)}
+                className="w-full bg-card/30 border border-border/40 focus:border-accent rounded-full py-2.5 pl-10 pr-12 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all placeholder-muted-foreground/60"
+              />
+              {searchQuery && onSearchChange && (
+                <button
+                  onClick={() => onSearchChange("")}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Scrollable Filters Content */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar bg-background">
+            {/* Scope Row */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                Filtrar en:
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: "foro", label: "Foro" },
+                  { key: "apuntes", label: "Apuntes y Recursos" },
+                  { key: "materias", label: "Materias" },
+                ].map((scope) => {
+                  const isActive = activeScope === scope.key;
+                  return (
+                    <button
+                      key={scope.key}
+                      onClick={() => onScopeChange?.(scope.key as any)}
+                      disabled={!onScopeChange}
+                      className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold border transition-all duration-200 ${
+                        isActive
+                          ? "bg-accent/15 border-accent text-accent font-bold"
+                          : "bg-muted/20 border-transparent text-muted-foreground"
+                      }`}
+                    >
+                      {scope.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Scope Specific sub-filters */}
+            {activeScope === "foro" && (
+              <div className="space-y-5 pt-4 border-t border-border/10">
+                {onCategoryChange && (
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                      Categoría del Hilo:
+                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { value: "Todas", label: "Todas" },
+                        { value: "question", label: "Preguntas" },
+                        { value: "resource", label: "Recursos" },
+                        { value: "tutoring", label: "Tutorías" },
+                        { value: "borrow", label: "Préstamos" },
+                        { value: "sell_rent", label: "Compra / Alquiler" },
+                      ].map((cat) => {
+                        const isActive = selectedCategory === cat.value;
+                        return (
+                          <button
+                            key={cat.value}
+                            onClick={() => onCategoryChange(cat.value)}
+                            className={`py-3 rounded-xl text-xs font-semibold border text-center transition-all ${
+                              isActive
+                                ? "bg-accent/20 border-accent text-accent font-bold"
+                                : "bg-card border-border/40 text-muted-foreground"
+                            }`}
+                          >
+                            {cat.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {onStatusChange && (
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                      Estado de Publicación:
+                    </span>
+                    <div className="flex flex-col gap-2">
+                      {[
+                        { value: "all", label: "Todas" },
+                        { value: "resolved", label: "Solucionadas" },
+                        { value: "open", label: "Abiertas (Sin resolver)" },
+                      ].map((stat) => {
+                        const isActive = selectedStatus === stat.value;
+                        return (
+                          <button
+                            key={stat.value}
+                            onClick={() => onStatusChange(stat.value)}
+                            className={`py-3 rounded-xl text-xs font-semibold border text-center transition-all ${
+                              isActive
+                                ? "bg-accent/20 border-accent text-accent font-bold"
+                                : "bg-card border-border/40 text-muted-foreground"
+                            }`}
+                          >
+                            {stat.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeScope === "apuntes" && (
+              <div className="space-y-5 pt-4 border-t border-border/10">
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                    Tipo de Apunte:
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 opacity-50">
+                    {["Todos", "Resúmenes", "Exámenes", "Trabajos Prácticos"].map((t) => (
+                      <button
+                        key={t}
+                        className="py-3 rounded-xl text-xs font-semibold border border-border/40 bg-card text-muted-foreground cursor-not-allowed"
+                        disabled
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Apply Actions Bar */}
+          <div className="p-4 border-t border-border/40 bg-card/60 backdrop-blur-xl flex gap-3">
+            {(searchQuery || selectedCategory !== "Todas" || (selectedStatus && selectedStatus !== "all")) && (
+              <button
+                onClick={() => {
+                  if (onSearchChange) onSearchChange("");
+                  if (onCategoryChange) onCategoryChange("Todas");
+                  if (onStatusChange) onStatusChange("all");
+                }}
+                className="flex-1 py-3 rounded-xl border border-border bg-transparent text-foreground hover:bg-muted/10 font-bold text-xs transition-all text-center"
+              >
+                Limpiar
+              </button>
+            )}
+            <button
+              onClick={() => setIsMobileSearchOpen(false)}
+              className="flex-1 py-3 bg-accent text-accent-foreground rounded-xl font-bold text-xs hover:scale-[1.02] transition-all text-center shadow-lg shadow-accent/10"
+            >
+              Aplicar filtros
+            </button>
+          </div>
+        </div>
+      )}
         </div>
       </div>
     </header>

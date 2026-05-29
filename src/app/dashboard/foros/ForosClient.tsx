@@ -98,6 +98,17 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
   const loading = false;
   const [selectedCategory, setSelectedCategory] = useState("Todas");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+
+  const handleScopeChange = (scope: "foro" | "apuntes" | "materias" | "todos") => {
+    if (scope === "apuntes") {
+      window.location.href = "/dashboard/recursos";
+    } else if (scope === "foro") {
+      window.location.href = "/dashboard/foros";
+    } else if (scope === "materias") {
+      window.location.href = "/dashboard/materias";
+    }
+  };
   
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -360,11 +371,28 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
       t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (t.subjectName || "").toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+    
+    const matchesStatus =
+      selectedStatus === "all" ||
+      (selectedStatus === "resolved" && t.is_resolved) ||
+      (selectedStatus === "open" && !t.is_resolved);
+
+    return matchesCategory && matchesSearch && matchesStatus;
   });
 
   return (
-    <DashboardLayout>
+    <DashboardLayout
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      activeScope="foro"
+      onScopeChange={handleScopeChange}
+      selectedCategory={selectedCategory}
+      onCategoryChange={setSelectedCategory}
+      selectedStatus={selectedStatus}
+      onStatusChange={setSelectedStatus}
+      searchPlaceholder="Buscá hilos o materias..."
+      showSearch={true}
+    >
       <div className="animate-fade-in dashboard-bg min-h-full pb-10">
         
         {/* Toast alert popup */}
@@ -394,18 +422,6 @@ export default function ForosClient({ initialThreads }: ForosClientProps) {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {/* Search Input */}
-            <div className="relative flex-grow md:flex-grow-0">
-              <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Buscá hilos o materias..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full md:w-60 pl-9 pr-4 py-2 bg-glass border border-border/40 rounded-xl text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-              />
-            </div>
-            
             {/* Action button */}
             <button
               onClick={() => setIsCreateModalOpen(true)}
