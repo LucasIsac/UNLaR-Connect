@@ -188,16 +188,22 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
               .eq("id", newRoom.student_id)
               .single();
 
-            const { data: subject } = await supabase
-              .from("subjects")
-              .select("name")
-              .eq("id", newRoom.subject_id)
-              .single();
+            let subjectName = "Consulta Express";
+            if (newRoom.subject_id) {
+              const { data: subject } = await supabase
+                .from("subjects")
+                .select("name")
+                .eq("id", newRoom.subject_id)
+                .single();
+              if (subject) {
+                subjectName = subject.name;
+              }
+            }
 
             setIncomingCall({
               roomId: newRoom.id,
               studentName: student ? `${student.name} ${student.last_name}` : "Estudiante",
-              subjectName: subject ? subject.name : "Consulta Express",
+              subjectName,
             });
           }
         }
