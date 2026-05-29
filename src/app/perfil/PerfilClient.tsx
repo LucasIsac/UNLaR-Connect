@@ -676,7 +676,7 @@ export default function PerfilClient({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 15 }}
                   transition={{ duration: 0.25 }}
-                  className="bg-glass rounded-3xl p-6 relative group hover:border-accent/10 transition-all duration-300"
+                  className="bg-glass rounded-3xl p-6 relative z-30 group hover:border-accent/10 transition-all duration-300"
                 >
                   <label className="block text-sm font-bold text-cream-bone mb-3 select-none">Materias que enseño</label>
                   
@@ -725,7 +725,7 @@ export default function PerfilClient({
                           initial={{ opacity: 0, y: 5 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: 5 }}
-                          className="absolute left-0 top-full mt-2 w-full bg-card border border-border/40 rounded-2xl shadow-xl z-20 max-h-48 overflow-y-auto custom-scrollbar p-2"
+                          className="absolute left-0 top-full mt-2 w-full bg-card border border-border/40 rounded-2xl shadow-xl z-50 max-h-48 overflow-y-auto custom-scrollbar p-2"
                         >
                           {filteredSubjectsForAutocomplete.length === 0 ? (
                             <li className="text-xs text-muted-foreground p-3 text-center">No encontramos esa materia, che.</li>
