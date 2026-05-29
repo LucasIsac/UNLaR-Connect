@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { 
   Trophy, 
@@ -189,6 +190,7 @@ export default function DashboardClient({
   initialEvents = [],
   canCreateEvents = false,
 }: DashboardClientProps) {
+  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(initialStats);
   const [sessions, setSessions] = useState<UpcomingSessionExtended[]>(initialSessions);
   const [posts, setPosts] = useState<ForumPostExtended[]>(initialPosts);
@@ -474,8 +476,10 @@ export default function DashboardClient({
 
     try {
       const response = await updateSessionStatus(sessionId, newStatus);
-      if (response.success && response.data) {
-        setSessions(response.data);
+      if (response.success) {
+        // Optimistic UI is already applied, just tell Next.js to refresh in background
+        // and do not overwrite with potentially stale response.data
+        router.refresh();
       } else {
         // Rollback on failure
         setSessions(previousSessions);

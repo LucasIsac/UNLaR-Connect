@@ -50,6 +50,7 @@ import {
 import { DbPostReply } from "@/types/database";
 import { Select } from "@/components/ui/Select";
 import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 
 const categories = [
   { label: "Todas", value: "Todas", color: "text-foreground bg-muted border-border/40" },
@@ -66,6 +67,7 @@ type ForoClientProps = {
 };
 
 export default function ForoClient({ initialThreads, currentUserId: initialUserId }: ForoClientProps) {
+  const router = useRouter();
   const [threads, setThreads] = useState<ForumPostExtended[]>(initialThreads);
   const loading = false;
   const [selectedCategory, setSelectedCategory] = useState("Todas");
@@ -413,10 +415,29 @@ export default function ForoClient({ initialThreads, currentUserId: initialUserI
     if ((!newReplyText.trim() && !replyImageUrl) || !selectedThread) return;
 
     setActionInProgress("add-reply");
+    
+    // Optimistic UI Update
+    const tempReply: DbPostReply = {
+      id: `temp-${Date.now()}` as any,
+      post_id: selectedThread.id,
+      user_id: currentUserId || "",
+      content: newReplyText,
+      upvotes: 0,
+      is_accepted: false,
+      created_at: new Date().toISOString(),
+      image_url: replyImageUrl || undefined,
+      author: {
+        name: "Vos",
+        last_name: ""
+      }
+    };
+    
+    const previousReplies = [...replies];
+    setReplies([...replies, tempReply]);
+    
     try {
       const response = await addPostReply(selectedThread.id, newReplyText, replyImageUrl || undefined);
-      if (response.success && response.data) {
-        setReplies(response.data);
+      if (response.success) {
         setNewReplyText("");
         setReplyImagePreview(null);
         setReplyImageUrl("");
@@ -426,10 +447,13 @@ export default function ForoClient({ initialThreads, currentUserId: initialUserI
         setThreads((prev) =>
           prev.map((t) => (t.id === selectedThread.id ? { ...t, repliesCount: t.repliesCount + 1 } : t))
         );
+        router.refresh();
       } else {
+        setReplies(previousReplies); // Rollback
         showToast(response.error || "No se pudo guardar tu comentario.");
       }
     } catch (err) {
+      setReplies(previousReplies); // Rollback
       console.error(err);
     } finally {
       setActionInProgress(null);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -62,9 +63,8 @@ export default function PerfilClient({
   initialCareers,
   initialSubjects,
 }: PerfilClientProps) {
+  const router = useRouter();
   const [profile, setProfile] = useState<UserProfileExtended | null>(initialProfile);
-  const [tutorSubjects, setTutorSubjects] = useState<DbSubject[]>(initialTutorSubjects);
-  const [availability, setAvailability] = useState<DbTutorAvailability[]>(initialAvailability);
   const [careers] = useState<DbCareer[]>(initialCareers);
   const [allSubjects] = useState<DbSubject[]>(initialSubjects);
   
@@ -74,7 +74,6 @@ export default function PerfilClient({
   
   // Modals state
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
-  const [isAddScheduleOpen, setIsAddScheduleOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   
   // Edit Profile Form State
@@ -82,11 +81,6 @@ export default function PerfilClient({
   const [editLastName, setEditLastName] = useState(initialProfile.last_name);
   const [editCareerId, setEditCareerId] = useState(initialProfile.career_id || 1);
   const [editAvatarUrl, setEditAvatarUrl] = useState(initialProfile.avatar_url || "");
-  
-  // Add Schedule Form State
-  const [scheduleDay, setScheduleDay] = useState(1); // Default to Monday
-  const [scheduleStart, setScheduleStart] = useState("18:30");
-  const [scheduleEnd, setScheduleEnd] = useState("20:00");
   
   // Subjects Autocomplete Search
   const [subjectSearch, setSubjectSearch] = useState("");
@@ -119,16 +113,29 @@ export default function PerfilClient({
   const handleSaveGeneralChanges = async () => {
     if (!profile) return;
     setActionInProgress("save-profile");
+    
+    // Optimistic UI update
+    const previousProfile = { ...profile };
+    setProfile(prev => prev ? { 
+      ...prev, 
+      name: editName, 
+      last_name: editLastName, 
+      career_id: editCareerId, 
+      avatar_url: editAvatarUrl !== undefined ? editAvatarUrl : prev.avatar_url 
+    } : null);
+    
     try {
       const response = await updateUserProfile(editName, editLastName, editCareerId, editAvatarUrl);
-      if (response.success && response.data) {
-        setProfile(response.data);
+      if (response.success) {
         setIsEditProfileOpen(false);
         triggerToast("¡Guardamos tus datos académicos al toque! 🎉");
+        router.refresh();
       } else {
+        setProfile(previousProfile); // Rollback
         triggerToast(response.error || "No pudimos guardar los cambios.");
       }
     } catch (err) {
+      setProfile(previousProfile); // Rollback
       console.error(err);
       triggerToast("Error de conexión al guardar cambios.");
     } finally {
@@ -166,112 +173,7 @@ export default function PerfilClient({
     }
   };
 
-  // 3. Remove a tutoring subject
-  const handleRemoveSubject = async (subjectId: number, name: string) => {
-    setActionInProgress(`remove-subject-${subjectId}`);
-    try {
-      const response = await removeTutorSubject(subjectId);
-      if (response.success && response.data) {
-        setTutorSubjects(response.data);
-        triggerToast(`Quitaste "${name}" de tus materias de tutoría.`);
-      } else {
-        triggerToast(response.error || "No pudimos quitar la materia.");
-      }
-    } catch (err) {
-      console.error(err);
-      triggerToast("Ocurrió un error al intentar quitar la materia.");
-    } finally {
-      setActionInProgress(null);
-    }
-  };
-
-  // 4. Add a tutoring subject
-  const handleAddSubject = async (subject: DbSubject) => {
-    setIsSearchFocused(false);
-    setSubjectSearch("");
-    
-    if (tutorSubjects.some(s => s.id === subject.id)) {
-      triggerToast(`"${subject.name}" ya está en tu lista.`);
-      return;
-    }
-    
-    setActionInProgress(`add-subject-${subject.id}`);
-    try {
-      const response = await addTutorSubject(subject.id);
-      if (response.success && response.data) {
-        setTutorSubjects(response.data);
-        triggerToast(`¡Sumaste "${subject.name}" como materia que enseñás!`);
-      } else {
-        triggerToast(response.error || "No se pudo agregar la materia.");
-      }
-    } catch (err) {
-      console.error(err);
-      triggerToast("Tuvimos un error al agregar la materia.");
-    } finally {
-      setActionInProgress(null);
-    }
-  };
-
-  // 5. Add availability schedule
-  const handleAddAvailability = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setActionInProgress("add-schedule");
-    
-    const newSlot: DbTutorAvailability = {
-      id: 0, // Server assigns ID
-      tutor_id: profile?.id || "",
-      day_of_week: scheduleDay,
-      start_time: scheduleStart,
-      end_time: scheduleEnd
-    };
-    
-    const updatedList = [...availability, newSlot].sort((a, b) => {
-      if (a.day_of_week !== b.day_of_week) {
-        return a.day_of_week - b.day_of_week;
-      }
-      return a.start_time.localeCompare(b.start_time);
-    });
-    
-    try {
-      const response = await saveTutorAvailability(updatedList);
-      if (response.success && response.data) {
-        setAvailability(response.data);
-        setIsAddScheduleOpen(false);
-        triggerToast(`Agregaste disponibilidad para el ${DAYS_OF_WEEK[scheduleDay]} de ${scheduleStart} a ${scheduleEnd}.`);
-      } else {
-        triggerToast(response.error || "No pudimos agendar el horario.");
-      }
-    } catch (err) {
-      console.error(err);
-      triggerToast("Error de conexión al guardar el horario.");
-    } finally {
-      setActionInProgress(null);
-    }
-  };
-
-  // 6. Delete availability slot
-  const handleDeleteAvailability = async (slotId: number) => {
-    setActionInProgress(`delete-schedule-${slotId}`);
-    
-    const updatedList = availability.filter(slot => slot.id !== slotId);
-    
-    try {
-      const response = await saveTutorAvailability(updatedList);
-      if (response.success && response.data) {
-        setAvailability(response.data);
-        triggerToast("Se eliminó el bloque de disponibilidad.");
-      } else {
-        triggerToast(response.error || "No se pudo eliminar el horario.");
-      }
-    } catch (err) {
-      console.error(err);
-      triggerToast("Error al procesar la baja del horario.");
-    } finally {
-      setActionInProgress(null);
-    }
-  };
-
-  // 7. Simulating Avatar Photo Uploading
+  // 3. Simulating Avatar Photo Uploading
   const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -320,12 +222,10 @@ export default function PerfilClient({
     }
   };
 
-  // Filter subjects for autocomplete
-  const filteredSubjectsForAutocomplete = allSubjects.filter(sub => {
-    const isAlreadyTeaching = tutorSubjects.some(ts => ts.id === sub.id);
-    const matchesSearch = sub.name.toLowerCase().includes(subjectSearch.toLowerCase());
-    return !isAlreadyTeaching && matchesSearch;
-  });
+  const handleSignOut = async () => {
+    // Implement sign out logic here
+    window.location.href = "/login";
+  };
 
   // Animated stagger variants
   const staggerContainer = {
@@ -668,7 +568,7 @@ export default function PerfilClient({
               </AnimatePresence>
             </motion.div>
 
-            {/* Tutoring Subjects Manager */}
+            {/* Configurar Tutorías Link (Visible when tutor is active) */}
             <AnimatePresence>
               {profile.isTutorActive && (
                 <motion.div 
@@ -678,134 +578,23 @@ export default function PerfilClient({
                   transition={{ duration: 0.25 }}
                   className="bg-glass rounded-3xl p-6 relative group hover:border-accent/10 transition-all duration-300"
                 >
-                  <label className="block text-sm font-bold text-cream-bone mb-3 select-none">Materias que enseño</label>
-                  
-                  {/* Tutor subjects tags */}
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {tutorSubjects.length === 0 ? (
-                      <p className="text-xs text-muted-foreground font-medium py-1">No agregaste materias todavía. ¡Sumá una abajo!</p>
-                    ) : (
-                      tutorSubjects.map((sub) => (
-                        <div 
-                          key={sub.id} 
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/10 border border-accent/25 text-accent text-xs font-bold transition-all duration-200 select-none group/tag"
-                        >
-                          <span>{sub.name}</span>
-                          <button
-                            onClick={() => handleRemoveSubject(sub.id, sub.name)}
-                            disabled={actionInProgress?.startsWith("remove-subject-")}
-                            className="text-accent/60 hover:text-destructive hover:bg-destructive/15 rounded-md p-0.5 shrink-0 transition-colors"
-                            aria-label={`Eliminar ${sub.name}`}
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {/* Autocomplete Search input */}
-                  <div className="relative" ref={searchContainerRef}>
-                    <div className="relative">
-                      <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        placeholder="¿En qué materias podés dar una mano?"
-                        value={subjectSearch}
-                        onChange={(e) => setSubjectSearch(e.target.value)}
-                        onFocus={() => setIsSearchFocused(true)}
-                        className="w-full bg-card/30 hover:bg-card/45 border border-border/40 focus:border-accent rounded-xl py-2.5 pl-10 pr-4 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all placeholder-muted-foreground/60 font-semibold"
-                      />
+                  <div className="flex items-center gap-3 mb-4 select-none">
+                    <div className="w-10 h-10 rounded-2xl bg-accent/10 border border-accent/15 flex items-center justify-center text-accent shrink-0">
+                      <Star className="w-5 h-5 text-accent" />
                     </div>
-
-                    {/* Suggestions list drop */}
-                    <AnimatePresence>
-                      {isSearchFocused && subjectSearch.trim().length > 0 && (
-                        <motion.ul 
-                          initial={{ opacity: 0, y: 5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 5 }}
-                          className="absolute left-0 top-full mt-2 w-full bg-card border border-border/40 rounded-2xl shadow-xl z-20 max-h-48 overflow-y-auto custom-scrollbar p-2"
-                        >
-                          {filteredSubjectsForAutocomplete.length === 0 ? (
-                            <li className="text-xs text-muted-foreground p-3 text-center">No encontramos esa materia, che.</li>
-                          ) : (
-                            filteredSubjectsForAutocomplete.map(sub => (
-                              <li key={sub.id}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleAddSubject(sub)}
-                                  className="w-full text-left text-xs font-semibold px-3.5 py-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30 focus:bg-muted/30 transition-colors focus:outline-none flex justify-between items-center"
-                                >
-                                  <span>{sub.name}</span>
-                                  <span className="text-[9px] border border-border/30 rounded px-1.5 py-0.5 text-muted-foreground font-bold uppercase">año {sub.year}</span>
-                                </button>
-                              </li>
-                            ))
-                          )}
-                        </motion.ul>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Weekly Availability Scheduler */}
-            <AnimatePresence>
-              {profile.isTutorActive && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 15 }}
-                  transition={{ duration: 0.3 }}
-                  className="bg-glass rounded-3xl p-6 relative group hover:border-accent/10 transition-all duration-300"
-                >
-                  <div className="flex items-center justify-between mb-4 select-none">
-                    <label className="block text-sm font-bold text-cream-bone">Disponibilidad Semanal</label>
-                    <button
-                      onClick={() => setIsAddScheduleOpen(true)}
-                      className="text-accent hover:text-accent/80 flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4 shrink-0" />
-                      <span>Agregar Horario</span>
-                    </button>
+                    <div>
+                      <h3 className="font-heading text-base font-bold text-cream-bone">Ajustes de Tutoría</h3>
+                      <p className="text-xs text-muted-foreground font-semibold">Horarios, materias y tarifas</p>
+                    </div>
                   </div>
 
-                  {/* List of active schedules */}
-                  <div className="space-y-2">
-                    {availability.length === 0 ? (
-                      <div className="p-4 rounded-2xl border border-dashed border-border/30 text-center select-none">
-                        <AlertCircle className="w-6 h-6 text-muted-foreground/50 mx-auto mb-1.5" />
-                        <p className="text-xs text-muted-foreground font-semibold">No tenés horarios configurados para dar tutorías.</p>
-                      </div>
-                    ) : (
-                      availability.map((slot) => (
-                        <div 
-                          key={slot.id} 
-                          className="flex items-center justify-between p-3.5 rounded-2xl bg-card/20 border border-border/20 hover:border-accent/30 transition-all group/slot"
-                        >
-                          <div className="flex items-center gap-3 select-none">
-                            <div className="w-2 h-2 rounded-full bg-accent shadow-[0_0_8px_rgba(245,158,11,0.6)] shrink-0" />
-                            <span className="text-xs font-bold text-cream-bone">{DAYS_OF_WEEK[slot.day_of_week]}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="font-mono text-[10px] font-bold text-muted-foreground bg-card/75 border border-border/20 px-2.5 py-1 rounded-lg select-none">
-                              {slot.start_time.slice(0, 5)} a {slot.end_time.slice(0, 5)}
-                            </span>
-                            <button
-                              onClick={() => handleDeleteAvailability(slot.id)}
-                              disabled={actionInProgress?.startsWith("delete-schedule-")}
-                              className="text-muted-foreground hover:text-destructive p-1 rounded-lg hover:bg-destructive/10 transition-colors"
-                              aria-label="Borrar horario"
-                            >
-                              <Trash2 className="w-4 h-4 shrink-0" />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  <Link
+                    href="/tutorias/configuracion"
+                    className="w-full h-11 bg-accent hover:bg-accent/90 text-accent-foreground font-bold text-xs rounded-xl transition-all duration-300 flex justify-center items-center gap-2 active:scale-98 cursor-pointer shadow-md shadow-accent/15"
+                  >
+                    <span>⚙️ Configurar mis Tutorías</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -931,111 +720,7 @@ export default function PerfilClient({
         )}
       </AnimatePresence>
 
-      {/* 2. Modal: Agregar Horario */}
-      <AnimatePresence>
-        {isAddScheduleOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop layer */}
-            <motion.div 
-              className="absolute inset-0 bg-background/85 backdrop-blur-md"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsAddScheduleOpen(false)}
-            />
 
-            {/* Modal Box */}
-            <motion.div
-              className="bg-card border border-border/40 w-full max-w-md rounded-3xl p-6 relative z-10 shadow-2xl space-y-5"
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              transition={{ type: "spring", duration: 0.35 }}
-            >
-              <div className="flex justify-between items-center border-b border-border/10 pb-3">
-                <h3 className="font-heading text-base font-extrabold text-cream-bone flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-accent" />
-                  <span>Agregar Disponibilidad</span>
-                </h3>
-                <button 
-                  onClick={() => setIsAddScheduleOpen(false)}
-                  className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Form Content */}
-              <form onSubmit={handleAddAvailability} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Día de la Semana</label>
-                  <Select
-                    value={scheduleDay}
-                    onChange={(val) => setScheduleDay(Number(val))}
-                    options={[
-                      { value: 1, label: "Lunes" },
-                      { value: 2, label: "Martes" },
-                      { value: 3, label: "Miércoles" },
-                      { value: 4, label: "Jueves" },
-                      { value: 5, label: "Viernes" },
-                      { value: 6, label: "Sábado" },
-                      { value: 0, label: "Domingo" }
-                    ]}
-                    className="w-full bg-muted/30 border border-border/40 focus:border-accent rounded-xl py-2.5 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all font-semibold cursor-pointer"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span>Desde</span>
-                    </label>
-                    <input
-                      type="time"
-                      value={scheduleStart}
-                      onChange={(e) => setScheduleStart(e.target.value)}
-                      className="w-full bg-muted/30 border border-border/40 focus:border-accent rounded-xl py-2.5 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all font-semibold cursor-pointer"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span>Hasta</span>
-                    </label>
-                    <input
-                      type="time"
-                      value={scheduleEnd}
-                      onChange={(e) => setScheduleEnd(e.target.value)}
-                      className="w-full bg-muted/30 border border-border/40 focus:border-accent rounded-xl py-2.5 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all font-semibold cursor-pointer"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Modal Controls */}
-                <div className="flex gap-3 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddScheduleOpen(false)}
-                    className="flex-1 py-2.5 border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-all"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={actionInProgress === "add-schedule"}
-                    className="flex-1 py-2.5 bg-accent hover:bg-accent/90 text-accent-foreground text-xs font-bold rounded-xl transition-all disabled:opacity-40"
-                  >
-                    {actionInProgress === "add-schedule" ? "Guardando..." : "Agregar Horario"}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* 3. Modal: Confirmar baja de cuenta (Soft Delete) */}
       <AnimatePresence>
