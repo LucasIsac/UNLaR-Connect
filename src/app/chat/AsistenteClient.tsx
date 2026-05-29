@@ -12,8 +12,12 @@ import {
   Check,
   ThumbsUp,
   ThumbsDown,
+  Filter,
 } from 'lucide-react';
 import { sendChatMessageAction } from '@/actions/chat';
+import { fetchResources, ResourceExtended } from '@/actions/recursos';
+import { ingestDocumentAction } from '@/actions/ingest';
+import { Select } from '@/components/ui/Select';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -82,6 +86,20 @@ function RichText({ text }: { text: string }) {
         const trimmed = line.trim();
         if (!trimmed) return <div key={i} className="h-2" />;
 
+        // Check for Markdown headings
+        if (trimmed.startsWith('# ')) {
+          return <h1 key={i} className="text-xl font-bold text-cream-bone mt-4 mb-2 select-text">{parseInlineMarkdown(trimmed.slice(2))}</h1>;
+        }
+        if (trimmed.startsWith('## ')) {
+          return <h2 key={i} className="text-lg font-bold text-cream-bone mt-3.5 mb-1.5 select-text">{parseInlineMarkdown(trimmed.slice(3))}</h2>;
+        }
+        if (trimmed.startsWith('### ')) {
+          return <h3 key={i} className="text-base font-bold text-cream-bone mt-3 mb-1 select-text">{parseInlineMarkdown(trimmed.slice(4))}</h3>;
+        }
+        if (trimmed.startsWith('#### ')) {
+          return <h4 key={i} className="text-sm font-bold text-cream-bone mt-2.5 mb-1 select-text">{parseInlineMarkdown(trimmed.slice(5))}</h4>;
+        }
+
         const isBullet = trimmed.startsWith('•') || trimmed.startsWith('-') || trimmed.startsWith('*');
         const contentStr = isBullet ? trimmed.replace(/^[•\-*]\s*/, '') : line;
 
@@ -90,12 +108,12 @@ function RichText({ text }: { text: string }) {
         if (isBullet) {
           return (
             <ul key={i} className="list-disc pl-5 my-1 space-y-1">
-              <li className="text-foreground/90">{parsedElements}</li>
+              <li className="text-foreground/90 select-text">{parsedElements}</li>
             </ul>
           );
         }
 
-        return <p key={i} className="text-foreground/95">{parsedElements}</p>;
+        return <p key={i} className="text-foreground/95 select-text">{parsedElements}</p>;
       })}
     </div>
   );
@@ -121,30 +139,11 @@ function MarkdownRenderer({ content }: { content: string }) {
   );
 }
 
-const MOCK_DOCS = [
-  {
-    name: 'Apunte_Unidad_3_Memoria.pdf',
-    pages: 45,
-    added: 'hoy',
-    tags: ['SO II', 'Teoría'],
-    active: true,
-    type: 'pdf' as const,
-  },
-  {
-    name: 'Clase_04_Concurrencia.pptx',
-    pages: 28,
-    added: 'ayer',
-    tags: ['SO II', 'Práctica'],
-    active: false,
-    type: 'pptx' as const,
-  },
-];
-
 const INITIAL_MESSAGES: Message[] = [
   {
     role: 'assistant',
     content:
-      'Hola. Soy tu Asistente UNLaR. He analizado los documentos de "Gestión de Memoria" y "Concurrencia". ¿Qué te gustaría repasar hoy?',
+      '¡Hola! Soy tu Asistente UNLaR. Podés chatear conmigo de forma general o seleccionar cualquiera de tus apuntes en la barra lateral para hacer consultas específicas. ¿Qué te gustaría repasar hoy?',
   },
 ];
 
@@ -152,9 +151,74 @@ export default function AsistenteClient() {
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  
+  // RAG / Documents states
+  const [documents, setDocuments] = useState<ResourceExtended[]>([]);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(true);
+  const [selectedDocId, setSelectedDocId] = useState<string | undefined>(undefined);
+  const [isIngesting, setIsIngesting] = useState(false);
+  const [ingestStatusText, setIngestStatusText] = useState("");
+
+  // Context filtering states
+  const [filterSubject, setFilterSubject] = useState<string>("all");
+  const [filterTopic, setFilterTopic] = useState<string>("all");
+  const [filterType, setFilterType] = useState<string>("all");
+
   const [feedback, setFeedback] = useState<Record<number, 'like' | 'dislike' | null>>({});
   const [copiedStates, setCopiedStates] = useState<Record<number, boolean>>({});
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Load document list from resources bank on mount
+  useEffect(() => {
+    const loadDocuments = async () => {
+      try {
+        const data = await fetchResources();
+        setDocuments(data);
+      } catch (err) {
+        console.error("Failed to load documents for RAG context:", err);
+      } finally {
+        setIsLoadingDocs(false);
+      }
+    };
+    loadDocuments();
+  }, []);
+
+  // Compute dynamic lists for filters
+  const uniqueSubjects = Array.from(new Set(documents.map(d => d.category).filter(Boolean)));
+  const uniqueTopics = Array.from(new Set(documents.map(d => d.thematicAxis).filter(Boolean)));
+
+  const subjectOptions = [
+    { value: "all", label: "Todas las materias" },
+    ...uniqueSubjects.map(sub => ({ value: sub, label: sub }))
+  ];
+
+  const topicOptions = [
+    { value: "all", label: "Todos los ejes" },
+    ...uniqueTopics.map(top => ({ value: top, label: top }))
+  ];
+
+  const typeOptions = [
+    { value: "all", label: "Todos los formatos" },
+    { value: "pdf", label: "PDF (.pdf)" },
+    { value: "text", label: "Texto/MD (.txt, .md)" }
+  ];
+
+  // Filter documents in real time based on active states
+  const filteredDocuments = documents.filter(doc => {
+    const matchSubject = filterSubject === "all" || doc.category === filterSubject;
+    const matchTopic = filterTopic === "all" || doc.thematicAxis === filterTopic;
+    
+    let matchType = true;
+    if (filterType !== "all") {
+      if (filterType === "pdf") {
+        matchType = doc.document_type.toLowerCase() === "pdf";
+      } else if (filterType === "text") {
+        matchType = doc.document_type.toLowerCase() === "txt" || doc.document_type.toLowerCase() === "md";
+      }
+    }
+    
+    return matchSubject && matchTopic && matchType;
+  });
 
   const handleFeedback = (idx: number, type: 'like' | 'dislike') => {
     setFeedback((prev) => ({
@@ -173,11 +237,34 @@ export default function AsistenteClient() {
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
+  }, [messages, isTyping, isIngesting]);
+
+  // Handle active document selection and self-healing vector ingestion if needed
+  const handleSelectDoc = async (docId: string) => {
+    if (selectedDocId === docId) {
+      setSelectedDocId(undefined);
+      return;
+    }
+
+    setSelectedDocId(docId);
+    setIsIngesting(true);
+    setIngestStatusText("Analizando apunte y preparando embeddings semánticos. Bancanos unos segundos...");
+
+    try {
+      const res = await ingestDocumentAction(docId);
+      if (!res.success) {
+        console.error("RAG Ingest Action Failed:", res.message);
+      }
+    } catch (err) {
+      console.error("Unexpected error during RAG doc ingestion:", err);
+    } finally {
+      setIsIngesting(false);
+    }
+  };
 
   const handleSend = async () => {
     const trimmed = input.trim();
-    if (!trimmed || isTyping) return;
+    if (!trimmed || isTyping || isIngesting) return;
 
     const userMessage: Message = { role: 'user', content: trimmed };
     const updatedMessages = [...messages, userMessage];
@@ -186,13 +273,18 @@ export default function AsistenteClient() {
     setIsTyping(true);
 
     try {
-      // Map the messages state array to ChatMessage type (matching the Server Action types)
+      // Map state array to secure backend format
       const chatMessages = updatedMessages.map(msg => ({
         role: msg.role,
         content: msg.content
       }));
 
-      const reply = await sendChatMessageAction(chatMessages);
+      // Trigger completions passing the query messages, active context document ID, and active filters
+      const reply = await sendChatMessageAction(
+        chatMessages, 
+        selectedDocId,
+        { subject: filterSubject, topic: filterTopic, type: filterType }
+      );
       
       const aiMessage: Message = { role: 'assistant', content: reply };
       setMessages((prev) => [...prev, aiMessage]);
@@ -216,12 +308,33 @@ export default function AsistenteClient() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] -mt-8 -mx-6 md:-ml-[240px] md:-mr-[320px] -mb-6 md:-mb-8">
-      {/* Main chat column */}
-      <div className="flex-1 flex flex-col min-w-0">
+    <div className="flex h-[calc(100vh-6.5rem)] w-full gap-6">
+      {/* Main chat column - Flat layout */}
+      <div className="flex-1 flex flex-col min-w-0 h-full">
+        
+        {/* RAG Context Selection Header (Highly Responsive & Mobile Friendly) */}
+        <div className="py-3 border-b border-border/20 flex items-center justify-between text-xs shrink-0 select-none mb-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${selectedDocId ? 'bg-accent animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]' : 'bg-muted-foreground/30'}`} />
+            <span className="text-muted-foreground font-medium whitespace-nowrap">Modo de consulta:</span>
+            <span className="font-semibold text-foreground truncate">
+              {selectedDocId 
+                ? `Apunte: "${documents.find(d => d.id === selectedDocId)?.title || 'Procesando...'}"` 
+                : 'General (Todos los apuntes)'}
+            </span>
+          </div>
+          {selectedDocId && (
+            <button 
+              onClick={() => setSelectedDocId(undefined)}
+              className="text-accent hover:underline font-medium shrink-0 ml-3"
+            >
+              Desactivar
+            </button>
+          )}
+        </div>
 
         {/* Chat area */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto custom-scrollbar py-4 px-0 space-y-6">
           {messages.map((msg, i) => (
             <div
               key={i}
@@ -236,22 +349,6 @@ export default function AsistenteClient() {
               ) : (
                 <div className="w-full text-foreground text-sm leading-relaxed py-3">
                   <MarkdownRenderer content={msg.content} />
-                  {msg.sources && msg.sources.length > 0 && (
-                    <div className="mt-3.5 flex flex-wrap gap-2">
-                      {msg.sources.map((src, j) => (
-                        <div
-                          key={j}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-card/60 border border-border/30 rounded-md text-xs"
-                        >
-                          <FileText className="w-3.5 h-3.5 text-secondary" />
-                          <span className="text-muted-foreground">{src.file}</span>
-                          <span className="bg-accent/10 text-accent px-1.5 py-0.5 rounded text-[10px] font-bold">
-                            {src.page}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                   {/* Actions Row */}
                   <div className="flex items-center gap-2.5 mt-2.5 text-muted-foreground/60 select-none">
                     <button
@@ -295,6 +392,18 @@ export default function AsistenteClient() {
             </div>
           ))}
 
+          {/* RAG Loading Animation Block */}
+          {isIngesting && (
+            <div className="flex justify-start w-full max-w-3xl mx-auto py-4 px-5 bg-accent/5 border border-accent/20 rounded-2xl animate-pulse">
+              <div className="flex gap-3.5 items-center w-full">
+                <div className="w-5 h-5 rounded-full border-2 border-accent border-t-transparent animate-spin shrink-0" />
+                <div className="text-xs text-foreground/90 font-medium">
+                  {ingestStatusText}
+                </div>
+              </div>
+            </div>
+          )}
+
           {isTyping && (
             <div className="flex justify-start w-full max-w-3xl mx-auto py-3">
               <div className="flex gap-1.5 items-center pl-1 h-6 select-none">
@@ -313,21 +422,26 @@ export default function AsistenteClient() {
           <div className="max-w-3xl mx-auto relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-accent/15 to-secondary/10 rounded-full blur opacity-25 group-focus-within:opacity-40 transition duration-500 pointer-events-none" />
             <div className="relative bg-muted/95 border border-border rounded-full shadow-lg flex items-center p-1.5 pl-3.5 pr-2 focus-within:border-accent/50 transition-colors">
-              <button className="p-2 text-muted-foreground hover:text-accent transition-colors rounded-full shrink-0 hover:bg-card/40">
+              <button 
+                onClick={() => window.location.href = "/recursos"}
+                className="p-2 text-muted-foreground hover:text-accent transition-colors rounded-full shrink-0 hover:bg-card/40"
+                title="Subir documentos al banco de apuntes"
+              >
                 <Paperclip className="w-5 h-5" />
               </button>
               <textarea
                 className="flex-1 bg-transparent border-none focus:ring-0 text-foreground resize-none py-1.5 px-2 max-h-28 overflow-y-auto text-sm placeholder-muted-foreground/50 scrollbar-none"
-                placeholder="Preguntale a tus apuntes..."
+                placeholder={selectedDocId ? "Hacé una pregunta sobre este apunte..." : "Preguntale a tus apuntes..."}
                 rows={1}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
+                disabled={isIngesting}
               />
               <button
                 className="w-9 h-9 bg-accent text-accent-foreground rounded-full hover:bg-accent/90 transition-colors flex items-center justify-center shadow-[0_0_12px_rgba(245,158,11,0.2)] shrink-0 disabled:opacity-40"
                 onClick={handleSend}
-                disabled={!input.trim() || isTyping}
+                disabled={!input.trim() || isTyping || isIngesting}
               >
                 <Send className="w-4 h-4 ml-0.5" />
               </button>
@@ -339,61 +453,126 @@ export default function AsistenteClient() {
         </div>
       </div>
 
-      {/* Right context sidebar */}
-      <aside className="w-72 border-l border-border bg-card/50 hidden lg:flex flex-col shrink-0">
-        <div className="p-4 border-b border-border">
+      {/* Right context sidebar - Flat layout separated by thin vertical divider */}
+      <aside className="w-72 border-l border-border/40 pl-6 hidden lg:flex flex-col shrink-0 h-full">
+        <div className="pb-3 border-b border-border/20 flex items-center justify-between">
           <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-            Contexto Actual
+            Contexto del Chat
           </h3>
-        </div>
-        <div className="p-4 space-y-3 overflow-y-auto custom-scrollbar flex-1">
-          {MOCK_DOCS.map((doc, idx) => (
-            <div
-              key={idx}
-              className={`bg-muted border rounded-lg p-3.5 relative overflow-hidden transition-colors cursor-pointer ${
-                doc.active
-                  ? 'border-accent/25 hover:border-accent/50'
-                  : 'border-border/50 hover:border-border opacity-70'
-              }`}
+          {selectedDocId && (
+            <button 
+              onClick={() => setSelectedDocId(undefined)}
+              className="text-[10px] text-accent font-semibold hover:underline"
             >
-              {doc.active && (
-                <div className="absolute left-0 top-0 w-1 h-full bg-accent" />
-              )}
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded bg-card flex items-center justify-center shrink-0 text-secondary">
-                  {doc.type === 'pdf' ? (
-                    <FileText className="w-4 h-4" />
-                  ) : (
-                    <Presentation className="w-4 h-4" />
+              Desactivar
+            </button>
+          )}
+        </div>
+
+        {/* Dynamic Context Filters Bar */}
+        <div className="py-3 border-b border-border/20 space-y-2 select-none text-[10px] text-muted-foreground shrink-0">
+          <div className="flex items-center gap-1 mb-1 font-semibold text-foreground uppercase tracking-wider text-[9px] text-muted-foreground/80">
+            <Filter className="w-3 h-3" />
+            <span>Filtros de Contexto</span>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span>Materia:</span>
+            <Select 
+              value={filterSubject}
+              onChange={(val) => setFilterSubject(val as string)}
+              options={subjectOptions}
+              className="bg-card/65 border border-border/40 rounded-xl px-3.5 py-2.5 text-xs flex items-center justify-between w-full"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span>Eje Temático:</span>
+            <Select 
+              value={filterTopic}
+              onChange={(val) => setFilterTopic(val as string)}
+              options={topicOptions}
+              className="bg-card/65 border border-border/40 rounded-xl px-3.5 py-2.5 text-xs flex items-center justify-between w-full"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span>Formato:</span>
+            <Select 
+              value={filterType}
+              onChange={(val) => setFilterType(val as string)}
+              options={typeOptions}
+              className="bg-card/65 border border-border/40 rounded-xl px-3.5 py-2.5 text-xs flex items-center justify-between w-full"
+            />
+          </div>
+        </div>
+
+        {/* Scrollable Document List */}
+        <div className="py-4 space-y-3 overflow-y-auto custom-scrollbar flex-1">
+          {isLoadingDocs ? (
+            <div className="text-center py-8 text-xs text-muted-foreground/60 select-none">
+              Cargando apuntes del servidor...
+            </div>
+          ) : filteredDocuments.length === 0 ? (
+            <div className="text-center py-8 text-xs text-muted-foreground/50 select-none">
+              No hay apuntes que coincidan con los filtros.
+            </div>
+          ) : (
+            filteredDocuments.map((doc) => {
+              const active = selectedDocId === doc.id;
+              return (
+                <div
+                  key={doc.id}
+                  onClick={() => handleSelectDoc(doc.id)}
+                  className={`bg-muted/40 border rounded-lg p-3.5 relative overflow-hidden transition-colors cursor-pointer ${
+                    active
+                      ? 'border-accent/25 hover:border-accent/50 bg-muted/95'
+                      : 'border-border/50 hover:border-border opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  {active && (
+                    <div className="absolute left-0 top-0 w-1 h-full bg-accent" />
+                  )}
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded bg-card flex items-center justify-center shrink-0 text-secondary">
+                      {doc.document_type === 'pdf' ? (
+                        <FileText className="w-4 h-4" />
+                      ) : (
+                        <Presentation className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-medium text-foreground line-clamp-1">
+                        {doc.title}
+                      </h4>
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        Materia: {doc.category}
+                      </p>
+                    </div>
+                  </div>
+                  {(doc.thematicAxis || doc.document_type) && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {doc.thematicAxis && doc.thematicAxis !== "General" && (
+                        <span className="px-1.5 py-0.5 bg-card/60 text-muted-foreground text-[9px] rounded border border-border/40 truncate max-w-[120px]">
+                          {doc.thematicAxis}
+                        </span>
+                      )}
+                      <span className="px-1.5 py-0.5 bg-card/60 text-muted-foreground text-[9px] rounded border border-border/40 uppercase">
+                        {doc.document_type}
+                      </span>
+                    </div>
                   )}
                 </div>
-                <div className="min-w-0">
-                  <h4 className="text-sm font-medium text-foreground line-clamp-1">
-                    {doc.name}
-                  </h4>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {doc.pages} páginas · Añadido {doc.added}
-                  </p>
-                </div>
-              </div>
-              {doc.tags && (
-                <div className="mt-2.5 flex gap-1.5">
-                  {doc.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2 py-0.5 bg-card text-muted-foreground text-[10px] rounded border border-border/50"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+              );
+            })
+          )}
 
-          <button className="w-full py-2.5 border border-dashed border-border rounded-lg text-muted-foreground hover:text-accent hover:border-accent/40 transition-colors flex flex-col items-center justify-center gap-1.5">
+          <button 
+            onClick={() => window.location.href = "/recursos"}
+            className="w-full py-2.5 border border-dashed border-border rounded-lg text-muted-foreground hover:text-accent hover:border-accent/40 transition-colors flex flex-col items-center justify-center gap-1.5 text-center mt-2"
+          >
             <PlusCircle className="w-4 h-4" />
-            <span className="text-[11px] font-semibold">Añadir documento al contexto</span>
+            <span className="text-[11px] font-semibold">Subir apunte a UNLaR</span>
           </button>
         </div>
       </aside>
