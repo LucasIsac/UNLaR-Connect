@@ -13,6 +13,7 @@ import {
   ThumbsUp,
   ThumbsDown,
 } from 'lucide-react';
+import { sendChatMessageAction } from '@/actions/chat';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -174,41 +175,37 @@ export default function AsistenteClient() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = input.trim();
     if (!trimmed || isTyping) return;
 
     const userMessage: Message = { role: 'user', content: trimmed };
-    setMessages((prev) => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setInput('');
     setIsTyping(true);
 
-    setTimeout(() => {
-      const lower = trimmed.toLowerCase();
-      let reply: string;
-      let sources: { file: string; page: string }[] | undefined;
+    try {
+      // Map the messages state array to ChatMessage type (matching the Server Action types)
+      const chatMessages = updatedMessages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
 
-      if (lower.includes('paginación') || lower.includes('segmentación')) {
-        reply =
-          'Según los apuntes de la cátedra, la diferencia principal radica en cómo se divide lógicamente la memoria y cómo el sistema operativo maneja esas divisiones.\n\n• Paginación: Divide la memoria física en bloques de tamaño fijo (marcos) y la memoria lógica en bloques del mismo tamaño (páginas). Es transparente para el programador.\n\n• Segmentación: Divide la memoria en bloques de tamaño variable (segmentos) que corresponden a unidades lógicas del programa (como la pila, el código, los datos). Es visible para el programador.';
-        sources = [
-          { file: 'Apunte_Unidad_3_Memoria.pdf', page: 'Pág. 14' },
-        ];
-      } else if (lower.includes('concurr') || lower.includes('hilo')) {
-        reply =
-          'La concurrencia permite que múltiples tareas se ejecuten simultáneamente en un mismo programa. En los apuntes se distingue entre:\n\n• Paralelismo real: múltiples núcleos de CPU ejecutando instrucciones al mismo tiempo.\n• Concurrencia lógica: un solo núcleo alterna entre tareas tan rápido que parece que corren en paralelo.\n\nLos hilos (threads) son la unidad básica de concurrencia dentro de un proceso.';
-        sources = [
-          { file: 'Clase_04_Concurrencia.pptx', page: 'Slide 8' },
-        ];
-      } else {
-        reply =
-          'Buena pregunta. Déjame revisar los documentos cargados en el contexto para darte la mejor respuesta posible. ¿Podrías darme más detalles sobre el tema específico que te interesa?';
-      }
-
-      const aiMessage: Message = { role: 'assistant', content: reply, sources };
+      const reply = await sendChatMessageAction(chatMessages);
+      
+      const aiMessage: Message = { role: 'assistant', content: reply };
       setMessages((prev) => [...prev, aiMessage]);
+    } catch (err) {
+      console.error("Error sending message to Groq:", err);
+      const errorMessage: Message = { 
+        role: 'assistant', 
+        content: "Che, disculpame, pero surgió un problema de conexión con el asistente de IA. Probá mandando tu mensaje otra vez." 
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 800);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
