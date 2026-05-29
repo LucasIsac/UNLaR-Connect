@@ -233,7 +233,7 @@ export default function AsistenteClient() {
               }`}
             >
               {msg.role === 'user' ? (
-                <div className="px-5 py-3 rounded-2xl bg-muted text-foreground rounded-tr-sm border border-border text-sm max-w-2xl leading-relaxed">
+                <div className="px-5 py-3 rounded-full bg-muted text-foreground border border-border text-sm max-w-2xl leading-relaxed">
                   <p className="whitespace-pre-line">{msg.content}</p>
                 </div>
               ) : (
