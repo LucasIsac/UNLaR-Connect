@@ -33,14 +33,15 @@ import {
   deleteResource,
   ResourceExtended
 } from "@/actions/recursos";
-import { fetchSubjects } from "@/actions/perfil";
-import { DbSubject } from "@/types/database";
+import { fetchSubjects, fetchCareers } from "@/actions/perfil";
+import { DbSubject, DbCareer } from "@/types/database";
 
-const tabs = ["Recientes", "Más Valorados", "Mis Guardados"];
+const tabs = ["Recientes", "Más Valorados", "Mis Guardados", "Mis Apuntes"];
 
 export default function RecursosPage() {
   const [resources, setResources] = useState<ResourceExtended[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(9); // Pagination state
   const [activeTab, setActiveTab] = useState(0);
   const [gridView, setGridView] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,36 +53,31 @@ export default function RecursosPage() {
   const [filterMateria, setFilterMateria] = useState("Todas");
   const [filterTipo, setFilterTipo] = useState("Todos");
   const [subjectsDataList, setSubjectsDataList] = useState<DbSubject[]>([]);
-
-  // AI Active Context states (keeps a list of Resource objects currently active)
-  const [aiContextList, setAiContextList] = useState<ResourceExtended[]>([]);
+  const [carrerasList, setCarrerasList] = useState<DbCareer[]>([]);
 
   // Detailed preview modal state
   const [selectedResource, setSelectedResource] = useState<ResourceExtended | null>(null);
 
-  // Mini AI chat mockup states inside the preview modal
-  const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
 
 
 
   // Sidebar Form States
   const [newTitle, setNewTitle] = useState("");
-  const [newCategory, setNewCategory] = useState("Sistemas Operativos");
-  const [newAxis, setNewAxis] = useState("Gestión de Memoria");
-  const [newType, setNewType] = useState("Apunte de Teoría");
+  const [newCategory, setNewCategory] = useState("");
+  const [newAxis, setNewAxis] = useState("");
+  const [newType, setNewType] = useState("");
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [isMateriaDropdownOpen, setIsMateriaDropdownOpen] = useState(false);
   const [isEjeDropdownOpen, setIsEjeDropdownOpen] = useState(false);
   const [materiaFilter, setMateriaFilter] = useState("");
   const [ejeFilter, setEjeFilter] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
-  const normalizeString = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const normalizeString = (str: string) => (str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
   const [predefinedMaterias, setPredefinedMaterias] = useState<string[]>(["Cargando materias..."]);
-  const predefinedEjes = ["Gestión de Memoria", "Consultas SQL", "Integrales Múltiples", "Programación Funcional"];
+  const [predefinedEjes, setPredefinedEjes] = useState<string[]>(["Cargando ejes..."]);
 
   // Drag & drop styling state
   const [isDragging, setIsDragging] = useState(false);
@@ -102,22 +98,45 @@ export default function RecursosPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [data, subjectsData] = await Promise.all([
+        const [data, subjectsData, careersData] = await Promise.all([
           fetchResources(),
-          fetchSubjects()
+          fetchSubjects(),
+          fetchCareers()
         ]);
         setResources(data);
         
+        if (careersData) {
+          setCarrerasList(careersData);
+        }
+        
         if (subjectsData && subjectsData.length > 0) {
-          setPredefinedMaterias(subjectsData.map((s) => s.name));
+          const uniqueMap = new Map<string, string>();
+          subjectsData.forEach((s) => {
+            if (!s.name) return;
+            const norm = (s.name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            if (!uniqueMap.has(norm)) {
+              uniqueMap.set(norm, s.name.trim());
+            }
+          });
+          setPredefinedMaterias(Array.from(uniqueMap.values()));
           setSubjectsDataList(subjectsData);
         } else {
           setPredefinedMaterias(["Sistemas Operativos", "Bases de Datos", "Paradigmas de Programación"]);
         }
 
-        // Set second item as initial active context
-        if (data.length > 1) {
-          setAiContextList([data[1]]);
+        // Dynamically extract unique thematic axes from resources
+        if (data && data.length > 0) {
+          const uniqueEjesMap = new Map<string, string>();
+          data.forEach((r) => {
+            if (!r.thematicAxis || r.thematicAxis === "General") return;
+            const norm = r.thematicAxis.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            if (!uniqueEjesMap.has(norm)) {
+              uniqueEjesMap.set(norm, r.thematicAxis.trim());
+            }
+          });
+          setPredefinedEjes(Array.from(uniqueEjesMap.values()));
+        } else {
+          setPredefinedEjes(["Gestión de Memoria", "Consultas SQL"]);
         }
       } catch (err) {
         console.error("Error loading data:", err);
@@ -128,59 +147,64 @@ export default function RecursosPage() {
     loadData();
   }, []);
 
-  // Initialize mini chatbot messages when a resource is selected
-  useEffect(() => {
-    if (!selectedResource) return;
-    setChatMessages([
-      {
-        role: "assistant",
-        content: `¡Hola! Soy tu asistente de IA. Leí completo el documento "${selectedResource.title}". ¿Qué querés preguntarme o resumir sobre él?`
-      }
-    ]);
-    setChatInput("");
-  }, [selectedResource]);
-
-  const handleToggleAiContext = (rsc: ResourceExtended, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const exists = aiContextList.some((item) => item.id === rsc.id);
-
-    if (exists) {
-      setAiContextList((prev) => prev.filter((item) => item.id !== rsc.id));
-      showToast(`Quitaste "${rsc.title.slice(0, 20)}..." del contexto AI.`);
-    } else {
-      setAiContextList((prev) => [...prev, rsc]);
-      showToast(`Agregaste "${rsc.title.slice(0, 20)}..." al contexto AI.`);
-    }
-  };
-
-  const handleRemoveAiContextItem = (id: string) => {
-    setAiContextList((prev) => prev.filter((item) => item.id !== id));
-    showToast("Material quitado del contexto de IA.");
-  };
-
   const handleUploadApunteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim() || !file) {
-      showToast("Por favor completá todos los campos y seleccioná un archivo.", "error");
+    if (!newTitle.trim() || !newCategory.trim() || !newType.trim() || !file) {
+      showToast("Por favor completá todos los campos obligatorios y seleccioná un archivo.", "error");
       return;
     }
 
     setActionInProgress("upload-resource");
     try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData.user;
+      if (!user) {
+        showToast("No estás autenticado.", "error");
+        setActionInProgress(null);
+        return;
+      }
+
+      showToast("Subiendo archivo, aguardá un momento...", "info");
+      
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      const { error: storageError } = await supabase.storage
+        .from('apuntes')
+        .upload(filePath, file, { contentType: file.type });
+        
+      if (storageError) {
+        console.error("Client Upload error:", storageError);
+        showToast("Error al subir el archivo (verificá tu conexión).", "error");
+        setActionInProgress(null);
+        return;
+      }
+
       const formData = new FormData();
-      formData.append("file", file);
       formData.append("title", newTitle);
+      formData.append("filePath", filePath);
       formData.append("category", newCategory);
       formData.append("thematicAxis", newAxis || "General");
       formData.append("type", newType);
       formData.append("description", newAxis ? `Material sobre ${newAxis} (${newType}).` : `Material de tipo ${newType}.`);
 
       const response = await uploadResource(formData);
-      if (response.success && response.data) {
-        setResources((prev) => [response.data!, ...prev]);
-        showToast("¡Apunte subido con éxito! Listo para la IA.", "success");
+      if (response.success) {
+        showToast("¡Apunte subido exitosamente!", "success");
         setNewTitle("");
         setFile(null);
+        setNewType("");
+        setIsUploadModalOpen(false);
+        // Force Header points to update instantly
+        window.dispatchEvent(new Event("points-updated"));
+        
+        // Optimistically add to list (simplificado)
+        if (response.data) {
+          setResources((prev) => [response.data!, ...prev]);
+        }
       } else {
         showToast(response.error || "No se pudo registrar tu apunte.", "error");
       }
@@ -195,14 +219,24 @@ export default function RecursosPage() {
   const handleLikeResourceSubmit = async (rscId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     
-    // Optimistic UI Update
+    // Optimistic UI Update: Toggle likes based on hasVoted status
     setResources((prev) =>
-      prev.map((r) => (r.id === rscId ? { ...r, likes: r.likes + 1 } : r))
+      prev.map((r) => {
+        if (r.id === rscId) {
+          return { ...r, likes: r.hasVoted ? r.likes - 1 : r.likes + 1, hasVoted: !r.hasVoted };
+        }
+        return r;
+      })
     );
-    showToast("¡Gracias por tu valoración! Aportás a la comunidad.");
 
     try {
-      await castResourceVote(rscId);
+      const response = await castResourceVote(rscId);
+      if (response.success && response.newScore !== undefined) {
+        // Sync absolute truth from server in case of race conditions
+        setResources((prev) =>
+          prev.map((r) => (r.id === rscId ? { ...r, likes: response.newScore ?? r.likes } : r))
+        );
+      }
     } catch (err) {
       console.error(err);
     }
@@ -241,8 +275,20 @@ export default function RecursosPage() {
       } else {
         showToast(response.error || "No se pudo eliminar el apunte.", "error");
         // Revert optimistic update
-        const fetchMissing = await fetchResources();
-        setResources(fetchMissing);
+        const fetchAll = async () => {
+          setLoading(true);
+          try {
+            const data = await fetchResources();
+            setResources(data);
+            setVisibleCount(9); // Reset pagination on full reload
+          } catch (err) {
+            console.error(err);
+            showToast("Error al cargar los recursos.", "error");
+          } finally { 
+            setLoading(false);
+          }
+        };
+        fetchAll();
       }
     } catch (err) {
       console.error(err);
@@ -250,34 +296,25 @@ export default function RecursosPage() {
     }
   };
 
-  const handleMiniChatSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || !selectedResource) return;
-
-    const userMsg = chatInput.trim();
-    setChatMessages((prev) => [...prev, { role: "user", content: userMsg }]);
-    setChatInput("");
-    setChatLoading(true);
-
+  const handleDownloadResource = async (rsc: ResourceExtended) => {
     try {
-      // Artificial dynamic stream phase
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-
-      let aiResp = `Che, te comento que según el documento de "${selectedResource.category}", en el apartado de "${selectedResource.thematicAxis}", se explica en profundidad que los principales conceptos a dominar son la resolución del caso y la aplicación del marco práctico.`;
-      
-      if (userMsg.toLowerCase().includes("resumi") || userMsg.toLowerCase().includes("resumen")) {
-        aiResp = `Mirá, te armé un resumen al toque de este apunte:
-1. **Introducción práctica**: Detalla el contexto de las guías de estudio.
-2. **Conceptos Clave**: Sincronización, lógica y optimización de variables.
-3. **Casos de TP**: Ejercicios resueltos paso a paso por ${selectedResource.authorName}.
-¿Querés que profundice en algún punto?`;
-      }
-
-      setChatMessages((prev) => [...prev, { role: "assistant", content: aiResp }]);
+      showToast("Preparando descarga...", "info");
+      const response = await fetch(rsc.storage_url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      // Get extension from URL or fallback
+      const ext = rsc.storage_url.split('.').pop() || "pdf";
+      a.download = `${rsc.title}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      showToast("¡Descarga completada con éxito!", "success");
     } catch (err) {
       console.error(err);
-    } finally {
-      setChatLoading(false);
+      showToast("Error al intentar descargar el archivo.", "error");
     }
   };
 
@@ -285,6 +322,7 @@ export default function RecursosPage() {
   const filteredResources = resources.filter((rsc) => {
     // 1. Tab filter
     if (activeTab === 2 && !rsc.saved) return false; // "Mis Guardados"
+    if (activeTab === 3 && !rsc.isOwner) return false; // "Mis Apuntes"
     
     // 2. Search query filter
     const matchesSearch =
@@ -294,7 +332,8 @@ export default function RecursosPage() {
       rsc.authorName.toLowerCase().includes(searchQuery.toLowerCase());
       
     // 3. Carrera filter
-    const matchesCarrera = filterCarrera === "Todas" || filterCarrera === "Sistemas"; // Defaults to Sistemas for now
+    // Note: If a subject has no assigned careers (orphan), we show it in ALL filters as requested.
+    const matchesCarrera = filterCarrera === "Todas" || rsc.careers.length === 0 || rsc.careers.includes(filterCarrera);
 
     // 4. Año filter
     let matchesAno = filterAno === "Todos";
@@ -307,15 +346,20 @@ export default function RecursosPage() {
     const matchesMateria = filterMateria === "Todas" || rsc.category === filterMateria;
 
     // 6. Tipo filter
-    const matchesTipo = filterTipo === "Todos" || rsc.document_type === filterTipo;
+    const matchesTipo = filterTipo === "Todos" || (rsc.description && rsc.description.includes(filterTipo));
 
     return matchesSearch && matchesCarrera && matchesAno && matchesMateria && matchesTipo;
   }).sort((a, b) => {
     if (activeTab === 1) {
       return b.likes - a.likes; // "Más Valorados"
     }
-    return b.id.localeCompare(a.id); // "Recientes" (fallback ID sort)
+    // "Recientes" (or any other tab): sort by upload date descending
+    const dateA = a.uploaded_at ? new Date(a.uploaded_at).getTime() : 0;
+    const dateB = b.uploaded_at ? new Date(b.uploaded_at).getTime() : 0;
+    return dateB - dateA;
   });
+
+  const paginatedResources = filteredResources.slice(0, visibleCount);
 
   return (
     <DashboardLayout>
@@ -371,23 +415,24 @@ export default function RecursosPage() {
               />
             </div>
 
+          <div className="flex flex-wrap items-center gap-3 w-full">
             {/* Carrera Filter */}
             <div className="relative">
               <button
                 onClick={() => setOpenFilter(openFilter === "carrera" ? null : "carrera")}
-                className="px-3 py-1.5 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 bg-background/50 border border-border/40 text-muted-foreground rounded-xl text-sm font-semibold hover:bg-muted/10 transition-colors flex items-center gap-2"
               >
                 Carrera: <span className="text-accent">{filterCarrera}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openFilter === "carrera" ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-4 h-4 transition-transform ${openFilter === "carrera" ? "rotate-180" : ""}`} />
               </button>
               <AnimatePresence>
                 {openFilter === "carrera" && (
                   <motion.div
                     initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
-                    className="absolute top-full left-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col min-w-[120px]"
+                    className="absolute top-full left-0 mt-2 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col min-w-[150px]"
                   >
-                    {["Todas", "Sistemas"].map(opt => (
-                      <button key={opt} onClick={() => { setFilterCarrera(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${filterCarrera === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
+                    {["Todas", ...carrerasList.map(c => c.name)].map(opt => (
+                      <button key={opt} onClick={() => { setFilterCarrera(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-sm hover:bg-accent/15 transition-colors ${filterCarrera === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
                         {opt}
                       </button>
                     ))}
@@ -400,19 +445,19 @@ export default function RecursosPage() {
             <div className="relative">
               <button
                 onClick={() => setOpenFilter(openFilter === "ano" ? null : "ano")}
-                className="px-3 py-1.5 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 bg-background/50 border border-border/40 text-muted-foreground rounded-xl text-sm font-semibold hover:bg-muted/10 transition-colors flex items-center gap-2"
               >
                 Año: <span className="text-accent">{filterAno}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openFilter === "ano" ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-4 h-4 transition-transform ${openFilter === "ano" ? "rotate-180" : ""}`} />
               </button>
               <AnimatePresence>
                 {openFilter === "ano" && (
                   <motion.div
                     initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
-                    className="absolute top-full left-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col min-w-[100px]"
+                    className="absolute top-full left-0 mt-2 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col min-w-[100px]"
                   >
                     {["Todos", "1", "2", "3", "4", "5"].map(opt => (
-                      <button key={opt} onClick={() => { setFilterAno(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${filterAno === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
+                      <button key={opt} onClick={() => { setFilterAno(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-sm hover:bg-accent/15 transition-colors ${filterAno === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
                         {opt}
                       </button>
                     ))}
@@ -425,22 +470,22 @@ export default function RecursosPage() {
             <div className="relative">
               <button
                 onClick={() => setOpenFilter(openFilter === "materia" ? null : "materia")}
-                className="px-3 py-1.5 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 transition-colors flex items-center gap-1.5 max-w-[200px] truncate"
+                className="px-4 py-2 bg-background/50 border border-border/40 text-muted-foreground rounded-xl text-sm font-semibold hover:bg-muted/10 transition-colors flex items-center gap-2 max-w-[250px] truncate"
               >
                 Materia: <span className="text-accent truncate">{filterMateria}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform shrink-0 ${openFilter === "materia" ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-4 h-4 transition-transform shrink-0 ${openFilter === "materia" ? "rotate-180" : ""}`} />
               </button>
               <AnimatePresence>
                 {openFilter === "materia" && (
                   <motion.div
                     initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
-                    className="absolute top-full right-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-y-auto max-h-60 custom-scrollbar z-20 flex flex-col min-w-[200px]"
+                    className="absolute top-full right-0 mt-2 bg-card border border-border/40 rounded-xl shadow-xl overflow-y-auto max-h-60 custom-scrollbar z-20 flex flex-col min-w-[200px]"
                   >
-                    <button onClick={() => { setFilterMateria("Todas"); setOpenFilter(null); }} className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${filterMateria === "Todas" ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
+                    <button onClick={() => { setFilterMateria("Todas"); setOpenFilter(null); }} className={`text-left px-3 py-2 text-sm hover:bg-accent/15 transition-colors ${filterMateria === "Todas" ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
                       Todas
                     </button>
                     {predefinedMaterias.map(opt => (
-                      <button key={opt} onClick={() => { setFilterMateria(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${filterMateria === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
+                      <button key={opt} onClick={() => { setFilterMateria(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-sm hover:bg-accent/15 transition-colors ${filterMateria === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
                         {opt}
                       </button>
                     ))}
@@ -449,38 +494,31 @@ export default function RecursosPage() {
               </AnimatePresence>
             </div>
 
-            {/* Tipo Filter */}
-            <div className="relative">
-              <button
-                onClick={() => setOpenFilter(openFilter === "tipo" ? null : "tipo")}
-                className="px-3 py-1.5 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 transition-colors flex items-center gap-1.5"
-              >
-                Tipo: <span className="text-accent">{filterTipo}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openFilter === "tipo" ? "rotate-180" : ""}`} />
-              </button>
-              <AnimatePresence>
-                {openFilter === "tipo" && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
-                    className="absolute top-full right-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col min-w-[180px]"
-                  >
-                    {["Todos", "Apunte de Teoría", "Trabajo Práctico Resuelto", "Guía de Ejercicios", "Examen Final", "Otro"].map(opt => (
-                      <button key={opt} onClick={() => { setFilterTipo(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${filterTipo === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
-                        {opt}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+            {/* Quick Tipo Pills */}
+            <div className="flex flex-wrap items-center gap-2 ml-auto lg:ml-4">
+              {["Todos", "Apunte de Teoría", "Trabajo Práctico Resuelto", "Guía de Ejercicios", "Resumen", "Otro"].map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => setFilterTipo(opt)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
+                    filterTipo === opt
+                      ? "bg-accent/20 border-accent text-accent shadow-[0_0_10px_rgba(var(--accent-rgb),0.15)]"
+                      : "bg-background/50 border-border/40 text-muted-foreground hover:text-foreground hover:border-border/60 hover:bg-card/80"
+                  }`}
+                >
+                  {opt}
+                </button>
+              ))}
             </div>
+          </div>
           </div>
         </div>
 
         {/* Main Columns Container */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
           
           {/* Left / Center Content: Resource list and tabs */}
-          <div className="lg:col-span-3 space-y-4">
+          <div className="lg:col-span-7 xl:col-span-8 space-y-4">
             
             {/* Navigation Tabs and Grid Layout Switcher */}
             <div className="flex items-center gap-4 border-b border-border/10 pb-2 mb-4 overflow-x-auto select-none">
@@ -545,11 +583,20 @@ export default function RecursosPage() {
               <>
                 {/* List empty state */}
                 {filteredResources.length === 0 && (
-                  <div className="bg-glass rounded-2xl p-8 border border-border/20 text-center text-muted-foreground">
-                    <Search className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
-                    <p className="text-sm font-semibold">No se encontraron apuntes cargados en esta sección.</p>
-                    <p className="text-xs mt-1">¡Cargá tu material en el panel derecho para empezar!</p>
-                  </div>
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
+                    className="bg-glass rounded-3xl p-12 border border-dashed border-border/30 text-center relative overflow-hidden flex flex-col items-center justify-center min-h-[250px] shadow-inner"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent pointer-events-none" />
+                    <div className="w-20 h-20 bg-accent/10 rounded-full flex items-center justify-center mb-5 relative">
+                       <div className="absolute inset-0 bg-accent/20 rounded-full animate-ping opacity-20" />
+                       <Search className="w-8 h-8 text-accent relative z-10" />
+                    </div>
+                    <h3 className="text-lg font-heading font-bold text-cream-bone mb-2 relative z-10">¡Acá hay mucho espacio libre!</h3>
+                    <p className="text-sm text-muted-foreground max-w-md relative z-10">
+                      No encontramos apuntes con esos filtros. ¡Sé el primero en compartir tu material y ayudá a la comunidad!
+                    </p>
+                  </motion.div>
                 )}
 
                 {/* Resource Card List / Grid Layout switching with motion */}
@@ -557,48 +604,39 @@ export default function RecursosPage() {
                   layout
                   className={
                     gridView
-                      ? "grid grid-cols-1 md:grid-cols-2 gap-4"
+                      ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
                       : "space-y-3"
                   }
                 >
-                  {filteredResources.map((rsc) => {
-                    const isActiveInContext = aiContextList.some((item) => item.id === rsc.id);
+                  {paginatedResources.map((rsc) => {
                     return (
                       <motion.div
                         layout
                         key={rsc.id}
                         onClick={() => setSelectedResource(rsc)}
-                        className="bg-glass rounded-2xl p-5 flex flex-col hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer hover:border-accent/25 relative border border-primary/5"
+                        className="bg-glass rounded-2xl p-5 flex flex-col hover:-translate-y-1 transition-all duration-300 group cursor-pointer hover:shadow-[0_0_20px_rgba(var(--accent-rgb),0.1)] relative border border-primary/5 hover:border-accent/30 overflow-hidden"
                       >
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="flex flex-col gap-0.5">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full blur-[40px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                        <div className="flex justify-between items-start mb-3 relative z-10">
+                          <div className="flex flex-col gap-0.5 flex-1 min-w-0 pr-2">
                             <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider inline-block w-max ${rsc.categoryColor}`}
+                              title={rsc.category}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider inline-block max-w-[fit-content] truncate ${rsc.categoryColor}`}
                             >
                               {rsc.category}
                             </span>
                             {rsc.thematicAxis && (
-                              <span className="text-[10px] text-muted-foreground font-semibold">
+                              <span title={`Eje: ${rsc.thematicAxis}`} className="text-[10px] text-muted-foreground font-semibold truncate max-w-full">
                                 Eje: {rsc.thematicAxis}
                               </span>
                             )}
                           </div>
-
-                          {/* AI Context selection button */}
-                          <button
-                            onClick={(e) => handleToggleAiContext(rsc, e)}
-                            className={`p-1.5 rounded-lg border transition-all duration-200 hover:scale-105 active:scale-95 ${
-                              isActiveInContext
-                                ? "bg-accent/20 border-accent text-accent"
-                                : "bg-card/50 border-border/20 text-muted-foreground hover:text-accent hover:border-accent/40"
-                            }`}
-                            title={isActiveInContext ? "Quitar del contexto AI" : "Guardar en contexto AI"}
-                          >
-                            <Bot className="w-4 h-4" />
-                          </button>
+                          <div className="w-8 h-8 rounded-full bg-card/60 border border-border/20 flex items-center justify-center text-muted-foreground group-hover:text-accent group-hover:border-accent/30 transition-colors shrink-0">
+                            <FileText className="w-4 h-4" />
+                          </div>
                         </div>
 
-                        <h3 className="font-heading text-base font-bold text-cream-bone mb-2 group-hover:text-primary transition-colors line-clamp-2">
+                        <h3 className="font-heading text-base font-bold text-cream-bone mb-2 group-hover:text-primary transition-colors line-clamp-2 relative z-10">
                           {rsc.title}
                         </h3>
                         <p className="text-xs text-muted-foreground mb-4 line-clamp-2 flex-1 leading-relaxed">
@@ -623,13 +661,13 @@ export default function RecursosPage() {
                           </div>
                           
                           <div className="flex items-center gap-3 text-muted-foreground">
-                            <button
+                            <button 
                               onClick={(e) => handleLikeResourceSubmit(rsc.id, e)}
-                              className="flex items-center gap-1 hover:text-accent transition-colors group/btn text-xs"
-                              title="Valorar apunte"
+                              className={`p-1.5 rounded hover:bg-muted/10 transition-colors flex items-center gap-1.5 ${rsc.hasVoted ? "text-accent" : "text-muted-foreground"}`}
+                              title={rsc.hasVoted ? "Quitar Me gusta" : "Me gusta"}
                             >
-                              <ThumbsUp className="w-3.5 h-3.5" />
-                              <span className="text-[11px]">{rsc.likes}</span>
+                              <ThumbsUp className={`w-3.5 h-3.5 ${rsc.hasVoted ? "fill-accent text-accent" : ""}`} />
+                              <span className="text-xs font-semibold">{rsc.likes}</span>
                             </button>
                             <button
                               onClick={(e) => handleToggleSaveResourceSubmit(rsc.id, e)}
@@ -649,20 +687,22 @@ export default function RecursosPage() {
             )}
 
             {/* Load more button */}
-            <div className="flex justify-center pt-4">
-              <button 
-                onClick={() => showToast("Cargando más apuntes oficiales de la nube...")}
-                className="px-5 py-2 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 hover:text-foreground active:scale-95 transition-all flex items-center gap-2"
-              >
-                Cargar Más
-                <RefreshCw className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            {visibleCount < filteredResources.length && (
+              <div className="flex justify-center pt-4">
+                <button 
+                  onClick={() => setVisibleCount(v => v + 9)}
+                  className="px-5 py-2 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 hover:text-foreground active:scale-95 transition-all flex items-center gap-2"
+                >
+                  Cargar Más
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
 
           </div>
 
-          {/* Right sidebar column: Upload zone and AI active context list */}
-          <div className="lg:col-span-2 space-y-6">
+          {/* Right sidebar column: Upload zone */}
+          <div className="lg:col-span-5 xl:col-span-4 space-y-6 lg:sticky lg:top-24 lg:h-fit self-start pb-6">
 
             {/* Loading placeholder sidebars if true */}
             {loading ? (
@@ -673,79 +713,6 @@ export default function RecursosPage() {
               </div>
             ) : (
               <>
-                {/* Dynamic AI Active Context List */}
-                <div className="bg-glass rounded-2xl p-6 relative border border-border/20 shadow-xl shadow-accent/5 group/ai">
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-accent/5 to-transparent pointer-events-none" />
-                  <div className="absolute -top-6 -right-6 p-4 opacity-10 pointer-events-none select-none blur-[2px] group-hover/ai:blur-none transition-all duration-700">
-                    <Bot className="w-32 h-32 text-accent" />
-                  </div>
-                  
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-heading text-base font-bold text-accent flex items-center gap-2">
-                        <Bot className="w-5 h-5 animate-pulse" />
-                        Asistente de IA
-                      </h3>
-                      <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> En línea
-                      </span>
-                    </div>
-                    
-                    <p className="text-xs text-muted-foreground mb-4 leading-relaxed pr-6">
-                      Construí tu contexto seleccionando apuntes. Tenés <strong className="text-foreground">{aiContextList.length}</strong> listos para consultar.
-                    </p>
-                  
-                  <AnimatePresence initial={false}>
-                    {aiContextList.length === 0 ? (
-                      <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="p-3 text-center border border-dashed border-border/30 rounded-xl text-[11px] text-muted-foreground animate-fade-in-up"
-                      >
-                        No hay apuntes en tu contexto. Seleccioná tocando el ícono de robot en cualquier tarjeta.
-                      </motion.div>
-                    ) : (
-                      <motion.ul className="space-y-2 mb-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                        {aiContextList.map((item) => (
-                          <motion.li
-                            key={item.id}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 10, transition: { duration: 0.15 } }}
-                            className="bg-card/75 p-2 rounded-xl border border-border/20 flex justify-between items-center text-xs"
-                          >
-                            <span className="text-[11px] text-cream-bone truncate pr-2 font-medium flex items-center gap-1.5">
-                              <FileText className="w-3.5 h-3.5 text-accent shrink-0" />
-                              {item.title}
-                            </span>
-                            <button
-                              onClick={() => handleRemoveAiContextItem(item.id)}
-                              className="text-muted-foreground hover:text-destructive hover:bg-muted/20 p-1 rounded transition-colors shrink-0"
-                              title="Quitar"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </motion.li>
-                        ))}
-                      </motion.ul>
-                    )}
-                  </AnimatePresence>
-                  
-                  <button 
-                    onClick={() => {
-                      if (aiContextList.length > 0) {
-                        showToast("Abriendo Asistente AI con el contexto seleccionado...");
-                      }
-                    }}
-                    disabled={aiContextList.length === 0}
-                    className="w-full bg-card/50 border border-accent/40 text-accent hover:bg-accent hover:text-accent-foreground hover:shadow-lg hover:shadow-accent/20 transition-all duration-300 text-sm font-bold py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none mt-2"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    Iniciar Chat con IA
-                  </button>
-                  </div>
-                </div>
-
                 {/* Sidebar upload form */}
                 <div className="bg-glass rounded-2xl p-7 border border-outline-variant shadow-lg relative group">
                   <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary-container to-terracotta-soft opacity-10 blur-xl group-hover:opacity-20 transition-opacity pointer-events-none" />
@@ -800,7 +767,9 @@ export default function RecursosPage() {
                                       </button>
                                     ))
                                   ) : (
-                                    <div className="px-3 py-2 text-xs text-muted-foreground italic">Presioná enter para agregar &quot;{newCategory}&quot;</div>
+                                    <div className="px-3 py-2 text-xs text-muted-foreground italic">
+                                      {newCategory ? `Se registrará "${newCategory}" como materia nueva` : "Escribí para buscar o crear"}
+                                    </div>
                                   )}
                                 </motion.div>
                               )}
@@ -857,14 +826,14 @@ export default function RecursosPage() {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-muted-foreground mb-1">Tipo de Archivo</label>
+                        <label className="block text-xs font-semibold text-muted-foreground mb-1">Tipo de Archivo <span className="text-red-400">*</span></label>
                         <div className="relative">
                           <button
                             type="button"
                             onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-                            className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all flex justify-between items-center"
+                            className={`w-full bg-card/65 border border-border/40 rounded-xl py-2 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-accent transition-all flex justify-between items-center ${newType ? "text-foreground" : "text-muted-foreground/70"}`}
                           >
-                            <span>{newType}</span>
+                            <span>{newType || "Seleccioná un tipo..."}</span>
                             <ChevronDown className={`w-3.5 h-3.5 opacity-50 transition-transform ${isTypeDropdownOpen ? "rotate-180" : ""}`} />
                           </button>
                           
@@ -876,7 +845,7 @@ export default function RecursosPage() {
                                 exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
                                 className="absolute top-full left-0 right-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col"
                               >
-                                {["Apunte de Teoría", "Trabajo Práctico Resuelto", "Guía de Ejercicios", "Otro"].map((type) => (
+                                {["Apunte de Teoría", "Trabajo Práctico Resuelto", "Guía de Ejercicios", "Resumen", "Otro"].map((type) => (
                                   <button
                                     key={type}
                                     type="button"
@@ -915,8 +884,8 @@ export default function RecursosPage() {
                             setNewTitle(title);
                           }
                         }}
-                        className={`border-2 border-dashed rounded-xl p-5 hover:border-accent/50 transition-colors bg-card/30 cursor-pointer flex flex-col items-center justify-center text-center w-full block ${
-                          isDragging ? "border-accent bg-accent/5" : "border-border/30"
+                        className={`border-2 border-dashed rounded-2xl p-8 hover:border-accent/50 transition-all duration-300 bg-card/30 cursor-pointer flex flex-col items-center justify-center text-center w-full min-h-[140px] block ${
+                          isDragging ? "border-accent bg-accent/10 shadow-[0_0_30px_rgba(var(--accent-rgb),0.15)] scale-[1.02]" : "border-border/30 hover:bg-card/50"
                         }`}
                       >
                         <input 
@@ -945,7 +914,9 @@ export default function RecursosPage() {
                           }}
                           accept=".pdf,.png,.jpg,.jpeg"
                         />
-                        <CloudUpload className={`w-8 h-8 mb-2 transition-transform duration-200 ${isDragging ? "scale-110 text-accent" : "text-muted-foreground"}`} />
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-all duration-300 ${isDragging ? "bg-accent/20 text-accent" : "bg-card border border-border/40 text-muted-foreground group-hover:text-accent"}`}>
+                          <CloudUpload className={`w-6 h-6 transition-transform duration-300 ${isDragging ? "scale-125 animate-bounce" : ""}`} />
+                        </div>
                         {file ? (
                           <>
                             <span className="text-xs text-accent font-bold mb-0.5 truncate max-w-full px-2">{file.name}</span>
@@ -1022,8 +993,8 @@ export default function RecursosPage() {
               {/* Two Column details body */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden pr-1 flex-1 pb-2 h-full">
                 
-                {/* Left Column: Real PDF Previewer */}
-                <div className="lg:col-span-8 flex flex-col h-full space-y-4">
+                {/* Full Width: Real PDF Previewer */}
+                <div className="lg:col-span-12 flex flex-col h-full space-y-4">
                   <h3 className="font-heading text-xs font-bold text-cream-bone uppercase tracking-wider flex items-center gap-2 shrink-0">
                     <Eye className="w-4 h-4 text-accent" />
                     Vista Previa del Documento
@@ -1040,107 +1011,24 @@ export default function RecursosPage() {
 
                   {/* Actions buttons */}
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => setResourceToDelete({ id: selectedResource.id, storageUrl: selectedResource.storage_url, title: selectedResource.title })}
-                      className="px-4 rounded-xl border border-destructive/20 text-destructive hover:bg-destructive/10 transition-all flex items-center justify-center gap-1.5 text-xs font-semibold"
-                      title="Eliminar apunte"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {selectedResource.isOwner && (
+                      <button
+                        onClick={() => setResourceToDelete({ id: selectedResource.id, storageUrl: selectedResource.storage_url, title: selectedResource.title })}
+                        className="px-4 rounded-xl border border-destructive/20 text-destructive hover:bg-destructive/10 transition-all flex items-center justify-center gap-1.5 text-xs font-semibold"
+                        title="Eliminar apunte"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
 
                     <button
-                      onClick={() => showToast("¡Apunte descargado! Guardado en descargas local.")}
+                      onClick={() => handleDownloadResource(selectedResource)}
                       className="flex-1 bg-accent text-accent-foreground font-semibold py-2.5 rounded-xl hover:bg-accent/90 transition-all text-xs flex items-center justify-center gap-2 shadow-lg shadow-accent/15"
                     >
                       <Download className="w-4 h-4" />
-                      Descargar PDF Completo
-                    </button>
-                    
-                    <button
-                      onClick={(e) => handleToggleAiContext(selectedResource, e)}
-                      className={`px-4 rounded-xl border transition-all duration-200 flex items-center justify-center gap-1.5 text-xs font-semibold ${
-                        aiContextList.some((item) => item.id === selectedResource.id)
-                          ? "bg-accent/20 border-accent text-accent"
-                          : "bg-card/50 border-border/20 text-muted-foreground hover:text-accent hover:border-accent/40"
-                      }`}
-                    >
-                      <Bot className="w-4 h-4" />
-                      {aiContextList.some((item) => item.id === selectedResource.id) ? "En Contexto AI" : "Cargar en Contexto"}
+                      Descargar Archivo Original
                     </button>
                   </div>
-                </div>
-
-                {/* Right Column: Dynamic RAG Chat Interface Terminal mockup */}
-                <div className="flex flex-col h-full lg:col-span-4 bg-obsidian/45 rounded-2xl border border-border/10 p-4 relative overflow-hidden">
-                  
-                  {/* Glowing background amber decoration */}
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 blur-[50px] rounded-full pointer-events-none" />
-
-                  <h3 className="font-heading text-xs font-bold text-accent uppercase tracking-wider mb-3 flex items-center gap-1.5 border-b border-white/5 pb-2 relative z-10 select-none">
-                    <Bot className="w-4 h-4" />
-                    Preguntale al Asistente IA
-                  </h3>
-
-                  {/* Chat messages layout list */}
-                  <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 py-2 space-y-3.5 relative z-10">
-                    {chatMessages.map((msg, i) => (
-                      <div
-                        key={i}
-                        className={`flex items-start gap-2.5 max-w-[85%] ${
-                          msg.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"
-                        }`}
-                      >
-                        <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[10px] font-black border ${
-                          msg.role === "user" 
-                            ? "bg-accent/25 border-accent text-accent" 
-                            : "bg-card border-border/30 text-muted-foreground"
-                        }`}>
-                          {msg.role === "user" ? "U" : "IA"}
-                        </div>
-                        <div className={`rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
-                          msg.role === "user"
-                            ? "bg-accent text-accent-foreground font-semibold"
-                            : "bg-card/65 border border-border/5 text-muted-foreground"
-                        }`}>
-                          <p>{msg.content}</p>
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Chat loader streaming display */}
-                    {chatLoading && (
-                      <div className="flex items-start gap-2.5 mr-auto max-w-[85%] animate-pulse">
-                        <div className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[10px] font-black bg-card border border-border/30 text-muted-foreground">
-                          IA
-                        </div>
-                        <div className="bg-card/65 border border-border/5 text-muted-foreground rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce" />
-                          <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-delay:0.2s]" />
-                          <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-delay:0.4s]" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Chat input box trigger form */}
-                  <form onSubmit={handleMiniChatSend} className="mt-3 pt-3 border-t border-white/5 relative z-10 flex gap-2">
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ej: ¿Me hacés un resumen de los temas más importantes?"
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      className="flex-1 bg-card/60 border border-border/40 rounded-xl py-2 px-3 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                    />
-                    <button
-                      type="submit"
-                      disabled={chatLoading}
-                      className="bg-accent text-accent-foreground font-semibold px-3 rounded-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-transform disabled:opacity-40"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                    </button>
-                  </form>
-
                 </div>
 
               </div>

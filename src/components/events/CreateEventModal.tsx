@@ -216,7 +216,7 @@ export default function CreateEventModal({ isOpen, onClose, onCreated, editingEv
             </label>
             <Select
               value={form.event_type}
-              onChange={(val) => updateField("event_type", val)}
+              onChange={(val) => updateField("event_type", String(val))}
               options={EVENT_TYPES}
               className="w-full bg-card/65 border border-border/40 rounded-xl py-2.5 px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
             />

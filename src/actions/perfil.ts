@@ -469,7 +469,7 @@ export async function fetchSubjects(): Promise<DbSubject[]> {
     ["subjects-list"],
     {
       tags: [CACHE_TAGS.subjectsList],
-      revalidate: 86400
+      revalidate: 300
     }
   )();
 }

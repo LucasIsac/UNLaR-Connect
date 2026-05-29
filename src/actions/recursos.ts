@@ -3,6 +3,7 @@
 import { createServerClient } from "@/lib/supabase";
 import { DbDocument } from "@/types/database";
 import { revalidatePath } from "next/cache";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 
 export interface ResourceExtended extends DbDocument {
   category: string; // Map from topic/subject
@@ -11,8 +12,11 @@ export interface ResourceExtended extends DbDocument {
   authorName: string;
   uploadedDate: string;
   saved: boolean;
+  hasVoted?: boolean;
   likes: number;
   description: string;
+  careers: string[];
+  isOwner: boolean;
 }
 
 // Note: auth is now retrieved server-side.
@@ -23,9 +27,12 @@ export interface ResourceExtended extends DbDocument {
 export async function fetchResources(): Promise<ResourceExtended[]> {
   const supabase = createServerClient();
   try {
+    const { data: authData } = await supabase.auth.getUser();
+    const userId = authData?.user?.id;
+
     const { data: documents, error } = await supabase
       .from("documents")
-      .select("*, subjects(name)")
+      .select("*, subjects(name, career_subjects(careers(name))), users!documents_user_id_fkey(name, last_name), topics(name), saved_documents(user_id), document_votes(user_id)")
       .order("uploaded_at", { ascending: false });
 
     if (error) {
@@ -41,6 +48,7 @@ export async function fetchResources(): Promise<ResourceExtended[]> {
     return documents.map((doc: any) => {
       const cat = doc.subjects?.name || "Otra";
       let catColor = "text-primary bg-primary/10 border-primary/20";
+      const relatedCareers = doc.subjects?.career_subjects?.map((cs: any) => cs.careers?.name).filter(Boolean) || [];
       
       if (cat === "Sistemas Operativos") catColor = "text-orange-400 bg-orange-400/10 border-orange-400/20";
       else if (cat.includes("Análisis")) catColor = "text-blue-400 bg-blue-400/10 border-blue-400/20";
@@ -50,12 +58,15 @@ export async function fetchResources(): Promise<ResourceExtended[]> {
         ...doc,
         category: cat,
         categoryColor: catColor,
-        thematicAxis: "General",
-        authorName: "Estudiante UNLaR",
+        thematicAxis: doc.topics?.name || "General",
+        authorName: doc.users ? `${doc.users.name} ${doc.users.last_name || ""}`.trim() : "Estudiante UNLaR",
         uploadedDate: new Date(doc.uploaded_at).toLocaleDateString("es-AR"),
-        saved: false,
+        saved: userId ? doc.saved_documents?.some((s: any) => s.user_id === userId) : false,
+        hasVoted: userId ? doc.document_votes?.some((v: any) => v.user_id === userId) : false,
         likes: doc.upvotes || 0,
         description: "Apunte subido a la plataforma.",
+        careers: relatedCareers,
+        isOwner: userId ? userId === doc.user_id : false,
       };
     });
   } catch (error) {
@@ -70,22 +81,18 @@ export async function fetchResources(): Promise<ResourceExtended[]> {
 export async function uploadResource(formData: FormData): Promise<{ success: boolean; data?: ResourceExtended; error?: string }> {
   const supabase = createServerClient();
   try {
-    const file = formData.get("file") as File;
     const title = formData.get("title") as string;
     const category = formData.get("category") as string;
     const thematicAxis = formData.get("thematicAxis") as string;
     const description = formData.get("description") as string;
+    const filePath = formData.get("filePath") as string;
 
-    if (!file || !title) {
-      return { success: false, error: "El archivo y el título son obligatorios." };
+    if (!title) {
+      return { success: false, error: "El título es obligatorio." };
     }
 
-    if (file.size === 0) {
-      return { success: false, error: "El archivo está vacío (0 bytes)." };
-    }
-
-    if (file.size > 50 * 1024 * 1024) {
-      return { success: false, error: "El archivo es demasiado grande (máximo 50MB)." };
+    if (!filePath) {
+      return { success: false, error: "El archivo no se subió correctamente o no se recibió la ruta." };
     }
 
     const authResponse = await supabase.auth.getUser();
@@ -95,23 +102,6 @@ export async function uploadResource(formData: FormData): Promise<{ success: boo
       return { success: false, error: "No estás autenticado/a." };
     }
 
-    const fileExt = file.name.split('.').pop();
-    const filePath = `${authUser.id}/${Date.now()}.${fileExt}`;
-
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    const { error: storageError } = await supabase.storage
-      .from('apuntes')
-      .upload(filePath, buffer, {
-        contentType: file.type,
-      });
-
-    if (storageError) {
-      console.error("Storage upload error:", storageError);
-      return { success: false, error: "Error al subir el archivo físico." };
-    }
-
     const { data: publicUrlData } = supabase.storage
       .from('apuntes')
       .getPublicUrl(filePath);
@@ -119,13 +109,46 @@ export async function uploadResource(formData: FormData): Promise<{ success: boo
     // Look up the subject ID to save it to the DB so it persists
     let subjectId = null;
     if (category) {
-      const { data: subj } = await supabase.from('subjects').select('id').ilike('name', category).single();
-      if (subj) subjectId = subj.id;
+      const { data: subj } = await supabase.from('subjects').select('id').ilike('name', category).maybeSingle();
+      if (subj) {
+        subjectId = subj.id;
+      } else {
+        // Create new subject automatically
+        const { data: newSubj, error: newSubjErr } = await supabase
+          .from('subjects')
+          .insert({ name: category, year: 1 })
+          .select('id')
+          .single();
+          
+        if (newSubj) {
+          subjectId = newSubj.id;
+          invalidateCache(CACHE_TAGS.subjectsList);
+        } else {
+          console.error("Error al crear materia nueva:", newSubjErr);
+        }
+      }
     }
 
+    let topicId = null;
+    if (thematicAxis && thematicAxis !== "General" && subjectId) {
+      const { data: topic } = await supabase.from('topics').select('id').eq('subject_id', subjectId).ilike('name', thematicAxis).maybeSingle();
+      if (topic) {
+        topicId = topic.id;
+      } else {
+        const { data: newTopic } = await supabase
+          .from('topics')
+          .insert({ name: thematicAxis, subject_id: subjectId })
+          .select('id')
+          .single();
+        if (newTopic) topicId = newTopic.id;
+      }
+    }
+
+    const fileExt = filePath.split('.').pop();
     const newDoc = {
       user_id: authUser.id,
       subject_id: subjectId,
+      topic_id: topicId,
       title: title.trim(),
       document_type: fileExt || "unknown",
       storage_url: publicUrlData.publicUrl,
@@ -155,12 +178,16 @@ export async function uploadResource(formData: FormData): Promise<{ success: boo
       category,
       categoryColor: catColor,
       thematicAxis,
-      authorName: "Tu Perfil",
+      authorName: authUser.user_metadata?.name || "Tu Perfil",
       uploadedDate: "Hoy",
       likes: dbData.upvotes || 0,
       saved: false,
-      description: description || `Material aportado voluntariamente.`
+      description: description || `Material aportado voluntariamente.`,
+      careers: []
     };
+
+    // Revalidate everything so the top header points update
+    revalidatePath('/', 'layout');
 
     return { success: true, data: mappedDoc };
   } catch (error) {
@@ -173,10 +200,30 @@ export async function uploadResource(formData: FormData): Promise<{ success: boo
  * Favorite or save a resource (Placeholder for now)
  */
 export async function toggleSaveResource(id: string): Promise<{ success: boolean; saved?: boolean; error?: string }> {
+  if (!id) return { success: false, error: "ID inválido." };
+  const supabase = createServerClient();
   try {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return { success: true, saved: true };
-  } catch {
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData.user) return { success: false, error: "No autorizado." };
+
+    const { data: existing } = await supabase
+      .from('saved_documents')
+      .select('user_id')
+      .eq('user_id', authData.user.id)
+      .eq('document_id', id)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase.from('saved_documents').delete().eq('user_id', authData.user.id).eq('document_id', id);
+      revalidatePath('/', 'layout');
+      return { success: true, saved: false };
+    } else {
+      await supabase.from('saved_documents').insert({ user_id: authData.user.id, document_id: id });
+      revalidatePath('/', 'layout');
+      return { success: true, saved: true };
+    }
+  } catch (error) {
+    console.error("Error al guardar el apunte:", error);
     return { success: false, error: "Error al guardar el apunte." };
   }
 }
@@ -185,10 +232,35 @@ export async function toggleSaveResource(id: string): Promise<{ success: boolean
  * Cast a vote on a resource (Placeholder for now)
  */
 export async function castResourceVote(id: string): Promise<{ success: boolean; newScore?: number; error?: string }> {
+  if (!id) return { success: false, error: "ID inválido." };
+  const supabase = createServerClient();
   try {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return { success: true, newScore: 2 };
-  } catch {
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData.user) return { success: false, error: "No autorizado." };
+
+    const { data: existingVote } = await supabase
+      .from('document_votes')
+      .select('direction')
+      .eq('user_id', authData.user.id)
+      .eq('document_id', id)
+      .maybeSingle();
+
+    if (existingVote) {
+      await supabase.from('document_votes').delete().eq('user_id', authData.user.id).eq('document_id', id);
+    } else {
+      await supabase.from('document_votes').insert({ user_id: authData.user.id, document_id: id, direction: 1 });
+    }
+
+    // Wait a bit for the trigger to update the documents upvotes, then fetch the new score
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const { data: doc } = await supabase.from('documents').select('upvotes').eq('id', id).single();
+    
+    // Refresh layout for global points
+    revalidatePath('/', 'layout');
+
+    return { success: true, newScore: doc?.upvotes || 0 };
+  } catch (error) {
+    console.error("Error al registrar voto:", error);
     return { success: false, error: "Error al registrar voto." };
   }
 }
