@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient as createBrowserClient } from "@/lib/supabase/client";
+import {
+  createClient as createBrowserClient,
+  unsubscribeRealtimeChannel,
+} from "@/lib/supabase/client";
 import { useCallPresence } from "@/hooks/useCallPresence";
 import { 
   AvailableTutor, 
@@ -29,18 +32,21 @@ import {
   AlertCircle
 } from "lucide-react";
 import { DbSubject } from "@/types/database";
+import DashboardLayout from "@/components/layout/DashboardLayout";
+import type { CombinedHeaderData } from "@/actions/perfil";
 
 interface TutoriasClientProps {
   currentUser: {
     id: string;
     name: string;
     last_name: string;
-    role_id: number; // 1 = Tutor, 2 = Student
+    role_id: number; // 3 = Tutor, 2 = Student
     avatar_url?: string;
   };
+  initialHeaderData?: CombinedHeaderData;
 }
 
-export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
+export default function TutoriasClient({ currentUser, initialHeaderData }: TutoriasClientProps) {
   const router = useRouter();
   const supabase = createBrowserClient();
 
@@ -106,7 +112,7 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
 
   // Listen for incoming call requests (if user is a tutor)
   useEffect(() => {
-    if (currentUser.role_id !== 1) return;
+    if (currentUser.role_id !== 3) return;
 
     const channel = supabase
       .channel("tutor_call_listeners")
@@ -128,16 +134,22 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
               .eq("id", newRoom.student_id)
               .single();
 
-            const { data: subject } = await supabase
-              .from("subjects")
-              .select("name")
-              .eq("id", newRoom.subject_id)
-              .single();
+            let subjectName = "Consulta General";
+            if (newRoom.subject_id) {
+              const { data: subject } = await supabase
+                .from("subjects")
+                .select("name")
+                .eq("id", newRoom.subject_id)
+                .single();
+              if (subject) {
+                subjectName = subject.name;
+              }
+            }
 
             setIncomingCall({
               roomId: newRoom.id,
               studentName: student ? `${student.name} ${student.last_name}` : "Estudiante",
-              subjectName: subject ? subject.name : "Consulta Express",
+              subjectName,
             });
           }
         }
@@ -145,9 +157,9 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      unsubscribeRealtimeChannel(channel);
     };
-  }, [currentUser]);
+  }, [currentUser.id, currentUser.role_id]);
 
   // Listen for outgoing request status changes (if student is waiting)
   useEffect(() => {
@@ -179,7 +191,7 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      unsubscribeRealtimeChannel(channel);
     };
   }, [activeCallRoomId]);
 
@@ -225,6 +237,9 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
   // Intersect DB tutors list with current online presence to render available tutors
   const getAvailableTutors = (): AvailableTutor[] => {
     return allTutors.filter((tutor) => {
+      // Exclude current user from the list of available tutors
+      if (tutor.id === currentUser.id) return false;
+
       // Must be online based on presence
       const isOnline = onlineTutors[tutor.id]?.available;
       if (!isOnline) return false;
@@ -280,7 +295,8 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-12">
+    <DashboardLayout initialHeaderData={initialHeaderData} showSearch={false}>
+      <div className="space-y-8 animate-fade-in pb-12">
       {/* Incoming call notification */}
       {incomingCall && (
         <IncomingCallBanner
@@ -341,7 +357,7 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
         </div>
 
         {/* Tutor Availability Switch */}
-        {currentUser.role_id === 1 && (
+        {currentUser.role_id === 3 && (
           <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-xl border border-border/20 shrink-0">
             <div className="text-right">
               <span className="text-xs text-muted-foreground block font-semibold uppercase tracking-wider">
@@ -585,5 +601,6 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
 
       </div>
     </div>
+    </DashboardLayout>
   );
 }

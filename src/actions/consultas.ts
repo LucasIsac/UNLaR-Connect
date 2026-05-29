@@ -43,49 +43,48 @@ export async function fetchAvailableTutors(
 
     const supabase = createServerClient();
 
-    let query = supabase
-      .from("tutor_subjects")
+    // Query all users who are tutors (role_id = 3)
+    const { data, error } = await supabase
+      .from("users")
       .select(`
-        tutor:users!tutor_id(
-          id, name, last_name, avatar_url, tutor_rating, total_reviews, role_id
-        ),
-        subject:subjects(id, name, year)
-      `);
+        id, name, last_name, avatar_url, tutor_rating, total_reviews, role_id,
+        tutor_subjects(
+          subject:subjects(id, name, year)
+        )
+      `)
+      .eq("role_id", 3);
 
-    if (subjectId) {
-      query = query.eq("subject_id", subjectId);
-    }
-
-    const { data, error } = await query;
     if (error) throw error;
 
-    // Group by tutor
-    const tutorMap = new Map<string, AvailableTutor>();
+    const tutors: AvailableTutor[] = [];
+
     for (const row of data ?? []) {
-      const tutor = (Array.isArray(row.tutor) ? row.tutor[0] : row.tutor) as unknown as (DbUser & { role_id: number });
-      const subject = (Array.isArray(row.subject) ? row.subject[0] : row.subject) as unknown as DbSubject;
+      // Extract the subjects list from the nested relation
+      const rawSubjects = (row.tutor_subjects || []) as any[];
+      const subjects: DbSubject[] = rawSubjects
+        .map((item: any) => {
+          const s = Array.isArray(item.subject) ? item.subject[0] : item.subject;
+          return s as DbSubject;
+        })
+        .filter(Boolean);
 
-      if (!tutor || !tutor.id) continue;
-      // Only role_id === 1 (tutor) can appear
-      if (tutor.role_id !== 1) continue;
+      // If a specific subject filter is requested, filter it here
+      if (subjectId && !subjects.some((s) => s.id === subjectId)) {
+        continue;
+      }
 
-      if (!tutorMap.has(tutor.id)) {
-        tutorMap.set(tutor.id, {
-          id: tutor.id,
-          name: tutor.name,
-          last_name: tutor.last_name,
-          avatar_url: tutor.avatar_url ?? null,
-          tutor_rating: tutor.tutor_rating ?? 0,
-          total_reviews: tutor.total_reviews ?? 0,
-          subjects: [],
-        });
-      }
-      if (subject) {
-        tutorMap.get(tutor.id)!.subjects.push(subject);
-      }
+      tutors.push({
+        id: row.id,
+        name: row.name,
+        last_name: row.last_name,
+        avatar_url: row.avatar_url ?? null,
+        tutor_rating: Number(row.tutor_rating) || 0,
+        total_reviews: row.total_reviews ?? 0,
+        subjects,
+      });
     }
 
-    return { success: true, data: Array.from(tutorMap.values()) };
+    return { success: true, data: tutors };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Error desconocido";
     console.error("[fetchAvailableTutors]", msg);

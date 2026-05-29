@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient as createBrowserClient } from "@/lib/supabase/client";
+import {
+  createClient as createBrowserClient,
+  unsubscribeRealtimeChannel,
+} from "@/lib/supabase/client";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { 
   CallRoomExtended, 
@@ -22,6 +25,7 @@ import {
   FileText, 
   User, 
   AlertTriangle,
+  Info,
   Clock,
   Sparkles
 } from "lucide-react";
@@ -30,6 +34,12 @@ interface SalaClientProps {
   room: CallRoomExtended;
   isTutor: boolean;
   currentUserId: string;
+}
+
+interface CallExitNotice {
+  title: string;
+  message: string;
+  actionLabel: string;
 }
 
 export default function SalaClient({
@@ -42,12 +52,16 @@ export default function SalaClient({
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const endingByMeRef = useRef(false);
+  const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [messages, setMessages] = useState<DbCallMessage[]>([]);
   const [showChat, setShowChat] = useState(true);
   const [activeTab, setActiveTab] = useState<"chat" | "resources">("chat");
   const [unreadCount, setUnreadCount] = useState(0);
+  const [callExitNotice, setCallExitNotice] = useState<CallExitNotice | null>(null);
+  const [visibleMediaInfo, setVisibleMediaInfo] = useState<string | null>(null);
 
   // Call timer state
   const [callDuration, setCallDuration] = useState(0);
@@ -56,7 +70,11 @@ export default function SalaClient({
   const {
     localStream,
     remoteStream,
+    remoteHasAudio,
+    remoteHasVideo,
     connectionState,
+    mediaMode,
+    mediaWarning,
     isMuted,
     isCameraOff,
     toggleMute,
@@ -64,6 +82,7 @@ export default function SalaClient({
   } = useWebRTC({
     roomId: room.id,
     isTutor,
+    currentUserId,
     onConnectionStateChange: (state) => {
       if (state === "connected") {
         // Automatically set call room active in database if not already
@@ -132,12 +151,22 @@ export default function SalaClient({
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      unsubscribeRealtimeChannel(channel);
     };
   }, [room.id, showChat, activeTab]);
 
   // Listen to call_rooms updates (to detect when the peer ends the call)
   useEffect(() => {
+    const peerName = isTutor ? room.student?.name : room.tutor?.name;
+
+    const scheduleReturnToTutorias = () => {
+      if (redirectTimeoutRef.current) return;
+
+      redirectTimeoutRef.current = setTimeout(() => {
+        router.push("/tutorias");
+      }, 1800);
+    };
+
     const channel = supabase
       .channel(`room_lifecycle_${room.id}`)
       .on(
@@ -151,17 +180,29 @@ export default function SalaClient({
         (payload) => {
           const updatedRoom = payload.new;
           if (updatedRoom.status === "ended" || updatedRoom.status === "rejected") {
-            alert("La llamada ha sido finalizada por el otro usuario.");
-            router.push("/tutorias");
+            if (endingByMeRef.current) {
+              setCallExitNotice({
+                title: "Consulta finalizada",
+                message: "Cerraste la llamada. Te llevamos de vuelta a Tutorías.",
+                actionLabel: "Volver ahora",
+              });
+            } else {
+              setCallExitNotice({
+                title: "Consulta finalizada",
+                message: `${peerName || "La otra persona"} terminó la llamada. Te llevamos de vuelta a Tutorías.`,
+                actionLabel: "Volver a Tutorías",
+              });
+            }
+            scheduleReturnToTutorias();
           }
         }
       )
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      unsubscribeRealtimeChannel(channel);
     };
-  }, [room.id]);
+  }, [isTutor, room.id, room.student?.name, room.tutor?.name, router]);
 
   // Call duration stopwatch timer
   useEffect(() => {
@@ -172,13 +213,62 @@ export default function SalaClient({
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!mediaWarning) {
+      setVisibleMediaInfo(null);
+      return;
+    }
+
+    setVisibleMediaInfo(mediaWarning);
+    const timeout = setTimeout(() => {
+      setVisibleMediaInfo(null);
+    }, 4500);
+
+    return () => clearTimeout(timeout);
+  }, [mediaWarning]);
+
   const handleSendMessage = async (content: string) => {
     await sendCallMessage(room.id, content);
   };
 
   const handleEndCall = async () => {
-    await endCall(room.id);
-    router.push("/tutorias");
+    endingByMeRef.current = true;
+    setCallExitNotice({
+      title: "Cerrando consulta",
+      message: "Estamos finalizando la llamada y guardando el cierre.",
+      actionLabel: "Volver ahora",
+    });
+
+    const res = await endCall(room.id);
+    if (!res.success) {
+      endingByMeRef.current = false;
+      setCallExitNotice({
+        title: "No pudimos cerrar la llamada",
+        message: res.error || "Intentá finalizarla de nuevo en unos segundos.",
+        actionLabel: "Entendido",
+      });
+      return;
+    }
+
+    setCallExitNotice({
+      title: "Consulta finalizada",
+      message: "Cerraste la llamada. Te llevamos de vuelta a Tutorías.",
+      actionLabel: "Volver ahora",
+    });
+
+    if (!redirectTimeoutRef.current) {
+      redirectTimeoutRef.current = setTimeout(() => {
+        router.push("/tutorias");
+      }, 1200);
+    }
   };
 
   const toggleChatPanel = () => {
@@ -206,9 +296,34 @@ export default function SalaClient({
   const peerUser = isTutor ? room.student : room.tutor;
   const peerRoleLabel = isTutor ? "Estudiante" : "Tutor experto";
   const peerInitials = `${peerUser?.name?.[0] || ""}${peerUser?.last_name?.[0] || ""}`.toUpperCase();
+  const hasRemoteMedia = Boolean(remoteStream);
+  const mediaInfoTitle = mediaMode === "chat-only" ? "Modo chat" : "Modo sin cámara";
 
   return (
     <div className="flex-grow flex flex-col min-h-0 relative">
+      {callExitNotice && (
+        <div className="fixed inset-0 z-[80] bg-background/80 backdrop-blur-xl flex items-center justify-center p-4 animate-fade-in">
+          <div className="w-full max-w-sm rounded-xl border border-border/40 bg-glass shadow-2xl p-6 text-center space-y-5">
+            <div className="w-14 h-14 rounded-full bg-destructive/15 border border-destructive/25 flex items-center justify-center mx-auto text-destructive">
+              <PhoneOff className="w-7 h-7" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-heading font-black text-xl text-foreground">
+                {callExitNotice.title}
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {callExitNotice.message}
+              </p>
+            </div>
+            <button
+              onClick={() => router.push("/tutorias")}
+              className="w-full h-11 rounded-xl bg-accent text-accent-foreground font-bold text-sm shadow-lg shadow-accent/10 hover:bg-accent/90 transition-all hover:scale-[1.01] focus:outline-none"
+            >
+              {callExitNotice.actionLabel}
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Top Banner Status */}
       <div className="bg-glass px-6 py-3 rounded-xl border border-border/20 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg z-10 mb-4 backdrop-blur-xl">
@@ -260,13 +375,32 @@ export default function SalaClient({
           
           {/* Main Remote Video */}
           <div className="absolute inset-0 z-0 bg-neutral-900/50 flex items-center justify-center">
-            {connectionState === "connected" && remoteStream ? (
-              <video
-                ref={remoteVideoRef}
-                autoPlay
-                playsInline
-                className="w-full h-full object-cover"
-              />
+            {hasRemoteMedia ? (
+              <>
+                <video
+                  ref={remoteVideoRef}
+                  autoPlay
+                  playsInline
+                  className={remoteHasVideo ? "w-full h-full object-cover" : "absolute w-px h-px opacity-0 pointer-events-none"}
+                />
+                {!remoteHasVideo && (
+                  <div className="text-center space-y-4 p-6">
+                    <div className="w-16 h-16 rounded-full bg-accent/15 border border-accent/25 flex items-center justify-center text-accent mx-auto font-heading font-black text-lg">
+                      {peerInitials || "UC"}
+                    </div>
+                    <div>
+                      <h4 className="font-heading font-bold text-base text-foreground">
+                        {remoteHasAudio ? "Audio conectado" : "Conectado sin video"}
+                      </h4>
+                      <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-relaxed mt-1">
+                        {remoteHasAudio
+                          ? `${peerUser?.name} está en la consulta sin cámara.`
+                          : `Esperando la cámara de ${peerUser?.name}.`}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               // Loading/connecting placeholder
               <div className="text-center space-y-4 p-6">
@@ -276,7 +410,9 @@ export default function SalaClient({
                     Estableciendo conexión...
                   </h4>
                   <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-relaxed mt-1">
-                    Conectando de forma directa y segura con {peerUser?.name}.
+                    {mediaMode === "chat-only"
+                      ? `Podés usar el chat mientras esperamos a ${peerUser?.name}.`
+                      : `Conectando de forma directa y segura con ${peerUser?.name}.`}
                   </p>
                 </div>
               </div>
@@ -301,7 +437,7 @@ export default function SalaClient({
             )}
           </div>
 
-          {/* Direct-WebRTC fallback/warning banner */}
+          {/* Direct-WebRTC connection failure */}
           {connectionError && (
             <div className="absolute bottom-4 left-4 right-4 z-20 bg-destructive/95 text-white border border-destructive/20 p-3.5 rounded-xl flex items-start gap-3 shadow-2xl backdrop-blur-md">
               <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 animate-bounce text-amber-300" />
@@ -311,6 +447,21 @@ export default function SalaClient({
                 </h5>
                 <p className="text-xs text-destructive-foreground/90 mt-1 leading-relaxed">
                   {connectionError}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Non-blocking local media info */}
+          {visibleMediaInfo && !connectionError && (
+            <div className="absolute bottom-4 left-4 right-4 z-20 bg-card/90 text-foreground border border-border/40 p-3.5 rounded-xl flex items-start gap-3 shadow-2xl backdrop-blur-md animate-fade-in">
+              <Info className="w-5 h-5 shrink-0 mt-0.5 text-accent" />
+              <div className="flex-1 min-w-0">
+                <h5 className="font-heading font-black text-sm text-foreground uppercase tracking-wider leading-none">
+                  {mediaInfoTitle}
+                </h5>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  {visibleMediaInfo}
                 </p>
               </div>
             </div>

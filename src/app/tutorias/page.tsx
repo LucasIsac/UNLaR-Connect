@@ -1,6 +1,7 @@
 import { getVerifiedSession, createServerClient } from "@/lib/supabase";
 import { redirect } from "next/navigation";
 import TutoriasClient from "./TutoriasClient";
+import { fetchCombinedHeaderData } from "@/actions/perfil";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,13 @@ export default async function TutoriasPage() {
     redirect("/auth/login");
   }
 
-  const supabase = createServerClient();
+  const [headerData, supabase] = await Promise.all([
+    fetchCombinedHeaderData().catch((err) => {
+      console.error("Failed to load header data in TutoriasPage:", err);
+      return undefined;
+    }),
+    createServerClient(),
+  ]);
 
   // Fetch complete user profile details
   const { data: user, error } = await supabase
@@ -25,16 +32,15 @@ export default async function TutoriasPage() {
   }
 
   return (
-    <main className="container max-w-container-max mx-auto px-4 md:px-6 py-8">
-      <TutoriasClient
-        currentUser={{
-          id: user.id,
-          name: user.name,
-          last_name: user.last_name,
-          role_id: user.role_id,
-          avatar_url: user.avatar_url ?? undefined,
-        }}
-      />
-    </main>
+    <TutoriasClient
+      currentUser={{
+        id: user.id,
+        name: user.name,
+        last_name: user.last_name,
+        role_id: user.role_id,
+        avatar_url: user.avatar_url ?? undefined,
+      }}
+      initialHeaderData={headerData}
+    />
   );
 }

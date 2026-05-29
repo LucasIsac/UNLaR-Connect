@@ -50,6 +50,55 @@ export default function RootLayout({
             `,
           }}
         />
+        <script
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var attrName = 'bis_skin_checked';
+                  var clean = function(root) {
+                    if (!root || root.nodeType !== 1) return;
+                    if (root.hasAttribute && root.hasAttribute(attrName)) {
+                      root.removeAttribute(attrName);
+                    }
+                    if (root.querySelectorAll) {
+                      root.querySelectorAll('[' + attrName + ']').forEach(function(node) {
+                        node.removeAttribute(attrName);
+                      });
+                    }
+                  };
+
+                  clean(document.documentElement);
+
+                  var observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                      if (mutation.type === 'attributes') {
+                        clean(mutation.target);
+                      } else {
+                        mutation.addedNodes.forEach(clean);
+                      }
+                    });
+                  });
+
+                  observer.observe(document.documentElement, {
+                    attributes: true,
+                    childList: true,
+                    subtree: true,
+                    attributeFilter: [attrName]
+                  });
+
+                  window.addEventListener('load', function() {
+                    window.setTimeout(function() {
+                      observer.disconnect();
+                      clean(document.documentElement);
+                    }, 3000);
+                  });
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
       </head>
       <body className="font-sans antialiased custom-scrollbar" suppressHydrationWarning>
         <ThemeProvider>
