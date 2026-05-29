@@ -29,7 +29,7 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch: network-first strategy for API calls, cache-first for static assets
+// Fetch: cache-first strategy for static assets, network-only for all dynamic routes and pages
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -53,66 +53,53 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Network-first for API calls and server actions
-  if (
-    url.pathname.startsWith("/api/") ||
-    url.pathname.startsWith("/dashboard/") ||
-    request.headers.get("accept")?.includes("text/x-component")
-  ) {
+  // Define static assets paths that are safe to cache-first.
+  // These are unchanging files like icons, logo, manifest, fonts, and favicons.
+  const isStaticAsset =
+    url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/fonts/") ||
+    url.pathname === "/manifest.json" ||
+    url.pathname === "/logo.svg" ||
+    url.pathname === "/favicon.ico" ||
+    url.pathname === "/favicon.png";
+
+  if (isStaticAsset) {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Clone and cache successful responses
-          if (response.ok) {
-            const responseClone = response.clone();
-            event.waitUntil(
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone))
-            );
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cachedResponse = await caches.match(request);
-          return cachedResponse || Response.error();
-        })
+      caches.match(request).then((cachedResponse) => {
+        if (cachedResponse) {
+          // Return cached version, fetch update in background to refresh cache
+          event.waitUntil(
+            fetch(request)
+              .then((networkResponse) => {
+                if (networkResponse.ok) {
+                  return caches.open(CACHE_NAME).then((cache) => {
+                    return cache.put(request, networkResponse);
+                  });
+                }
+              })
+              .catch(() => undefined)
+          );
+          return cachedResponse;
+        }
+
+        // Not in cache, fetch from network and cache
+        return fetch(request)
+          .then((response) => {
+            if (response.ok) {
+              const responseClone = response.clone();
+              event.waitUntil(
+                caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone))
+              );
+            }
+            return response;
+          })
+          .catch(() => Response.error());
+      })
     );
     return;
   }
 
-  // Cache-first for static assets (JS, CSS, images, fonts)
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Return cached version, fetch update in background
-        event.waitUntil(
-          fetch(request)
-            .then((networkResponse) => {
-              if (networkResponse.ok) {
-                return caches.open(CACHE_NAME).then((cache) => {
-                  return cache.put(request, networkResponse);
-                });
-              }
-            })
-            .catch(() => undefined)
-        );
-        return cachedResponse;
-      }
-
-      // Not in cache, fetch from network
-      return fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const responseClone = response.clone();
-            event.waitUntil(
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone))
-            );
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cachedResponse = await caches.match(request);
-          return cachedResponse || Response.error();
-        });
-    })
-  );
+  // For EVERYTHING else (page routes, server actions, API routes, RSC components, etc.):
+  // Bypassing the service worker completely. Let the browser handle these via network-only.
+  return;
 });
