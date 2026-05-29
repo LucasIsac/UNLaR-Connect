@@ -427,7 +427,7 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
 
   return (
     <DashboardLayout initialHeaderData={initialHeaderData} showSearch={false}>
-      <div className="space-y-8 animate-fade-in pb-12">
+      <div className="space-y-4 animate-fade-in pb-6">
       {incomingCall && (
         <IncomingCallBanner
           studentName={incomingCall.studentName}
@@ -484,26 +484,26 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
         />
       )}
 
-      {/* Header section with Tabs and Tutor toggle */}
-      <div className="bg-glass p-6 rounded-xl border border-border/40 shadow-lg space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Page Header */}
+      <div className="mb-8 flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="font-heading font-black text-3xl text-foreground flex items-center gap-3">
-              <Video className="w-8 h-8 text-accent animate-pulse" />
+            <h1 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight mb-1 text-cream-bone flex items-center gap-2">
+              <Video className="w-6 h-6 text-accent animate-pulse shrink-0" />
               Tutorías P2P
             </h1>
-            <p className="text-muted-foreground mt-1.5 leading-relaxed text-sm">
+            <p className="text-sm text-muted-foreground">
               Conectate con compañeros para resolver dudas en vivo o agendar tutorías programadas.
             </p>
           </div>
 
           {isTutor && (
-            <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-xl border border-border/20 shrink-0">
+            <div className="flex items-center gap-2 bg-glass py-1.5 px-3 rounded-xl border border-border/40 shrink-0 select-none">
               <div className="text-right">
-                <span className="text-xs text-muted-foreground block font-semibold uppercase tracking-wider">
+                <span className="text-[10px] text-muted-foreground block font-semibold uppercase tracking-wider">
                   Tu disponibilidad
                 </span>
-                <span className={`text-sm font-bold block ${isAvailable ? "text-emerald-500" : "text-muted-foreground"}`}>
+                <span className={`text-xs font-bold block ${isAvailable ? "text-emerald-500" : "text-muted-foreground"}`}>
                   {isAvailable ? "Estoy disponible" : "No disponible"}
                 </span>
               </div>
@@ -512,9 +512,9 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                 className="text-accent transition-all hover:scale-105"
               >
                 {isAvailable ? (
-                  <ToggleRight className="w-11 h-11 fill-accent text-background" />
+                  <ToggleRight className="w-9 h-9 fill-accent text-background" />
                 ) : (
-                  <ToggleLeft className="w-11 h-11 text-muted-foreground" />
+                  <ToggleLeft className="w-9 h-9 text-muted-foreground" />
                 )}
               </button>
             </div>
@@ -522,107 +522,108 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-2 p-1 bg-muted/30 rounded-xl border border-border/20">
-          <button
-            onClick={() => setActiveTab("live")}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-              activeTab === "live"
-                ? "bg-accent text-accent-foreground shadow-lg shadow-accent/10"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            }`}
-          >
-            <Video className="w-4 h-4" />
-            En vivo
-          </button>
-          <button
-            onClick={() => setActiveTab("scheduled")}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all relative ${
-              activeTab === "scheduled"
-                ? "bg-accent text-accent-foreground shadow-lg shadow-accent/10"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            }`}
-          >
-            <Calendar className="w-4 h-4" />
-            Programadas
-            {pendingSessionsCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
-                {pendingSessionsCount}
-              </span>
-            )}
-          </button>
+        <div className="pt-3 border-t border-border/10">
+          <div className="flex gap-1.5 p-0.5 bg-muted/30 rounded-xl border border-border/20 max-w-xs select-none">
+            <button
+              onClick={() => setActiveTab("live")}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === "live"
+                  ? "bg-accent text-accent-foreground shadow-md shadow-accent/10 animate-fade-in"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              <Video className="w-3.5 h-3.5" />
+              En vivo
+            </button>
+            <button
+              onClick={() => setActiveTab("scheduled")}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all relative ${
+                activeTab === "scheduled"
+                  ? "bg-accent text-accent-foreground shadow-md shadow-accent/10 animate-fade-in"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              Programadas
+              {pendingSessionsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {pendingSessionsCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* ==================== LIVE TAB CONTENT ==================== */}
       {activeTab === "live" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-glass rounded-xl p-6 border border-border/40 space-y-6">
-              <div className="flex items-center justify-between border-b border-border/20 pb-4">
-                <h2 className="font-heading font-bold text-lg text-foreground flex items-center gap-2">
-                  <Users className="w-5 h-5 text-accent" />
+          {/* Left Column (Main Area) - Spans 2/3 */}
+          <div className="lg:col-span-2 space-y-4">
+            
+            {/* Tutores Activos en Línea */}
+            <div className="bg-glass rounded-2xl p-4 sm:p-5 border border-border/40 space-y-4">
+              <div className="flex items-center justify-between border-b border-border/20 pb-2.5">
+                <h2 className="font-heading font-bold text-sm text-foreground flex items-center gap-2">
+                  <Users className="w-4.5 h-4.5 text-accent" />
                   Tutores Activos en Línea
                 </h2>
-                <span className="bg-accent/15 text-accent px-3 py-1 rounded-full text-xs font-bold animate-pulse">
+                <span className="bg-accent/15 text-accent px-2.5 py-0.5 rounded-full text-[10px] font-bold animate-pulse">
                   {Object.keys(onlineTutors).length} online
                 </span>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <div className="flex-1 relative">
-                  <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     placeholder="Buscar por tutor o materia..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-background/50 border border-border/30 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                    className="w-full bg-background/50 border border-border/30 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                 </div>
 
-                <div className="min-w-[200px] w-full sm:w-auto">
+                <div className="min-w-[180px] w-full sm:w-auto">
                   <Select
                     value={selectedSubjectId || ""}
                     onChange={(val) => setSelectedSubjectId(val ? Number(val) : null)}
                     options={subjectOptions}
                     placeholder="Todas las materias"
-                    className="bg-background/50 border border-border/30 rounded-xl px-4 py-2.5 text-sm focus-within:ring-1 focus-within:ring-accent focus:outline-none font-sans"
+                    className="bg-background/50 border border-border/30 rounded-xl px-3 py-2 text-xs focus-within:ring-1 focus-within:ring-accent focus:outline-none font-sans"
                   />
                 </div>
               </div>
 
               {loadingTutors ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="bg-glass rounded-xl p-5 border border-border/20 space-y-4 animate-pulse">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-muted/60" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="bg-glass rounded-xl p-4 border border-border/20 space-y-3 animate-pulse">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-muted/60" />
                         <div className="flex-1 space-y-2">
-                          <div className="h-4 bg-muted/60 rounded-md w-3/4" />
-                          <div className="h-3 bg-muted/40 rounded-md w-1/2" />
+                          <div className="h-3.5 bg-muted/60 rounded-md w-3/4" />
+                          <div className="h-2.5 bg-muted/40 rounded-md w-1/2" />
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <div className="h-6 bg-muted/30 rounded-full w-20" />
-                        <div className="h-6 bg-muted/30 rounded-full w-16" />
-                      </div>
-                      <div className="h-10 bg-muted/40 rounded-xl w-full mt-2" />
+                      <div className="h-8 bg-muted/40 rounded-xl w-full mt-1" />
                     </div>
                   ))}
                 </div>
               ) : filteredAvailableTutors.length === 0 ? (
-                <div className="py-12 px-6 text-center border-2 border-dashed border-border/20 rounded-xl space-y-3 bg-muted/10">
-                  <AlertCircle className="w-10 h-10 text-muted-foreground/60 mx-auto" />
+                <div className="py-8 px-4 text-center border-2 border-dashed border-border/20 rounded-xl space-y-2 bg-muted/10">
+                  <AlertCircle className="w-8 h-8 text-muted-foreground/60 mx-auto" />
                   <div>
-                    <h3 className="font-semibold text-foreground text-base">No hay tutores disponibles</h3>
-                    <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto leading-relaxed">
+                    <h3 className="font-semibold text-foreground text-xs">No hay tutores disponibles</h3>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 max-w-xs mx-auto leading-relaxed">
                       Nadie está disponible en este momento con tus filtros. Avisale a un compañero para que active su disponibilidad.
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {filteredAvailableTutors.map((tutor) => (
                     <TutorCard
                       key={tutor.id}
@@ -635,93 +636,32 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                 </div>
               )}
             </div>
-          </div>
 
-          <div className="space-y-6">
-            <div className="bg-glass rounded-xl p-6 border border-border/40 shadow-lg space-y-6">
-              <h3 className="font-heading font-bold text-lg text-foreground flex items-center gap-2 border-b border-border/20 pb-4">
-                <Award className="w-5 h-5 text-accent" />
-                Tu Actividad Express
-              </h3>
-
-              {loadingHistory ? (
-                <div className="grid grid-cols-1 gap-4 animate-pulse">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-muted/30 border border-border/10 p-4 rounded-xl flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-muted/50 shrink-0" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-5 bg-muted/60 rounded-md w-1/4" />
-                        <div className="h-3 bg-muted/40 rounded-md w-3/4" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="bg-muted/30 border border-border/10 p-4 rounded-xl flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-accent/15 flex items-center justify-center text-accent shrink-0">
-                      <CheckCircle className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <span className="text-2xl font-black text-foreground block">{analytics.totalCalls}</span>
-                      <span className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider">
-                        Consultas realizadas
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="bg-muted/30 border border-border/10 p-4 rounded-xl flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-secondary/15 flex items-center justify-center text-secondary shrink-0">
-                      <Clock className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <span className="text-2xl font-black text-foreground block">{analytics.totalMinutes} min</span>
-                      <span className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider">
-                        Minutos de ayuda en vivo
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="bg-muted/30 border border-border/10 p-4 rounded-xl flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-amber-500/15 flex items-center justify-center text-amber-500 shrink-0">
-                      <BookOpen className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <span className="text-base font-black text-foreground block truncate max-w-[170px]">
-                        {analytics.topSubject}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider">
-                        Materia más consultada
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-glass rounded-xl p-6 border border-border/40 space-y-4">
-              <h3 className="font-heading font-bold text-base text-foreground">
+            {/* Historial de consultas */}
+            <div className="bg-glass rounded-2xl p-4 sm:p-5 border border-border/40 space-y-3">
+              <h3 className="font-heading font-bold text-sm text-foreground flex items-center gap-2 border-b border-border/20 pb-2.5">
+                <Clock className="w-4 h-4 text-accent" />
                 Historial de consultas
               </h3>
               
               {loadingHistory ? (
-                <div className="space-y-2.5 animate-pulse">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="p-3 bg-muted/20 border border-border/10 rounded-xl flex items-center justify-between">
-                      <div className="space-y-1.5 flex-1">
-                        <div className="h-3.5 bg-muted/50 rounded-md w-1/2" />
-                        <div className="h-2.5 bg-muted/30 rounded-md w-1/3" />
+                <div className="space-y-2 animate-pulse">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="p-2.5 bg-muted/20 border border-border/10 rounded-xl flex items-center justify-between">
+                      <div className="space-y-1 flex-1">
+                        <div className="h-3 bg-muted/50 rounded-md w-1/3" />
+                        <div className="h-2 bg-muted/30 rounded-md w-1/4" />
                       </div>
-                      <div className="w-16 h-5 bg-muted/40 rounded-full shrink-0" />
+                      <div className="w-12 h-4 bg-muted/40 rounded-full shrink-0" />
                     </div>
                   ))}
                 </div>
               ) : history.length === 0 ? (
-                <p className="text-sm text-muted-foreground leading-relaxed text-center py-4 bg-muted/10 rounded-xl border-2 border-dashed border-border/10">
+                <p className="text-xs text-muted-foreground leading-relaxed text-center py-4 bg-muted/10 rounded-xl border border-dashed border-border/10">
                   Aún no participaste de ninguna consulta en vivo.
                 </p>
               ) : (
-                <div className="space-y-2.5 max-h-[280px] overflow-y-auto custom-scrollbar">
+                <div className="space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar pr-1">
                   {history.map((room) => {
                     const isStudent = room.student_id === currentUser.id;
                     const peer = isStudent ? room.tutor : room.student;
@@ -733,22 +673,22 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                     return (
                       <div
                         key={room.id}
-                        className="p-3 bg-muted/20 border border-border/10 rounded-xl flex items-center justify-between text-xs hover:bg-muted/30 transition-all"
+                        className="p-2.5 bg-muted/20 border border-border/10 rounded-xl flex items-center justify-between text-xs hover:bg-muted/30 transition-all"
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-foreground truncate max-w-[120px]">
+                            <span className="font-semibold text-foreground truncate max-w-[150px]">
                               {peer ? `${peer.name} ${peer.last_name?.[0] || ""}.` : "Compañero/a"}
                             </span>
-                            <span className="text-[10px] text-muted-foreground">{formattedDate}</span>
+                            <span className="text-[10px] text-muted-foreground/60">{formattedDate}</span>
                           </div>
-                          <span className="text-accent font-medium block truncate max-w-[160px] mt-0.5">
+                          <span className="text-accent font-semibold block truncate max-w-[200px] mt-0.5 text-[11px]">
                             {room.subject?.name || "Consulta General"}
                           </span>
                         </div>
 
                         <span
-                          className={`px-2 py-0.5 rounded-full font-bold uppercase tracking-wider text-[9px] ${
+                          className={`px-2 py-0.5 rounded-full font-bold uppercase tracking-wider text-[8px] ${
                             room.status === "ended"
                               ? "bg-emerald-500/10 text-emerald-500"
                               : room.status === "rejected" || room.status === "missed"
@@ -770,6 +710,71 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                 </div>
               )}
             </div>
+
+          </div>
+
+          {/* Right Column (Sidebar) - Spans 1/3 */}
+          <div className="space-y-4 lg:col-span-1">
+            <div className="bg-glass rounded-2xl p-4 sm:p-5 border border-border/40 shadow-lg space-y-4">
+              <h3 className="font-heading font-bold text-sm text-foreground flex items-center gap-2 border-b border-border/20 pb-2.5">
+                <Award className="w-4 h-4 text-accent" />
+                Tu Actividad Express
+              </h3>
+
+              {loadingHistory ? (
+                <div className="grid grid-cols-1 gap-3 animate-pulse">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="bg-muted/30 border border-border/10 p-3 rounded-xl flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-muted/50 shrink-0" />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-4 bg-muted/60 rounded-md w-1/3" />
+                        <div className="h-2.5 bg-muted/40 rounded-md w-2/3" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="bg-muted/20 border border-border/10 p-3 rounded-xl flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center text-accent shrink-0">
+                      <CheckCircle className="w-4.5 h-4.5" />
+                    </div>
+                    <div>
+                      <span className="text-lg font-black text-foreground block leading-tight">{analytics.totalCalls}</span>
+                      <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">
+                        Consultas realizadas
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="bg-muted/20 border border-border/10 p-3 rounded-xl flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-secondary/15 flex items-center justify-center text-secondary shrink-0">
+                      <Clock className="w-4.5 h-4.5" />
+                    </div>
+                    <div>
+                      <span className="text-lg font-black text-foreground block leading-tight">{analytics.totalMinutes} min</span>
+                      <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">
+                        Minutos de ayuda en vivo
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="bg-muted/20 border border-border/10 p-3 rounded-xl flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center text-amber-500 shrink-0">
+                      <BookOpen className="w-4.5 h-4.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-black text-foreground block truncate leading-tight">
+                        {analytics.topSubject}
+                      </span>
+                      <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider block mt-0.5">
+                        Materia más consultada
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
         </div>
@@ -777,75 +782,71 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
 
       {/* ==================== SCHEDULED TAB CONTENT ==================== */}
       {activeTab === "scheduled" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-glass rounded-xl p-6 border border-border/40 space-y-4">
-              <div className="flex items-center justify-between border-b border-border/20 pb-4">
-                <h2 className="font-heading font-bold text-lg text-foreground flex items-center gap-2">
-                  <Users className="w-5 h-5 text-accent" />
+          <div className="lg:col-span-2 space-y-4">
+            <div className="bg-glass rounded-2xl p-4 sm:p-5 border border-border/40 space-y-4">
+              <div className="flex items-center justify-between border-b border-border/20 pb-2.5">
+                <h2 className="font-heading font-bold text-sm text-foreground flex items-center gap-2">
+                  <Users className="w-4.5 h-4.5 text-accent" />
                   Tutores Disponibles
                 </h2>
-                <span className="bg-accent/15 text-accent px-3 py-1 rounded-full text-xs font-bold">
+                <span className="bg-accent/15 text-accent px-2.5 py-0.5 rounded-full text-[10px] font-bold">
                   {filteredTutorProfiles.length} tutores
                 </span>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <div className="flex-1 relative">
-                  <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     placeholder="Buscar por tutor o materia..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-background/50 border border-border/30 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                    className="w-full bg-background/50 border border-border/30 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                 </div>
 
-                <div className="min-w-[200px] w-full sm:w-auto">
+                <div className="min-w-[180px] w-full sm:w-auto">
                   <Select
                     value={selectedSubjectId || ""}
                     onChange={(val) => setSelectedSubjectId(val ? Number(val) : null)}
                     options={subjectOptions}
                     placeholder="Todas las materias"
-                    className="bg-background/50 border border-border/30 rounded-xl px-4 py-2.5 text-sm focus-within:ring-1 focus-within:ring-accent focus:outline-none font-sans"
+                    className="bg-background/50 border border-border/30 rounded-xl px-3 py-2 text-xs focus-within:ring-1 focus-within:ring-accent focus:outline-none font-sans"
                   />
                 </div>
               </div>
             </div>
 
             {loadingProfiles ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="bg-glass rounded-xl p-5 border border-border/20 space-y-4 animate-pulse">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-muted/60" />
+                  <div key={i} className="bg-glass rounded-xl p-4 border border-border/20 space-y-3 animate-pulse">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-muted/60" />
                       <div className="flex-1 space-y-2">
-                        <div className="h-4 bg-muted/60 rounded-md w-3/4" />
-                        <div className="h-3 bg-muted/45 rounded-md w-1/2" />
+                        <div className="h-3.5 bg-muted/60 rounded-md w-3/4" />
+                        <div className="h-2.5 bg-muted/45 rounded-md w-1/2" />
                       </div>
                     </div>
-                    <div className="flex gap-2 pt-1">
-                      <div className="h-5 bg-muted/30 rounded-full w-24" />
-                      <div className="h-5 bg-muted/30 rounded-full w-20" />
-                    </div>
-                    <div className="h-10 bg-muted/40 rounded-xl w-full mt-3" />
+                    <div className="h-8 bg-muted/40 rounded-xl w-full mt-2" />
                   </div>
                 ))}
               </div>
             ) : filteredTutorProfiles.length === 0 ? (
-              <div className="py-12 px-6 text-center border-2 border-dashed border-border/20 rounded-xl space-y-3 bg-muted/10">
-                <AlertCircle className="w-10 h-10 text-muted-foreground/60 mx-auto" />
+              <div className="py-8 px-4 text-center border-2 border-dashed border-border/20 rounded-xl space-y-2 bg-muted/10">
+                <AlertCircle className="w-8 h-8 text-muted-foreground/60 mx-auto" />
                 <div>
-                  <h3 className="font-semibold text-foreground text-base">No hay tutores disponibles</h3>
-                  <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto leading-relaxed">
+                  <h3 className="font-semibold text-foreground text-xs">No hay tutores disponibles</h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 max-w-xs mx-auto leading-relaxed">
                     No se encontraron tutores con los filtros seleccionados. Probá con otros términos.
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {filteredTutorProfiles.map((tutor) => (
                   <ScheduledTutorCard
                     key={tutor.id}
@@ -857,12 +858,12 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
             )}
           </div>
 
-          <div className="space-y-6">
-            <div className="bg-glass rounded-xl p-4 border border-border/40">
-              <div className="flex gap-2 p-1 bg-muted/30 rounded-lg">
+          <div className="space-y-4">
+            <div className="bg-glass rounded-2xl p-2.5 border border-border/40 shadow-sm">
+              <div className="flex gap-1.5 p-0.5 bg-muted/30 rounded-lg">
                 <button
                   onClick={() => setViewMode("list")}
-                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-semibold transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all ${
                     viewMode === "list"
                       ? "bg-accent text-accent-foreground"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -873,7 +874,7 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                 </button>
                 <button
                   onClick={() => setViewMode("calendar")}
-                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-semibold transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all ${
                     viewMode === "calendar"
                       ? "bg-accent text-accent-foreground"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -895,9 +896,9 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
             )}
 
             {viewMode === "list" && (
-              <div className="bg-glass rounded-xl p-6 border border-border/40 space-y-4">
-                <h3 className="font-heading font-bold text-lg text-foreground flex items-center gap-2 border-b border-border/20 pb-4">
-                  <Calendar className="w-5 h-5 text-accent" />
+              <div className="bg-glass rounded-2xl p-4 sm:p-5 border border-border/40 space-y-3 shadow-md">
+                <h3 className="font-heading font-bold text-sm text-foreground flex items-center gap-2 border-b border-border/20 pb-2.5">
+                  <Calendar className="w-4.5 h-4.5 text-accent" />
                   Mis Tutorías Programadas
                 </h3>
 

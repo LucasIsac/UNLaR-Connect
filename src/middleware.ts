@@ -4,9 +4,13 @@ import { createServerClient } from "@supabase/ssr";
 // Define paths that require authentication
 const protectedRoutes = [
   "/dashboard",
-  "/apuntes",
-  "/foros",
+  "/recursos",
+  "/asistente",
+  "/foro",
   "/tutorias",
+  "/eventos",
+  "/perfil",
+  "/apuntes",
   "/chat",
   "/ranking",
   "/karma",

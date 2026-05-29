@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Menu, Search, Bell, Award, User, LogOut, Settings, Calendar, Trophy, Sparkles, Check, Trash2, X, ArrowLeft, SlidersHorizontal } from "lucide-react";
+import { Menu, Search, Bell, Award, User, LogOut, Settings, Calendar, Trophy, Sparkles, Check, X, ArrowLeft } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
 import Logo from "../ui/Logo";
 import { fetchCombinedHeaderData } from "@/actions/perfil";
@@ -551,7 +551,7 @@ export default function Header({
 
               {/* Options buttons */}
               <Link
-                href="/dashboard/perfil"
+                href="/perfil"
                 onClick={() => setIsProfileOpen(false)}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/30 rounded-xl transition-all"
               >
@@ -561,7 +561,7 @@ export default function Header({
               <button
                 onClick={() => {
                   setIsProfileOpen(false);
-                  window.location.href = "/dashboard/perfil";
+                  window.location.href = "/perfil";
                 }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/30 rounded-xl transition-all"
               >

@@ -153,7 +153,7 @@ export default function Home() {
 
                       {/* Options buttons */}
                       <Link
-                        href="/dashboard/perfil"
+                        href="/perfil"
                         onClick={() => setIsProfileOpen(false)}
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/30 rounded-xl transition-all"
                       >
@@ -163,7 +163,7 @@ export default function Home() {
                       <button
                         onClick={() => {
                           setIsProfileOpen(false);
-                          window.location.href = "/dashboard/perfil";
+                          window.location.href = "/perfil";
                         }}
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/30 rounded-xl transition-all"
                       >

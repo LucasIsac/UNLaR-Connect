@@ -7,11 +7,7 @@ import {
   ArrowLeft, 
   Search, 
   Award, 
-  Users, 
-  BookOpen, 
-  MessageSquare, 
-  Star,
-  ChevronRight
+  Users
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { LeaderboardEntry } from "@/actions/karma";
@@ -24,7 +20,7 @@ interface RankingClientProps {
 }
 
 export default function RankingClient({ initialLeaderboard, currentUserId }: RankingClientProps) {
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(initialLeaderboard);
+  const [leaderboard] = useState<LeaderboardEntry[]>(initialLeaderboard);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<number>(0); // 0 = Todos, 1 = Sistemas, 2 = Computacion, 3 = Tecnicatura
 
@@ -81,29 +77,31 @@ export default function RankingClient({ initialLeaderboard, currentUserId }: Ran
         animate="show"
       >
         {/* Header */}
-        <motion.div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" variants={itemVariants}>
-          <div>
-            <Link 
-              href="/dashboard"
-              className="inline-flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors mb-2 focus:outline-none"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" /> Volver al Dashboard
-            </Link>
-            <h1 className="font-heading text-3xl md:text-4xl font-black tracking-tight text-foreground">
-              Ranking de <span className="text-accent">Estudiantes</span>
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Conocé a los alumnos que más aportan resúmenes, foros y tutorías en UNLaR. ¡Colaborá y subí vos también!
-            </p>
-          </div>
+        <motion.div className="flex flex-col gap-4 border-b border-border/10 pb-6" variants={itemVariants}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <Link 
+                href="/dashboard"
+                className="inline-flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors mb-2 focus:outline-none"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Volver al Dashboard
+              </Link>
+              <h1 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight mb-1 text-cream-bone">
+                Ranking de <span className="text-accent font-bold">Estudiantes</span>
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Conocé a los alumnos que más aportan resúmenes, foros y tutorías en UNLaR. ¡Colaborá y subí vos también!
+              </p>
+            </div>
 
-          <Link
-            href="/karma"
-            className="self-start sm:self-center px-4 py-2 text-xs font-bold border border-border hover:border-accent bg-card/30 hover:bg-card/65 rounded-xl transition-all duration-300 flex items-center gap-1.5 focus:outline-none active:scale-95"
-          >
-            <Award className="w-4 h-4 text-accent animate-pulse-slow" />
-            <span>Ver mis Puntos y Medallas</span>
-          </Link>
+            <Link
+              href="/karma"
+              className="self-start sm:self-center px-4 py-2 text-xs font-bold border border-border hover:border-accent bg-card/30 hover:bg-card/65 rounded-xl transition-all duration-300 flex items-center gap-1.5 focus:outline-none active:scale-95 shrink-0 select-none"
+            >
+              <Award className="w-4 h-4 text-accent animate-pulse-slow" />
+              <span>Ver mis Puntos y Medallas</span>
+            </Link>
+          </div>
         </motion.div>
 
         {/* Current User Standing Quick Info widget */}
@@ -188,7 +186,6 @@ export default function RankingClient({ initialLeaderboard, currentUserId }: Ran
               {podiumStudents.map((student, idx) => {
                 const isFirst = idx === 0;
                 const isSecond = idx === 1;
-                const isThird = idx === 2;
                 
                 const rankText = isFirst ? "1er Puesto" : isSecond ? "2do Puesto" : "3er Puesto";
                 const rankIcon = isFirst ? "🥇" : isSecond ? "🥈" : "🥉";

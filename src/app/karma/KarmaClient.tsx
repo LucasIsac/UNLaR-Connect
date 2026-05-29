@@ -8,7 +8,6 @@ import {
   Sparkles, 
   MessageSquare, 
   Zap, 
-  ChevronRight, 
   Lock, 
   CheckCircle2, 
   BookOpen, 
@@ -19,16 +18,22 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { simulateKarmaAporte, KarmaStats } from "@/actions/karma";
+import { DbBadge } from "@/types/database";
 import Link from "next/link";
 
 interface KarmaClientProps {
   initialStats: KarmaStats;
 }
 
+interface ActiveBadge extends DbBadge {
+  justUnlocked?: boolean;
+  awardRecord?: { awarded_at: string } | null;
+}
+
 export default function KarmaClient({ initialStats }: KarmaClientProps) {
   const [stats, setStats] = useState<KarmaStats>(initialStats);
   const [showToast, setShowToast] = useState<string | null>(null);
-  const [activeModalBadge, setActiveModalBadge] = useState<any>(null);
+  const [activeModalBadge, setActiveModalBadge] = useState<ActiveBadge | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -173,29 +178,31 @@ export default function KarmaClient({ initialStats }: KarmaClientProps) {
         animate="show"
       >
         {/* Navigation back and header */}
-        <motion.div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" variants={itemVariants}>
-          <div>
-            <Link 
-              href="/dashboard"
-              className="inline-flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors mb-2 focus:outline-none"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" /> Volver al Dashboard
-            </Link>
-            <h1 className="font-heading text-3xl md:text-4xl font-black tracking-tight text-foreground">
-              Karma y <span className="text-accent">Recompensas</span>
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Tu colaboración en la comunidad UNLaR te hace crecer. Ganá puntos, subí de nivel y coleccioná medallas.
-            </p>
-          </div>
+        <motion.div className="flex flex-col gap-4 border-b border-border/10 pb-6" variants={itemVariants}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <Link 
+                href="/dashboard"
+                className="inline-flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors mb-2 focus:outline-none"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Volver al Dashboard
+              </Link>
+              <h1 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight mb-1 text-cream-bone">
+                Karma y <span className="text-accent font-bold">Recompensas</span>
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Tu colaboración en la comunidad UNLaR te hace crecer. Ganá puntos, subí de nivel y coleccioná medallas.
+              </p>
+            </div>
 
-          <Link
-            href="/ranking"
-            className="self-start sm:self-center px-4 py-2 text-xs font-bold border border-border hover:border-accent bg-card/30 hover:bg-card/65 rounded-xl transition-all duration-300 flex items-center gap-1.5 focus:outline-none active:scale-95"
-          >
-            <Trophy className="w-4 h-4 text-accent" />
-            <span>Ver Ranking de Alumnos</span>
-          </Link>
+            <Link
+              href="/ranking"
+              className="self-start sm:self-center px-4 py-2 text-xs font-bold border border-border hover:border-accent bg-card/30 hover:bg-card/65 rounded-xl transition-all duration-300 flex items-center gap-1.5 focus:outline-none active:scale-95 shrink-0 select-none"
+            >
+              <Trophy className="w-4 h-4 text-accent animate-pulse-slow" />
+              <span>Ver Ranking de Alumnos</span>
+            </Link>
+          </div>
         </motion.div>
 
         {/* Top Bento Layout: Stats Progress + Simulator */}

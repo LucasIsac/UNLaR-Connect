@@ -9,7 +9,7 @@ interface TutoringCalendarProps {
   onEventClick?: (event: TutoringCalendarEvent) => void;
 }
 
-const DAY_NAMES_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const DAY_NAMES_SHORT = ["L", "M", "M", "J", "V", "S", "D"];
 const MONTH_NAMES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
@@ -17,7 +17,7 @@ const MONTH_NAMES = [
 
 export default function TutoringCalendar({ events, onEventClick }: TutoringCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
 
   // Get current month and year
   const currentMonth = currentDate.getMonth();
@@ -115,44 +115,46 @@ export default function TutoringCalendar({ events, onEventClick }: TutoringCalen
   const selectedDateEvents = getEventsForDate(selectedDate);
 
   return (
-    <div className="bg-glass rounded-xl p-6 border border-border/40 space-y-4">
+    <div className="bg-glass/60 backdrop-blur-md rounded-2xl p-5 border border-accent/10 space-y-4">
       {/* Calendar Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="font-heading font-bold text-lg text-foreground">
-          Calendario de Tutorías
+      <div className="flex items-center justify-between border-b border-border/10 pb-3 mb-2">
+        <h3 className="font-heading font-bold text-xs text-muted-foreground uppercase tracking-wider">
+          Calendario
         </h3>
         <button
           onClick={goToToday}
-          className="px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent/10 rounded-lg transition-colors"
+          className="px-2.5 py-1 text-[11px] font-semibold text-accent hover:bg-accent/10 border border-accent/20 rounded-full transition-all duration-200"
         >
           Hoy
         </button>
       </div>
 
       {/* Month Navigation */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={goToPreviousMonth}
-          className="p-2 hover:bg-muted/50 rounded-lg transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-        </button>
-        <h4 className="font-semibold text-foreground">
+      <div className="flex items-center justify-between px-1">
+        <h4 className="font-semibold text-cream-bone text-sm font-heading">
           {MONTH_NAMES[currentMonth]} {currentYear}
         </h4>
-        <button
-          onClick={goToNextMonth}
-          className="p-2 hover:bg-muted/50 rounded-lg transition-colors"
-        >
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={goToPreviousMonth}
+            className="p-1.5 hover:bg-muted/30 rounded-full text-muted-foreground hover:text-cream-bone transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={goToNextMonth}
+            className="p-1.5 hover:bg-muted/30 rounded-full text-muted-foreground hover:text-cream-bone transition-colors"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Calendar Grid */}
       <div className="grid grid-cols-7 gap-1">
         {/* Day headers */}
-        {DAY_NAMES_SHORT.map(day => (
-          <div key={day} className="text-center text-[10px] font-bold text-muted-foreground uppercase py-2">
+        {DAY_NAMES_SHORT.map((day, idx) => (
+          <div key={idx} className="text-center text-[11px] font-bold text-muted-foreground/60 h-8 flex items-center justify-center">
             {day}
           </div>
         ))}
@@ -168,50 +170,31 @@ export default function TutoringCalendar({ events, onEventClick }: TutoringCalen
             <div
               key={index}
               onClick={() => item.date && setSelectedDate(item.date)}
-              className={`relative min-h-[60px] p-1 rounded-lg border transition-all ${
-                !item.day
-                  ? "border-transparent"
-                  : isSelectedDate
-                  ? "border-accent bg-accent/10"
-                  : isTodayDate
-                  ? "border-accent/50 bg-accent/5"
-                  : "border-border/20 hover:border-border/40 hover:bg-muted/20"
-              } ${item.day ? "cursor-pointer" : ""}`}
+              className="aspect-square flex flex-col items-center justify-center relative p-0.5"
             >
-              {item.day && (
-                <>
-                  <span className={`text-xs font-semibold ${
-                    isTodayDate ? "text-accent" : "text-foreground"
-                  }`}>
-                    {item.day}
-                  </span>
+              {item.day ? (
+                <button
+                  type="button"
+                  disabled={!item.day}
+                  className={`w-8 h-8 rounded-full flex flex-col items-center justify-center text-xs font-semibold transition-all relative ${
+                    isTodayDate
+                      ? "bg-accent text-background font-bold shadow-md shadow-accent/20"
+                      : isSelectedDate
+                      ? "border-2 border-accent text-accent font-bold bg-accent/5"
+                      : "text-cream-bone hover:bg-muted/40 hover:text-white"
+                  } ${item.day ? "cursor-pointer" : ""}`}
+                >
+                  <span>{item.day}</span>
                   
-                  {/* Event indicators */}
+                  {/* Event indicator dot */}
                   {hasEvents && (
-                    <div className="mt-1 space-y-0.5">
-                      {dayEvents.slice(0, 2).map((event, eventIndex) => (
-                        <div
-                          key={eventIndex}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEventClick?.(event);
-                          }}
-                          className={`px-1 py-0.5 rounded text-[8px] font-bold truncate border ${
-                            getStatusColor(event.status)
-                          }`}
-                          title={event.title}
-                        >
-                          {event.subject_name}
-                        </div>
-                      ))}
-                      {dayEvents.length > 2 && (
-                        <span className="text-[8px] text-muted-foreground block text-center">
-                          +{dayEvents.length - 2}
-                        </span>
-                      )}
-                    </div>
+                    <span className={`absolute bottom-1 w-1 h-1 rounded-full ${
+                      isTodayDate ? "bg-background" : "bg-accent/70"
+                    }`} />
                   )}
-                </>
+                </button>
+              ) : (
+                <div className="w-8 h-8" />
               )}
             </div>
           );
