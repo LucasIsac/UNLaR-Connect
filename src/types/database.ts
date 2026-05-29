@@ -217,3 +217,56 @@ export interface DbNotification {
   is_read: boolean;
   created_at: string;
 }
+
+// ============================================================
+// Consultas Express — live 1-on-1 tutoring calls
+// ============================================================
+
+export type CallRoomStatus = 'requested' | 'accepted' | 'active' | 'ended' | 'rejected' | 'missed';
+
+export interface DbCallRoom {
+  id: string; // UUID
+  subject_id: number | null;
+  student_id: string; // UUID
+  tutor_id: string; // UUID
+  status: CallRoomStatus;
+  created_at: string;
+  started_at: string | null;
+  ended_at: string | null;
+}
+
+export interface DbCallMessage {
+  id: string; // UUID
+  room_id: string; // UUID
+  sender_id: string; // UUID
+  content: string;
+  created_at: string;
+}
+
+// ==========================================
+// Events System
+// ==========================================
+
+export interface DbEvent {
+  id: string; // UUID
+  title: string;
+  description: string;
+  event_type: 'seminario' | 'capacitacion' | 'diplomatura' | 'taller' | 'conferencia' | 'otro';
+  start_date: string; // TIMESTAMPTZ
+  end_date: string;
+  registration_deadline: string;
+  location: string;
+  meeting_link?: string;
+  image_url?: string;
+  created_by: string; // UUID
+  max_participants?: number;
+  status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
+  created_at: string;
+}
+
+export interface DbEventRegistration {
+  id: string; // UUID
+  event_id: string; // UUID
+  user_id: string; // UUID
+  registered_at: string;
+}

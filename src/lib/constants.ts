@@ -17,7 +17,7 @@ export const CONFIG = {
     
     // Features / Fictitious Endpoints
     apuntes: "/apuntes",
-    foros: "/foros",
+    foros: "/foro",
     chat: "/chat",
     tutorias: "/tutorias",
     karma: "/karma",
