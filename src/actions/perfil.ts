@@ -198,6 +198,43 @@ export async function toggleTutorStatus(
 }
 
 /**
+ * Update specific tutor configuration preferences (price, contact visibility)
+ */
+export async function updateTutorPreferences(
+  tutorPrice: number | null,
+  contactVisibility: boolean
+): Promise<{ success: boolean; data?: UserProfileExtended; error?: string }> {
+  try {
+    const db = createServerClient();
+    const authUserResponse = await db.auth.getUser();
+    const authUser = authUserResponse?.data?.user;
+
+    if (!authUser) {
+      return { success: false, error: "No estás autenticado/a." };
+    }
+
+    const { error } = await db
+      .from("users")
+      .update({
+        tutor_price: tutorPrice,
+        contact_visibility: contactVisibility
+      })
+      .eq("id", authUser.id);
+
+    if (error) throw error;
+
+    invalidateCache(CACHE_TAGS.userProfile(authUser.id));
+    invalidateCache(CACHE_TAGS.dashboardStats(authUser.id));
+
+    const updated = await fetchUserProfile();
+    return { success: true, data: updated };
+  } catch (err: any) {
+    console.error("Error updating tutor preferences in Supabase:", err);
+    return { success: false, error: err.message || "Hubo un error al actualizar las preferencias de tutor." };
+  }
+}
+
+/**
  * UNCACHED: Fetch subjects student is registered to teach
  */
 async function fetchTutorSubjectsUncached(userId: string, accessToken: string): Promise<DbSubject[]> {

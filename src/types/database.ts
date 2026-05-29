@@ -28,6 +28,8 @@ export interface DbUser {
   created_at: string;
   deleted_at?: string;
   avatar_url?: string;
+  tutor_price?: number;
+  contact_visibility?: boolean;
 }
 
 export interface DbSubject {

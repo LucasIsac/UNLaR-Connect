@@ -668,7 +668,7 @@ export default function PerfilClient({
               </AnimatePresence>
             </motion.div>
 
-            {/* Tutoring Subjects Manager */}
+            {/* Configurar Tutorías Link (Visible when tutor is active) */}
             <AnimatePresence>
               {profile.isTutorActive && (
                 <motion.div 
@@ -678,134 +678,23 @@ export default function PerfilClient({
                   transition={{ duration: 0.25 }}
                   className="bg-glass rounded-3xl p-6 relative group hover:border-accent/10 transition-all duration-300"
                 >
-                  <label className="block text-sm font-bold text-cream-bone mb-3 select-none">Materias que enseño</label>
-                  
-                  {/* Tutor subjects tags */}
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {tutorSubjects.length === 0 ? (
-                      <p className="text-xs text-muted-foreground font-medium py-1">No agregaste materias todavía. ¡Sumá una abajo!</p>
-                    ) : (
-                      tutorSubjects.map((sub) => (
-                        <div 
-                          key={sub.id} 
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/10 border border-accent/25 text-accent text-xs font-bold transition-all duration-200 select-none group/tag"
-                        >
-                          <span>{sub.name}</span>
-                          <button
-                            onClick={() => handleRemoveSubject(sub.id, sub.name)}
-                            disabled={actionInProgress?.startsWith("remove-subject-")}
-                            className="text-accent/60 hover:text-destructive hover:bg-destructive/15 rounded-md p-0.5 shrink-0 transition-colors"
-                            aria-label={`Eliminar ${sub.name}`}
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {/* Autocomplete Search input */}
-                  <div className="relative" ref={searchContainerRef}>
-                    <div className="relative">
-                      <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        placeholder="¿En qué materias podés dar una mano?"
-                        value={subjectSearch}
-                        onChange={(e) => setSubjectSearch(e.target.value)}
-                        onFocus={() => setIsSearchFocused(true)}
-                        className="w-full bg-card/30 hover:bg-card/45 border border-border/40 focus:border-accent rounded-xl py-2.5 pl-10 pr-4 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all placeholder-muted-foreground/60 font-semibold"
-                      />
+                  <div className="flex items-center gap-3 mb-4 select-none">
+                    <div className="w-10 h-10 rounded-2xl bg-accent/10 border border-accent/15 flex items-center justify-center text-accent shrink-0">
+                      <Star className="w-5 h-5 text-accent" />
                     </div>
-
-                    {/* Suggestions list drop */}
-                    <AnimatePresence>
-                      {isSearchFocused && subjectSearch.trim().length > 0 && (
-                        <motion.ul 
-                          initial={{ opacity: 0, y: 5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 5 }}
-                          className="absolute left-0 top-full mt-2 w-full bg-card border border-border/40 rounded-2xl shadow-xl z-20 max-h-48 overflow-y-auto custom-scrollbar p-2"
-                        >
-                          {filteredSubjectsForAutocomplete.length === 0 ? (
-                            <li className="text-xs text-muted-foreground p-3 text-center">No encontramos esa materia, che.</li>
-                          ) : (
-                            filteredSubjectsForAutocomplete.map(sub => (
-                              <li key={sub.id}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleAddSubject(sub)}
-                                  className="w-full text-left text-xs font-semibold px-3.5 py-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30 focus:bg-muted/30 transition-colors focus:outline-none flex justify-between items-center"
-                                >
-                                  <span>{sub.name}</span>
-                                  <span className="text-[9px] border border-border/30 rounded px-1.5 py-0.5 text-muted-foreground font-bold uppercase">año {sub.year}</span>
-                                </button>
-                              </li>
-                            ))
-                          )}
-                        </motion.ul>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Weekly Availability Scheduler */}
-            <AnimatePresence>
-              {profile.isTutorActive && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 15 }}
-                  transition={{ duration: 0.3 }}
-                  className="bg-glass rounded-3xl p-6 relative group hover:border-accent/10 transition-all duration-300"
-                >
-                  <div className="flex items-center justify-between mb-4 select-none">
-                    <label className="block text-sm font-bold text-cream-bone">Disponibilidad Semanal</label>
-                    <button
-                      onClick={() => setIsAddScheduleOpen(true)}
-                      className="text-accent hover:text-accent/80 flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4 shrink-0" />
-                      <span>Agregar Horario</span>
-                    </button>
+                    <div>
+                      <h3 className="font-heading text-base font-bold text-cream-bone">Ajustes de Tutoría</h3>
+                      <p className="text-xs text-muted-foreground font-semibold">Horarios, materias y tarifas</p>
+                    </div>
                   </div>
 
-                  {/* List of active schedules */}
-                  <div className="space-y-2">
-                    {availability.length === 0 ? (
-                      <div className="p-4 rounded-2xl border border-dashed border-border/30 text-center select-none">
-                        <AlertCircle className="w-6 h-6 text-muted-foreground/50 mx-auto mb-1.5" />
-                        <p className="text-xs text-muted-foreground font-semibold">No tenés horarios configurados para dar tutorías.</p>
-                      </div>
-                    ) : (
-                      availability.map((slot) => (
-                        <div 
-                          key={slot.id} 
-                          className="flex items-center justify-between p-3.5 rounded-2xl bg-card/20 border border-border/20 hover:border-accent/30 transition-all group/slot"
-                        >
-                          <div className="flex items-center gap-3 select-none">
-                            <div className="w-2 h-2 rounded-full bg-accent shadow-[0_0_8px_rgba(245,158,11,0.6)] shrink-0" />
-                            <span className="text-xs font-bold text-cream-bone">{DAYS_OF_WEEK[slot.day_of_week]}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="font-mono text-[10px] font-bold text-muted-foreground bg-card/75 border border-border/20 px-2.5 py-1 rounded-lg select-none">
-                              {slot.start_time.slice(0, 5)} a {slot.end_time.slice(0, 5)}
-                            </span>
-                            <button
-                              onClick={() => handleDeleteAvailability(slot.id)}
-                              disabled={actionInProgress?.startsWith("delete-schedule-")}
-                              className="text-muted-foreground hover:text-destructive p-1 rounded-lg hover:bg-destructive/10 transition-colors"
-                              aria-label="Borrar horario"
-                            >
-                              <Trash2 className="w-4 h-4 shrink-0" />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  <Link
+                    href="/tutorias/configuracion"
+                    className="w-full h-11 bg-accent hover:bg-accent/90 text-accent-foreground font-bold text-xs rounded-xl transition-all duration-300 flex justify-center items-center gap-2 active:scale-98 cursor-pointer shadow-md shadow-accent/15"
+                  >
+                    <span>⚙️ Configurar mis Tutorías</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
                 </motion.div>
               )}
             </AnimatePresence>
