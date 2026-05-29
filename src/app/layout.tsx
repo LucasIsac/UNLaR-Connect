@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Montserrat } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
-import LogoSwitcher from "@/components/ui/LogoSwitcher";
+import ServiceWorkerRegister from "@/components/pwa/ServiceWorkerRegister";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -51,7 +51,7 @@ export default function RootLayout({
     <html lang="es" className={`${inter.variable} ${montserrat.variable}`} suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <script
           suppressHydrationWarning
@@ -75,24 +75,57 @@ export default function RootLayout({
           }}
         />
         <script
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{
             __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js')
-                    .then(function(registration) {
-                      console.log('SW registered:', registration.scope);
-                    })
-                    .catch(function(error) {
-                      console.log('SW registration failed:', error);
+              (function() {
+                try {
+                  var attrName = 'bis_skin_checked';
+                  var clean = function(root) {
+                    if (!root || root.nodeType !== 1) return;
+                    if (root.hasAttribute && root.hasAttribute(attrName)) {
+                      root.removeAttribute(attrName);
+                    }
+                    if (root.querySelectorAll) {
+                      root.querySelectorAll('[' + attrName + ']').forEach(function(node) {
+                        node.removeAttribute(attrName);
+                      });
+                    }
+                  };
+
+                  clean(document.documentElement);
+
+                  var observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                      if (mutation.type === 'attributes') {
+                        clean(mutation.target);
+                      } else {
+                        mutation.addedNodes.forEach(clean);
+                      }
                     });
-                });
-              }
+                  });
+
+                  observer.observe(document.documentElement, {
+                    attributes: true,
+                    childList: true,
+                    subtree: true,
+                    attributeFilter: [attrName]
+                  });
+
+                  window.addEventListener('load', function() {
+                    window.setTimeout(function() {
+                      observer.disconnect();
+                      clean(document.documentElement);
+                    }, 3000);
+                  });
+                } catch (e) {}
+              })();
             `,
           }}
         />
       </head>
       <body className="font-sans antialiased custom-scrollbar" suppressHydrationWarning>
+        <ServiceWorkerRegister />
         <ThemeProvider>
           {children}
 

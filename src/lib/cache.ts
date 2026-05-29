@@ -12,6 +12,9 @@ export const CACHE_TAGS = {
   resources: "resources",
   careersList: "careers-list",
   subjectsList: "subjects-list",
+  scheduledTutoringSessions: (userId: string) => `scheduled-tutoring-sessions-${userId}`,
+  tutorProfilesForMatching: "tutor-profiles-for-matching",
+  tutoringCalendar: (userId: string) => `tutoring-calendar-${userId}`,
 };
 
 /**

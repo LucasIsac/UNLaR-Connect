@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 
 export interface SelectOption {
@@ -11,7 +10,7 @@ export interface SelectOption {
 
 interface SelectProps {
   value: string | number;
-  onChange: (value: any) => void;
+  onChange: (value: string | number) => void;
   options: SelectOption[];
   className?: string;
   placeholder?: string;
@@ -128,46 +127,42 @@ export function Select({
       </button>
 
       {/* Options Panel Dropdown */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.ul
-            ref={listRef}
-            initial={{ opacity: 0, y: 5, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 5, scale: 0.98 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute left-0 right-0 mt-2 z-50 bg-[#1A1614]/95 border border-accent/20 rounded-2xl shadow-[0_8px_32px_rgba(12,10,9,0.7)] backdrop-blur-md max-h-60 overflow-y-auto custom-scrollbar p-1.5 focus:outline-none"
-            style={{
-              scrollbarWidth: "thin",
-            }}
-          >
-            {options.map((option, idx) => {
-              const isSelected = option.value === value;
-              const isFocused = idx === focusedIndex;
+      <ul
+        ref={listRef}
+        className={`absolute left-0 right-0 mt-2 z-50 bg-[#1A1614]/95 border border-accent/20 rounded-2xl shadow-[0_8px_32px_rgba(12,10,9,0.7)] backdrop-blur-md max-h-60 overflow-y-auto custom-scrollbar p-1.5 focus:outline-none transition-all duration-150 ease-out origin-top ${
+          isOpen
+            ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
+            : "opacity-0 -translate-y-2 scale-98 pointer-events-none"
+        }`}
+        style={{
+          scrollbarWidth: "thin",
+        }}
+      >
+        {options.map((option, idx) => {
+          const isSelected = option.value === value;
+          const isFocused = idx === focusedIndex;
 
-              return (
-                <li
-                  key={option.value}
-                  onClick={() => {
-                    onChange(option.value);
-                    setIsOpen(false);
-                  }}
-                  onMouseEnter={() => setFocusedIndex(idx)}
-                  className={`relative flex items-center px-4 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors duration-150 ${
-                    isSelected
-                      ? "bg-accent/25 text-accent font-bold"
-                      : isFocused
-                      ? "bg-muted/40 text-cream-bone"
-                      : "text-muted-foreground hover:text-cream-bone"
-                  }`}
-                >
-                  <span className="truncate">{option.label}</span>
-                </li>
-              );
-            })}
-          </motion.ul>
-        )}
-      </AnimatePresence>
+          return (
+            <li
+              key={option.value}
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+              onMouseEnter={() => setFocusedIndex(idx)}
+              className={`relative flex items-center px-4 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors duration-150 ${
+                isSelected
+                  ? "bg-accent/25 text-accent font-bold"
+                  : isFocused
+                  ? "bg-muted/40 text-cream-bone"
+                  : "text-muted-foreground hover:text-cream-bone"
+              }`}
+            >
+              <span className="truncate">{option.label}</span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

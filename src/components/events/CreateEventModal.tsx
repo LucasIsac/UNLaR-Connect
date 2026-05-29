@@ -28,7 +28,7 @@ export default function CreateEventModal({ isOpen, onClose, onCreated, editingEv
   const isEditing = !!editingEvent;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(editEvent?.image_url || null);
+  const [imagePreview, setImagePreview] = useState<string | null>(editingEvent?.image_url || null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({

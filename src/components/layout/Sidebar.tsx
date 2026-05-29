@@ -12,6 +12,7 @@ import {
   X,
   Award,
   Trophy,
+  Video,
   Calendar
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ const getIconAnimationClass = (label: string, isActive: boolean) => {
     "Dashboard": "group-hover:animate-sidebar-dashboard" + (isActive ? " animate-sidebar-dashboard" : ""),
     "Banco de Apuntes": "group-hover:animate-sidebar-apuntes" + (isActive ? " animate-sidebar-apuntes" : ""),
     "Asistente IA": "group-hover:animate-sidebar-ai" + (isActive ? " animate-sidebar-ai" : ""),
+    "Tutorías": "group-hover:animate-sidebar-apuntes" + (isActive ? " animate-sidebar-apuntes" : ""),
     "Foros Estudiantiles": "group-hover:animate-sidebar-foros" + (isActive ? " animate-sidebar-foros" : ""),
     "Karma y Medallas": "group-hover:animate-sidebar-karma" + (isActive ? " animate-sidebar-karma" : ""),
     "Ranking Académico": "group-hover:animate-sidebar-ranking" + (isActive ? " animate-sidebar-ranking" : ""),
@@ -56,6 +58,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       icon: Bot,
       href: "/dashboard/asistente",
       isAi: true,
+    },
+    {
+      label: "Tutorías",
+      icon: Video,
+      href: "/tutorias",
+      isLive: true,
     },
     {
       label: "Foros Estudiantiles",
