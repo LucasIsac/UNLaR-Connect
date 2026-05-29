@@ -8,6 +8,8 @@ interface TutorCardProps {
   onRequestCall: (tutorId: string, subjectId: number | null) => void;
   isRequesting: boolean;
   selectedSubjectId?: number | null;
+  currentUserId: string;
+  onRateTutor: (tutorId: string, tutorName: string) => void;
 }
 
 export default function TutorCard({
@@ -15,6 +17,8 @@ export default function TutorCard({
   onRequestCall,
   isRequesting,
   selectedSubjectId,
+  currentUserId,
+  onRateTutor,
 }: TutorCardProps) {
   // Get subject names or format the subjects nicely
   const getSubjectBadges = () => {
@@ -70,14 +74,26 @@ export default function TutorCard({
             <h3 className="font-heading font-semibold text-lg text-foreground truncate">
               {tutor.name} {tutor.last_name}
             </h3>
-            <div className="flex items-center gap-1.5 mt-1 text-sm">
+            <div className="flex items-center gap-1.5 mt-1 text-sm flex-wrap">
               <div className="flex items-center text-amber-500">
                 <Star className="w-4 h-4 fill-amber-500 shrink-0" />
                 <span className="font-bold ml-1">{rating}</span>
               </div>
               <span className="text-muted-foreground">
-                ({reviews} {reviews === 1 ? "consulta" : "consultas"})
+                ({reviews} {reviews === 1 ? "reseña" : "reseñas"})
               </span>
+              
+              {currentUserId !== tutor.id && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRateTutor(tutor.id, `${tutor.name} ${tutor.last_name}`);
+                  }}
+                  className="ml-2 px-2 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 text-[10px] font-bold rounded-md transition-colors"
+                >
+                  Calificar
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -52,7 +52,7 @@ export async function fetchAvailableTutors(
           subject:subjects(id, name, year)
         )
       `)
-      .eq("role_id", 3);
+      .in("role_id", [1, 3]);
 
     if (error) throw error;
 
@@ -124,6 +124,39 @@ export async function requestCall(
     const msg = error instanceof Error ? error.message : "Error desconocido";
     console.error("[requestCall]", msg);
     return { success: false, error: "No pudimos crear la consulta. Intentá de nuevo." };
+  }
+}
+
+// ============================================================
+// createOpenCall
+// Tutor creates a call room where they are both student and tutor
+// initially. When a real student joins, they take over student_id.
+// ============================================================
+export async function createOpenCall(): Promise<ActionResponse<DbCallRoom>> {
+  try {
+    const session = await getVerifiedSession();
+    if (!session) return { success: false, error: "No estás autenticado/a." };
+
+    const supabase = createServerClient();
+
+    const { data, error } = await supabase
+      .from("call_rooms")
+      .insert({
+        student_id: session.userId, // Temporary: tutor acts as student until someone joins
+        tutor_id: session.userId,
+        status: "accepted" as CallRoomStatus,
+        started_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return { success: true, data: data as DbCallRoom };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Error desconocido";
+    console.error("[createOpenCall]", msg);
+    return { success: false, error: "No pudimos crear la sala abierta." };
   }
 }
 
@@ -259,6 +292,33 @@ export async function fetchCallRoom(
     if (error) throw error;
 
     const room = data as CallRoomExtended;
+
+    // Check if it's an "Open Call" (student_id === tutor_id) and current user is NOT the tutor
+    if (room.student_id === room.tutor_id && room.tutor_id !== session.userId) {
+      // Auto-assign the student to the room!
+      const { error: updateError } = await supabase
+        .from("call_rooms")
+        .update({ student_id: session.userId })
+        .eq("id", roomId);
+        
+      if (!updateError) {
+        // Refresh the room data after update
+        const { data: updatedData } = await supabase
+          .from("call_rooms")
+          .select(`
+            *,
+            subject:subjects(*),
+            student:users!student_id(id, name, last_name, avatar_url, tutor_rating),
+            tutor:users!tutor_id(id, name, last_name, avatar_url, tutor_rating)
+          `)
+          .eq("id", roomId)
+          .single();
+          
+        if (updatedData) {
+          return { success: true, data: updatedData as CallRoomExtended };
+        }
+      }
+    }
 
     // Security: only participants can view room details
     if (room.student_id !== session.userId && room.tutor_id !== session.userId) {
