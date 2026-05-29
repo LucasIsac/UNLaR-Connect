@@ -179,6 +179,7 @@ export interface DbPostReply {
   is_accepted: boolean;
   created_at: string;
   image_url?: string;
+  author?: { name: string; last_name: string };
 }
 
 export interface DbBadge {
