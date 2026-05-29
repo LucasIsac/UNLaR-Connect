@@ -185,7 +185,7 @@ export default function EventCard({ event, onRegister, onClick }: EventCardProps
             ) : event.isFull ? (
               "Completo"
             ) : (
-              "Registrarme"
+              "Inscribirme"
             )}
           </button>
         )}

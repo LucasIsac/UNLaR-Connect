@@ -117,7 +117,7 @@ export default function RankingClient({ initialLeaderboard, currentUserId }: Ran
               <div>
                 <h3 className="text-sm font-black text-foreground">¡Tu posición en el Ranking de la UNLaR!</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Estás en el puesto <strong className="text-accent">#{currentUserRank}</strong> con <strong className="text-foreground">{currentUserEntry.points.toLocaleString()} puntos de Karma</strong>.
+                  Estás en el puesto <strong className="text-accent">#{currentUserRank}</strong> con <strong className="text-foreground">{currentUserEntry.points.toLocaleString()} puntos de Reputación</strong>.
                 </p>
               </div>
             </div>
@@ -126,7 +126,7 @@ export default function RankingClient({ initialLeaderboard, currentUserId }: Ran
               href="/karma"
               className="px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground text-xs font-bold rounded-xl transition-colors shrink-0 cursor-pointer active:scale-95"
             >
-              Sumar Puntos de Karma
+              Sumar Puntos de Reputación
             </Link>
           </motion.div>
         )}
@@ -322,7 +322,7 @@ export default function RankingClient({ initialLeaderboard, currentUserId }: Ran
                           <span className="text-xs font-bold text-foreground">{student.badgesCount}</span>
                         </div>
                         <div>
-                          <span className="text-[10px] text-muted-foreground block leading-none">Karma</span>
+                           <span className="text-[10px] text-muted-foreground block leading-none">Reputación</span>
                           <span className="text-xs font-extrabold text-accent">{student.points.toLocaleString()} XP</span>
                         </div>
                       </div>

@@ -2,6 +2,8 @@
 
 import { createServerClient, getVerifiedSession } from "@/lib/supabase";
 import { DbEvent, DbEventRegistration } from "@/types/database";
+import { awardPoints } from "@/actions/reputation";
+import { POINT_VALUES } from "@/lib/reputation-constants";
 
 // ==========================================
 // TYPES
@@ -381,6 +383,10 @@ export async function registerForEvent(
       });
 
     if (error) throw error;
+
+    // Award +5 points for registering
+    await awardPoints(session.userId, POINT_VALUES.EVENT_REGISTRATION, "event_registration", "Se inscribió en un evento", eventId);
+
     return { success: true };
   } catch (error: any) {
     console.error("Error registering for event:", error);

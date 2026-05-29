@@ -15,6 +15,8 @@ export const CACHE_TAGS = {
   scheduledTutoringSessions: (userId: string) => `scheduled-tutoring-sessions-${userId}`,
   tutorProfilesForMatching: "tutor-profiles-for-matching",
   tutoringCalendar: (userId: string) => `tutoring-calendar-${userId}`,
+  karmaStats: (userId: string) => `karma-stats-${userId}`,
+  karmaLeaderboard: "karma-leaderboard",
 };
 
 /**

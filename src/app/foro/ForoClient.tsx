@@ -117,6 +117,16 @@ export default function ForoClient({ initialThreads, currentUserId: initialUserI
   const [tutoringPrice, setTutoringPrice] = useState("");
   const [tutoringModality, setTutoringModality] = useState<'online' | 'present' | 'hybrid'>("online");
   const [tutoringAvailability, setTutoringAvailability] = useState("");
+  
+  // Image upload state
+  const [postImagePreview, setPostImagePreview] = useState<string | null>(null);
+  const [postImageUrl, setPostImageUrl] = useState("");
+  const [uploadingPostImage, setUploadingPostImage] = useState(false);
+  
+  // Reply image upload state
+  const [replyImagePreview, setReplyImagePreview] = useState<string | null>(null);
+  const [replyImageUrl, setReplyImageUrl] = useState("");
+  const [uploadingReplyImage, setUploadingReplyImage] = useState(false);
 
   // Edit states
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -132,6 +142,82 @@ export default function ForoClient({ initialThreads, currentUserId: initialUserI
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  // Image upload handler
+  const handlePostImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      showToast("Solo se permiten archivos de imagen.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("La imagen no puede superar 5MB.");
+      return;
+    }
+
+    setUploadingPostImage(true);
+    try {
+      const supabase = createClient();
+      const fileName = `foro-post-${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("apuntes")
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("apuntes")
+        .getPublicUrl(fileName);
+
+      setPostImageUrl(urlData.publicUrl);
+      setPostImagePreview(URL.createObjectURL(file));
+    } catch (err: any) {
+      showToast(err.message || "No se pudo subir la imagen.");
+    } finally {
+      setUploadingPostImage(false);
+    }
+  };
+
+  // Reply image upload handler
+  const handleReplyImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      showToast("Solo se permiten archivos de imagen.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("La imagen no puede superar 5MB.");
+      return;
+    }
+
+    setUploadingReplyImage(true);
+    try {
+      const supabase = createClient();
+      const fileName = `foro-reply-${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("apuntes")
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("apuntes")
+        .getPublicUrl(fileName);
+
+      setReplyImageUrl(urlData.publicUrl);
+      setReplyImagePreview(URL.createObjectURL(file));
+    } catch (err: any) {
+      showToast(err.message || "No se pudo subir la imagen.");
+    } finally {
+      setUploadingReplyImage(false);
+    }
   };
 
   // Load user ID, votes, contributors and tags on mount
@@ -293,11 +379,11 @@ export default function ForoClient({ initialThreads, currentUserId: initialUserI
 
     setActionInProgress("create-post");
     try {
-      const response = await createForumPost(newTitle, newDesc, newSubject, newType, metadata);
+      const response = await createForumPost(newTitle, newDesc, newSubject, newType, metadata, postImageUrl || undefined);
       if (response.success && response.data) {
         setThreads((prev) => [response.data!, ...prev]);
         setIsCreateModalOpen(false);
-        showToast("¡Publicación realizada! Sumaste 15 puntos de Karma 🚀");
+        showToast("¡Publicación realizada! Sumaste 15 puntos de Reputación 🚀");
         
         // Reset inputs
         setNewTitle("");
@@ -309,6 +395,8 @@ export default function ForoClient({ initialThreads, currentUserId: initialUserI
         setTutoringSubject("");
         setTutoringPrice("");
         setTutoringAvailability("");
+        setPostImagePreview(null);
+        setPostImageUrl("");
       } else {
         showToast(response.error || "Error al crear la publicación.");
       }
@@ -322,14 +410,16 @@ export default function ForoClient({ initialThreads, currentUserId: initialUserI
 
   const handleAddReplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newReplyText.trim() || !selectedThread) return;
+    if ((!newReplyText.trim() && !replyImageUrl) || !selectedThread) return;
 
     setActionInProgress("add-reply");
     try {
-      const response = await addPostReply(selectedThread.id, newReplyText);
+      const response = await addPostReply(selectedThread.id, newReplyText, replyImageUrl || undefined);
       if (response.success && response.data) {
         setReplies(response.data);
         setNewReplyText("");
+        setReplyImagePreview(null);
+        setReplyImageUrl("");
         showToast("¡Respuesta enviada!");
         
         // Update reply count in main list
@@ -662,6 +752,15 @@ export default function ForoClient({ initialThreads, currentUserId: initialUserI
                             <p className="text-xs md:text-sm text-muted-foreground leading-relaxed mb-4 line-clamp-2">
                               {thread.content}
                             </p>
+
+                            {/* Thread Image */}
+                            {thread.image_url && (
+                              <img
+                                src={thread.image_url}
+                                alt="Imagen del hilo"
+                                className="w-full h-32 object-cover rounded-lg border border-border/30 mb-4"
+                              />
+                            )}
 
                             {/* Type-specific structured metadata layout */}
                             {thread.type === 'tutoring' && thread.metadata && (
@@ -1208,6 +1307,55 @@ export default function ForoClient({ initialThreads, currentUserId: initialUserI
                   />
                 </div>
 
+                {/* Image Upload */}
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                    Imagen (opcional)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePostImageUpload}
+                    className="hidden"
+                    id="post-image-upload"
+                  />
+                  {postImagePreview ? (
+                    <div className="relative">
+                      <img
+                        src={postImagePreview}
+                        alt="Preview"
+                        className="w-full h-32 object-cover rounded-xl border border-border/40"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPostImagePreview(null);
+                          setPostImageUrl("");
+                        }}
+                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-background/80 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label
+                      htmlFor="post-image-upload"
+                      className={`flex flex-col items-center justify-center w-full border border-dashed border-border/60 rounded-xl py-4 text-center text-muted-foreground hover:border-accent/40 hover:text-accent transition-colors cursor-pointer ${
+                        uploadingPostImage ? 'opacity-50 pointer-events-none' : ''
+                      }`}
+                    >
+                      {uploadingPostImage ? (
+                        <span className="text-xs">Subiendo...</span>
+                      ) : (
+                        <>
+                          <span className="text-xs font-semibold">Elegí una imagen</span>
+                          <span className="text-[10px] opacity-60 mt-0.5">JPG, PNG • Máx 5MB</span>
+                        </>
+                      )}
+                    </label>
+                  )}
+                </div>
+
                 <button
                   type="submit"
                   disabled={actionInProgress === "create-post"}
@@ -1615,9 +1763,18 @@ export default function ForoClient({ initialThreads, currentUserId: initialUserI
                                   </div>
                                 </div>
                               ) : (
-                                <p className="text-xs text-muted-foreground leading-relaxed mb-2">
-                                  {reply.content}
-                                </p>
+                                <>
+                                  <p className="text-xs text-muted-foreground leading-relaxed mb-2">
+                                    {reply.content}
+                                  </p>
+                                  {reply.image_url && (
+                                    <img
+                                      src={reply.image_url}
+                                      alt="Imagen de la respuesta"
+                                      className="w-full max-h-48 object-cover rounded-lg border border-border/30 mb-2"
+                                    />
+                                  )}
+                                </>
                               )}
 
                               <div className="flex items-center gap-3 mt-1">
@@ -1661,23 +1818,63 @@ export default function ForoClient({ initialThreads, currentUserId: initialUserI
               </div>
 
               {/* Reply Form Footer */}
-              <form onSubmit={handleAddReplySubmit} className="mt-4 border-t border-border/10 pt-4 flex gap-2">
-                <input
-                  type="text"
-                  required
-                  placeholder="Escribí una respuesta..."
-                  value={newReplyText}
-                  onChange={(e) => setNewReplyText(e.target.value)}
-                  className="flex-1 bg-card/60 border border-border/40 rounded-xl py-2.5 px-4 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                />
-                <button
-                  type="submit"
-                  disabled={actionInProgress === "add-reply"}
-                  className="bg-accent text-accent-foreground font-semibold px-4 rounded-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-transform disabled:opacity-40 shadow-lg shadow-accent/15"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </form>
+              <div className="mt-4 border-t border-border/10 pt-4 space-y-3">
+                {/* Reply Image Preview */}
+                {replyImagePreview && (
+                  <div className="relative">
+                    <img
+                      src={replyImagePreview}
+                      alt="Reply preview"
+                      className="w-full h-24 object-cover rounded-xl border border-border/40"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReplyImagePreview(null);
+                        setReplyImageUrl("");
+                      }}
+                      className="absolute top-2 right-2 p-1.5 rounded-lg bg-background/80 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+                <form onSubmit={handleAddReplySubmit} className="flex gap-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleReplyImageUpload}
+                    className="hidden"
+                    id="reply-image-upload"
+                  />
+                  <label
+                    htmlFor="reply-image-upload"
+                    className={`p-2.5 text-muted-foreground hover:text-accent transition-colors rounded-lg cursor-pointer flex items-center justify-center ${
+                      uploadingReplyImage ? 'opacity-50 pointer-events-none' : ''
+                    }`}
+                  >
+                    {uploadingReplyImage ? (
+                      <span className="text-[10px]">...</span>
+                    ) : (
+                      <span className="material-symbols-outlined">image</span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Escribí una respuesta..."
+                    value={newReplyText}
+                    onChange={(e) => setNewReplyText(e.target.value)}
+                    className="flex-1 bg-card/60 border border-border/40 rounded-xl py-2.5 px-4 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
+                  />
+                  <button
+                    type="submit"
+                    disabled={actionInProgress === "add-reply"}
+                    className="bg-accent text-accent-foreground font-semibold px-4 rounded-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-transform disabled:opacity-40 shadow-lg shadow-accent/15"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </form>
+              </div>
 
             </motion.div>
           </div>
