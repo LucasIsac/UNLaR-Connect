@@ -12,7 +12,8 @@ import {
   X,
   Award,
   Trophy,
-  Video
+  Video,
+  Calendar
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Logo from "@/components/ui/Logo";
@@ -32,6 +33,7 @@ const getIconAnimationClass = (label: string, isActive: boolean) => {
     "Foros Estudiantiles": "group-hover:animate-sidebar-foros" + (isActive ? " animate-sidebar-foros" : ""),
     "Karma y Medallas": "group-hover:animate-sidebar-karma" + (isActive ? " animate-sidebar-karma" : ""),
     "Ranking Académico": "group-hover:animate-sidebar-ranking" + (isActive ? " animate-sidebar-ranking" : ""),
+    "Eventos": "group-hover:animate-sidebar-events" + (isActive ? " animate-sidebar-events" : ""),
     "Mi Perfil": "group-hover:animate-sidebar-perfil" + (isActive ? " animate-sidebar-perfil" : ""),
   };
   return animations[label] || "";
@@ -77,6 +79,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       label: "Ranking Académico",
       icon: Trophy,
       href: "/ranking",
+    },
+    {
+      label: "Eventos",
+      icon: Calendar,
+      href: "/dashboard/eventos",
     },
     {
       label: "Mi Perfil",

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useEffect, useState, useRef } from "react";
 import SmoothScroll from "@/components/ui/SmoothScroll";
@@ -127,11 +128,12 @@ export default function Home() {
                     }`}
                   >
                     {user.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <Image
                         alt={`Foto de perfil de ${user.name}`}
                         className="w-full h-full object-cover"
                         src={user.avatar_url}
+                        width={36}
+                        height={36}
                       />
                     ) : (
                       <div className="w-full h-full rounded-xl flex items-center justify-center text-sm font-bold bg-accent/20 border border-accent/30 text-accent select-none">

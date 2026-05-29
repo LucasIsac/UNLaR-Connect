@@ -114,7 +114,7 @@ export async function fetchTutorProfilesForMatching(
 
     // Build tutor profiles with match scores
     const profiles: TutorProfileForMatching[] = [];
-    for (const [tutorId, { user, subjects }] of tutorMap) {
+    for (const [tutorId, { user, subjects }] of Array.from(tutorMap.entries())) {
       const availability = availabilityMap.get(tutorId) || [];
       
       // Calculate match score based on:

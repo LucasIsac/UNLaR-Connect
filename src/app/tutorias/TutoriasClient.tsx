@@ -57,6 +57,7 @@ interface TutoriasClientProps {
     role_id: number; // 1 = Tutor, 2 = Student, 3 = TutorActive
     avatar_url?: string;
   };
+  initialHeaderData?: any;
 }
 
 export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
