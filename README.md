@@ -58,11 +58,7 @@ Toda la estructura técnica y de directorios detallada está documentada en la c
 
 ## 🤖 Directrices e Inducción para Agentes de IA
 
-Este repositorio está optimizado para el trabajo asistido por inteligencia artificial:
-*   **Inducción**: Consulte [AGENTS.md](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/AGENTS.md) para alinearse con los estándares de desarrollo.
-*   **Política de Idioma Dual**:
-    *   Comentarios de código, planes de tareas y archivos de control internos se redactan en **inglés**.
-    *   Cualquier texto orientado al usuario (mensajes, chatbot, vistas, botones) debe utilizar estrictamente **español rioplatense con voseo** (*"Iniciá sesión"*, *"Subí tu apunte"*).
+Este repositorio está optimizado para el trabajo asistido por inteligencia artificial. Consulte [AGENTS.md](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/AGENTS.md) para alinearse con los estándares de desarrollo.
 
 ---
 
