@@ -4,7 +4,7 @@
 
 ---
 
-## 🎯 La Problemática (Eje 3 de la Hackathon)
+## La Problemática (Eje 3 de la Hackathon)
 
 A lo largo de su trayectoria universitaria, los estudiantes se enfrentan a dos grandes barreras estructurales:
 1.  **Dificultad académica en materias filtro**: Asignaturas complejas donde la tasa de recursado es alta y la falta de apoyo continuo genera deserción.
@@ -13,7 +13,7 @@ A lo largo de su trayectoria universitaria, los estudiantes se enfrentan a dos g
 
 ---
 
-## 💡 La Solución: ¿Cómo lo resuelve UNLaR-Connect?
+## La Solución: ¿Cómo lo resuelve UNLaR-Connect?
 
 UNLaR-Connect transforma la interacción informal en una red académica estructurada, segura y gamificada:
 
@@ -35,7 +35,7 @@ UNLaR-Connect transforma la interacción informal en una red académica estructu
 
 ---
 
-## 🛠️ Stack Tecnológico y Arquitectura
+## Stack Tecnológico y Arquitectura
 
 UNLaR-Connect se concibe como un monolito altamente eficiente y con tipado estricto:
 *   **Frontend**: Next.js 14 (App Router, React 18, TypeScript) con estilos Tailwind CSS y efecto *Glassmorphism* premium (Lumina Amber / Warm Obsidian).
@@ -45,7 +45,7 @@ UNLaR-Connect se concibe como un monolito altamente eficiente y con tipado estri
 
 ---
 
-## 📂 Documentación del Sistema
+## Documentación del Sistema
 
 Toda la estructura técnica y de directorios detallada está documentada en la carpeta [/docs](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/docs):
 
@@ -56,13 +56,13 @@ Toda la estructura técnica y de directorios detallada está documentada en la c
 
 ---
 
-## 🤖 Directrices e Inducción para Agentes de IA
+## Directrices e Inducción para Agentes de IA
 
 Este repositorio está optimizado para el trabajo asistido por inteligencia artificial. Consulte [AGENTS.md](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/AGENTS.md) para alinearse con los estándares de desarrollo.
 
 ---
 
-## 🚀 Primeros Pasos
+## Primeros Pasos
 
 Siga estos pasos para ejecutar UNLaR-Connect localmente en modo de desarrollo:
 
