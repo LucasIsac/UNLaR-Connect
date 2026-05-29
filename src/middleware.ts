@@ -5,7 +5,6 @@ import { createServerClient } from "@supabase/ssr";
 const protectedRoutes = [
   "/dashboard",
   "/recursos",
-  "/asistente",
   "/foro",
   "/tutorias",
   "/eventos",
