@@ -72,6 +72,23 @@
   * {
     @apply border-border;
   }
+  
+  /* Disable focus outlines and ring shadows globally for inputs, buttons, selects, and textareas */
+  input:focus,
+  input:focus-visible,
+  button:focus,
+  button:focus-visible,
+  select:focus,
+  select:focus-visible,
+  textarea:focus,
+  textarea:focus-visible {
+    outline: none !important;
+    --tw-ring-width: 0px !important;
+    --tw-ring-offset-width: 0px !important;
+    --tw-ring-color: transparent !important;
+    box-shadow: none !important;
+  }
+
   html {
     /* Lenis smooth scroll */
     scroll-behavior: auto !important;
