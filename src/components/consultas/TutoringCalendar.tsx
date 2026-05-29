@@ -229,17 +229,21 @@ export default function TutoringCalendar({ events, onEventClick }: TutoringCalen
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-semibold text-sm">{event.subject_name}</span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                      event.status === "confirmed" ? "bg-emerald-500/20 text-emerald-400" : "bg-accent/20 text-accent"
+                      event.status === "confirmed" 
+                        ? "bg-emerald-500/20 text-emerald-400" 
+                        : event.status === "canceled"
+                        ? "bg-destructive/20 text-destructive"
+                        : "bg-accent/20 text-accent"
                     }`}>
-                      {event.status === "confirmed" ? "Confirmada" : "Pendiente"}
+                      {event.status === "confirmed" ? "Confirmada" : event.status === "canceled" ? "Cancelada" : "Pendiente"}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     <Clock className="w-3 h-3" />
                     <span>
-                      {new Date(event.start).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(event.start).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false })}
                       {" - "}
-                      {new Date(event.end).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(event.end).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false })}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 text-xs mt-1">

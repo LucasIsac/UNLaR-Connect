@@ -7,6 +7,9 @@ interface ScheduledTutorCardProps {
   tutor: TutorProfileForMatching;
   onRequestTutoring: (tutor: TutorProfileForMatching) => void;
   isSelected?: boolean;
+  isOnline?: boolean;
+  currentUserId: string;
+  onRateTutor: (tutorId: string, tutorName: string) => void;
 }
 
 const DAY_NAMES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -15,7 +18,11 @@ export default function ScheduledTutorCard({
   tutor,
   onRequestTutoring,
   isSelected = false,
-}: ScheduledTutorCardProps) {
+  isOnline = false,
+  currentUserId,
+  onRateTutor,
+  onClick,
+}: ScheduledTutorCardProps & { onClick?: () => void }) {
   const rating = tutor.tutor_rating ? tutor.tutor_rating.toFixed(1) : "0.0";
   const reviews = tutor.total_reviews ?? 0;
 
@@ -36,37 +43,70 @@ export default function ScheduledTutorCard({
     .sort((a, b) => a - b);
 
   return (
-    <div className={`bg-glass rounded-xl p-5 flex flex-col justify-between hover-glow-subtle transition-all duration-300 hover:scale-[1.02] border ${
-      isSelected ? "border-accent/50 shadow-lg shadow-accent/10" : "border-border/40"
+    <div 
+      onClick={onClick}
+      className={`bg-muted/10 backdrop-blur-md rounded-2xl p-6 flex flex-col justify-between hover-glow-subtle transition-all duration-300 hover:scale-[1.02] border-2 cursor-pointer shadow-md ${
+      isSelected ? "border-accent shadow-lg shadow-accent/20" : "border-border/60 hover:border-accent/40"
     }`}>
       <div>
         {/* Header/Info section */}
         <div className="flex items-start gap-4 mb-4">
-          {tutor.avatar_url ? (
-            <img
-              src={tutor.avatar_url}
-              alt={`${tutor.name} ${tutor.last_name}`}
-              className="w-14 h-14 rounded-full object-cover border-2 border-accent/20"
-            />
-          ) : (
-            <div className="w-14 h-14 rounded-full bg-accent/10 border-2 border-accent/20 flex items-center justify-center text-accent font-bold text-lg">
-              {initials}
-            </div>
-          )}
-
-          <div className="flex-1 min-w-0">
-            <h3 className="font-heading font-semibold text-lg text-foreground truncate">
-              {tutor.name} {tutor.last_name}
-            </h3>
-            <div className="flex items-center gap-1.5 mt-1 text-sm">
-              <div className="flex items-center text-amber-500">
-                <Star className="w-4 h-4 fill-amber-500 shrink-0" />
-                <span className="font-bold ml-1">{rating}</span>
+          <div className="relative shrink-0">
+            {tutor.avatar_url ? (
+              <img
+                src={tutor.avatar_url}
+                alt={`${tutor.name} ${tutor.last_name}`}
+                className="w-14 h-14 rounded-full object-cover border-2 border-accent/20"
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-full bg-accent/10 border-2 border-accent/20 flex items-center justify-center text-accent font-bold text-lg">
+                {initials}
               </div>
-              <span className="text-muted-foreground">
-                ({reviews} {reviews === 1 ? "reseña" : "reseñas"})
-              </span>
+            )}
+            {isOnline && (
+              <div 
+                className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-background rounded-full shadow-sm shadow-emerald-500/50" 
+                title="En línea ahora" 
+              />
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0 flex justify-between items-start">
+            <div>
+              <h3 className="font-heading font-semibold text-lg text-foreground truncate">
+                {tutor.name} {tutor.last_name}
+              </h3>
+              <div className="flex items-center gap-1.5 mt-1 text-sm flex-wrap">
+                <div className="flex items-center text-amber-500">
+                  <Star className="w-4 h-4 fill-amber-500 shrink-0" />
+                  <span className="font-bold ml-1">{rating}</span>
+                </div>
+                <span className="text-muted-foreground">
+                  ({reviews} {reviews === 1 ? "reseña" : "reseñas"})
+                </span>
+                
+                {currentUserId !== tutor.id && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRateTutor(tutor.id, `${tutor.name} ${tutor.last_name}`);
+                    }}
+                    className="ml-2 px-2 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 text-[10px] font-bold rounded-md transition-colors"
+                  >
+                    Calificar
+                  </button>
+                )}
+              </div>
             </div>
+            
+            {/* Price Badge */}
+            <span className={`shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${
+              tutor.tutor_price === 0 
+                ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" 
+                : "bg-accent/10 text-accent border-accent/20"
+            }`}>
+              {tutor.tutor_price === 0 ? "Gratis" : `$${tutor.tutor_price}/h`}
+            </span>
           </div>
         </div>
 
@@ -129,8 +169,11 @@ export default function ScheduledTutorCard({
 
       {/* Action button */}
       <button
-        onClick={() => onRequestTutoring(tutor)}
-        className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold h-11 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-accent/10 hover:shadow-accent/20 focus:outline-none group"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRequestTutoring(tutor);
+        }}
+        className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold h-11 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-accent/10 hover:shadow-accent/20 focus:outline-none group mt-2"
       >
         <MessageSquare className="w-4 h-4 group-hover:scale-110 transition-transform" />
         <span>Pedí una tutoría</span>

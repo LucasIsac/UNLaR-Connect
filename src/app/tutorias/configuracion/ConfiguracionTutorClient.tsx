@@ -64,6 +64,7 @@ export default function ConfiguracionTutorClient({
   // General Settings State
   const [tutorPrice, setTutorPrice] = useState<number>(profile.tutor_price || 0);
   const [contactVisibility, setContactVisibility] = useState<boolean>(profile.contact_visibility ?? true);
+  const [phoneNumber, setPhoneNumber] = useState<string>(profile.phone_number || "");
 
   // Add Schedule Form State
   const [isAddScheduleOpen, setIsAddScheduleOpen] = useState(false);
@@ -92,15 +93,28 @@ export default function ConfiguracionTutorClient({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // 1. Save general preferences
+  // 1. General Preferences
   const handleSavePreferences = async () => {
     setActionInProgress("save-preferences");
+    
+    // Optimistic update
+    const previousProfile = profile ? { ...profile } : null;
+    if (profile) {
+      setProfile({
+        ...profile,
+        tutor_price: tutorPrice,
+        contact_visibility: contactVisibility,
+        phone_number: phoneNumber
+      });
+    }
+    
     try {
-      const response = await updateTutorPreferences(tutorPrice, contactVisibility);
-      if (response.success && response.data) {
-        setProfile(response.data);
-        triggerToast("¡Guardamos tus preferencias al toque! 🎉");
+      const response = await updateTutorPreferences(tutorPrice, contactVisibility, phoneNumber);
+      if (response.success) {
+        triggerToast("Preferencias de tutor actualizadas.");
+        router.refresh();
       } else {
+        setProfile(previousProfile as UserProfileExtended); // Rollback
         triggerToast(response.error || "No pudimos guardar los cambios.");
       }
     } catch (err) {
@@ -114,12 +128,18 @@ export default function ConfiguracionTutorClient({
   // 2. Remove subject
   const handleRemoveSubject = async (subjectId: number, name: string) => {
     setActionInProgress(`remove-subject-${subjectId}`);
+    
+    // Optimistic UI update
+    const previousSubjects = [...tutorSubjects];
+    setTutorSubjects(tutorSubjects.filter(s => s.id !== subjectId));
+    
     try {
       const response = await removeTutorSubject(subjectId);
-      if (response.success && response.data) {
-        setTutorSubjects(response.data);
+      if (response.success) {
         triggerToast(`Quitaste "${name}" de tus materias.`);
+        router.refresh();
       } else {
+        setTutorSubjects(previousSubjects); // Rollback
         triggerToast(response.error || "No pudimos quitar la materia.");
       }
     } catch (err) {
@@ -141,12 +161,18 @@ export default function ConfiguracionTutorClient({
     }
     
     setActionInProgress(`add-subject-${subject.id}`);
+    
+    // Optimistic UI update
+    const previousSubjects = [...tutorSubjects];
+    setTutorSubjects([...tutorSubjects, subject]);
+    
     try {
       const response = await addTutorSubject(subject.id);
-      if (response.success && response.data) {
-        setTutorSubjects(response.data);
+      if (response.success) {
         triggerToast(`¡Sumaste "${subject.name}" como materia!`);
+        router.refresh();
       } else {
+        setTutorSubjects(previousSubjects); // Rollback
         triggerToast(response.error || "No se pudo agregar la materia.");
       }
     } catch (err) {
@@ -175,13 +201,20 @@ export default function ConfiguracionTutorClient({
       return a.start_time.localeCompare(b.start_time);
     });
     
+    const previousAvailability = [...availability];
+    
+    // Optimistic UI update
+    setAvailability(updatedList);
+    setIsAddScheduleOpen(false);
+    
     try {
       const response = await saveTutorAvailability(updatedList);
-      if (response.success && response.data) {
-        setAvailability(response.data);
-        setIsAddScheduleOpen(false);
+      if (response.success) {
         triggerToast(`Agregaste disponibilidad para el ${DAYS_OF_WEEK[scheduleDay]}.`);
+        router.refresh();
       } else {
+        setAvailability(previousAvailability); // Rollback
+        setIsAddScheduleOpen(true);
         triggerToast(response.error || "No pudimos agendar el horario.");
       }
     } catch (err) {
@@ -197,12 +230,18 @@ export default function ConfiguracionTutorClient({
     setActionInProgress(`delete-schedule-${slotId}`);
     const updatedList = availability.filter(slot => slot.id !== slotId);
     
+    const previousAvailability = [...availability];
+    
+    // Optimistic UI update
+    setAvailability(updatedList);
+    
     try {
       const response = await saveTutorAvailability(updatedList);
-      if (response.success && response.data) {
-        setAvailability(response.data);
+      if (response.success) {
         triggerToast("Se eliminó el bloque de disponibilidad.");
+        router.refresh();
       } else {
+        setAvailability(previousAvailability); // Rollback
         triggerToast(response.error || "No se pudo eliminar el horario.");
       }
     } catch (err) {
@@ -328,7 +367,7 @@ export default function ConfiguracionTutorClient({
                         </span>
                         <span className="text-[10px] font-medium text-muted-foreground">
                           {contactVisibility 
-                            ? "Los estudiantes pueden ver tu email." 
+                            ? "Los estudiantes pueden ver tu email y teléfono." 
                             : "Solo te pueden contactar por el sistema."}
                         </span>
                       </div>
@@ -339,6 +378,32 @@ export default function ConfiguracionTutorClient({
                     </div>
                   </button>
                 </div>
+
+                {/* Phone Number (Conditionally Rendered) */}
+                <AnimatePresence>
+                  {contactVisibility && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                      animate={{ opacity: 1, height: "auto", marginTop: 20 }}
+                      exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                        Número de Teléfono / WhatsApp
+                      </label>
+                      <input
+                        type="tel"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        placeholder="Ej: +54 9 380 4123456"
+                        className="w-full bg-card/30 hover:bg-card/45 border border-border/40 focus:border-accent rounded-xl py-2.5 px-4 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all font-semibold"
+                      />
+                      <p className="text-[10px] text-muted-foreground mt-1.5 font-medium">
+                        Opcional. Si lo ponés, los alumnos podrán contactarte más rápido.
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               <div className="mt-6 pt-5 border-t border-border/10">
@@ -361,7 +426,7 @@ export default function ConfiguracionTutorClient({
             
             {/* Tutoring Subjects Manager */}
             <motion.div 
-              className="bg-glass rounded-3xl p-6 relative group hover:border-accent/10 transition-all duration-300"
+              className="bg-glass rounded-3xl p-6 relative group hover:border-accent/10 transition-all duration-300 z-10"
               variants={staggerItem}
             >
               <label className="block text-sm font-bold text-cream-bone mb-3 select-none flex items-center gap-2">

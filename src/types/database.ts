@@ -30,6 +30,7 @@ export interface DbUser {
   avatar_url?: string;
   tutor_price?: number;
   contact_visibility?: boolean;
+  phone_number?: string;
 }
 
 export interface DbSubject {

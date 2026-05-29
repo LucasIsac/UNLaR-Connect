@@ -83,7 +83,7 @@ export function useCallPresence(userId?: string, userMetadata?: CallPresenceMeta
       Object.keys(state).forEach((key) => {
         const presences = state[key] as unknown as PresenceUser[];
         presences.forEach((presence) => {
-          if (presence.roleId === 3 && presence.available) {
+          if ((presence.roleId === 3 || presence.roleId === 1) && presence.available) {
             tutors[presence.userId] = {
               userId: presence.userId,
               name: presence.name || "Tutor",
@@ -140,6 +140,26 @@ export function useCallPresence(userId?: string, userMetadata?: CallPresenceMeta
         roleId: data.roleId ?? 2,
         available: data.available,
         onlineAt: new Date().toISOString(),
+      });
+
+      // Immediately update local state for responsive UI feedback
+      // (the Supabase sync event may not re-fire for the originating client)
+      setOnlineTutors((prev) => {
+        const updated = { ...prev };
+        if (data.available && (data.roleId === 3 || data.roleId === 1)) {
+          updated[userId] = {
+            userId,
+            name: data.name || "Usuario",
+            last_name: data.last_name || "",
+            avatar_url: data.avatar_url || null,
+            roleId: data.roleId ?? 2,
+            available: true,
+            onlineAt: new Date().toISOString(),
+          };
+        } else {
+          delete updated[userId];
+        }
+        return updated;
       });
     }
   }, [isSubscribed, userId, isAvailable, metaName, metaLastName, metaAvatarUrl, metaRoleId]);

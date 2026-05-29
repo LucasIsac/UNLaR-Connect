@@ -202,7 +202,8 @@ export async function toggleTutorStatus(
  */
 export async function updateTutorPreferences(
   tutorPrice: number | null,
-  contactVisibility: boolean
+  contactVisibility: boolean,
+  phoneNumber: string
 ): Promise<{ success: boolean; data?: UserProfileExtended; error?: string }> {
   try {
     const db = createServerClient();
@@ -217,7 +218,8 @@ export async function updateTutorPreferences(
       .from("users")
       .update({
         tutor_price: tutorPrice,
-        contact_visibility: contactVisibility
+        contact_visibility: contactVisibility,
+        phone_number: phoneNumber || null
       })
       .eq("id", authUser.id);
 
