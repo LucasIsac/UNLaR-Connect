@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient as createBrowserClient } from "@/lib/supabase/client";
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import {
+  createClient as createBrowserClient,
+  unsubscribeRealtimeChannel,
+} from "@/lib/supabase/client";
 import { useCallPresence } from "@/hooks/useCallPresence";
 import { 
   AvailableTutor, 
@@ -27,6 +31,7 @@ import ScheduledTutorCard from "@/components/consultas/ScheduledTutorCard";
 import RequestTutoringModal from "@/components/consultas/RequestTutoringModal";
 import TutoringCalendar from "@/components/consultas/TutoringCalendar";
 import IncomingCallBanner from "@/components/consultas/IncomingCallBanner";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { 
   Video, 
   Calendar, 
@@ -46,8 +51,20 @@ import {
   List
 } from "lucide-react";
 import { DbSubject } from "@/types/database";
+import type { CombinedHeaderData } from "@/actions/perfil";
 
 type TabType = "live" | "scheduled";
+type IncomingCall = {
+  roomId: string;
+  studentName: string;
+  subjectName: string;
+};
+type CallRoomRealtimeRow = {
+  id: string;
+  status: string;
+  student_id: string;
+  subject_id: number | null;
+};
 
 interface TutoriasClientProps {
   currentUser: {
@@ -57,10 +74,10 @@ interface TutoriasClientProps {
     role_id: number; // 1 = Tutor, 2 = Student, 3 = TutorActive
     avatar_url?: string;
   };
-  initialHeaderData?: any;
+  initialHeaderData?: CombinedHeaderData;
 }
 
-export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
+export default function TutoriasClient({ currentUser, initialHeaderData }: TutoriasClientProps) {
   const router = useRouter();
   const supabase = createBrowserClient();
 
@@ -86,7 +103,7 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
   // ==================== LIVE TAB STATE ====================
   const [allTutors, setAllTutors] = useState<AvailableTutor[]>([]);
   const [loadingTutors, setLoadingTutors] = useState(true);
-  const [incomingCall, setIncomingCall] = useState<any | null>(null);
+  const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
   const [activeCallRoomId, setActiveCallRoomId] = useState<string | null>(null);
   const [isRequesting, setIsRequesting] = useState(false);
   const [isResponding, setIsResponding] = useState(false);
@@ -152,7 +169,7 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
 
   // ==================== REALTIME SUBSCRIPTIONS ====================
   useEffect(() => {
-    if (currentUser.role_id !== 1) return;
+    if (currentUser.role_id !== 1 && currentUser.role_id !== 3) return;
 
     const channel = supabase
       .channel("tutor_call_listeners")
@@ -164,9 +181,9 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
           table: "call_rooms",
           filter: `tutor_id=eq.${currentUser.id}`,
         },
-        async (payload: any) => {
-          const newRoom = payload.new;
-          if (newRoom.status === "requested") {
+        async (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+          const newRoom = payload.new as Partial<CallRoomRealtimeRow>;
+          if (newRoom.status === "requested" && newRoom.id && newRoom.student_id) {
             const { data: student } = await supabase
               .from("users")
               .select("name, last_name")
@@ -190,9 +207,9 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      unsubscribeRealtimeChannel(channel);
     };
-  }, [currentUser]);
+  }, [currentUser.id, currentUser.role_id, supabase]);
 
   useEffect(() => {
     if (!activeCallRoomId) return;
@@ -207,8 +224,8 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
           table: "call_rooms",
           filter: `id=eq.${activeCallRoomId}`,
         },
-        (payload: any) => {
-          const updatedRoom = payload.new;
+        (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+          const updatedRoom = payload.new as Partial<CallRoomRealtimeRow>;
           if (updatedRoom.status === "accepted" || updatedRoom.status === "active") {
             router.push(`/tutorias/sala/${activeCallRoomId}`);
           } else if (updatedRoom.status === "rejected") {
@@ -222,7 +239,7 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      unsubscribeRealtimeChannel(channel);
     };
   }, [activeCallRoomId]);
 
@@ -399,7 +416,8 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
   const isTutor = currentUser.role_id === 1 || currentUser.role_id === 3;
 
   return (
-    <div className="space-y-8 animate-fade-in pb-12">
+    <DashboardLayout initialHeaderData={initialHeaderData} showSearch={false}>
+      <div className="space-y-8 animate-fade-in pb-12">
       {incomingCall && (
         <IncomingCallBanner
           studentName={incomingCall.studentName}
@@ -988,6 +1006,7 @@ export default function TutoriasClient({ currentUser }: TutoriasClientProps) {
 
         </div>
       )}
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

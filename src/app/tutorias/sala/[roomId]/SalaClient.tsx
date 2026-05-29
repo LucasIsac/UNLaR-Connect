@@ -27,7 +27,10 @@ import {
   AlertTriangle,
   Info,
   Clock,
-  Sparkles
+  Sparkles,
+  GripHorizontal,
+  Maximize2,
+  Minimize2
 } from "lucide-react";
 
 interface SalaClientProps {
@@ -42,6 +45,11 @@ interface CallExitNotice {
   actionLabel: string;
 }
 
+interface PreviewPosition {
+  x: number;
+  y: number;
+}
+
 export default function SalaClient({
   room,
   isTutor,
@@ -52,6 +60,8 @@ export default function SalaClient({
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const videoStageRef = useRef<HTMLDivElement>(null);
+  const localPreviewRef = useRef<HTMLDivElement>(null);
   const endingByMeRef = useRef(false);
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -62,6 +72,8 @@ export default function SalaClient({
   const [unreadCount, setUnreadCount] = useState(0);
   const [callExitNotice, setCallExitNotice] = useState<CallExitNotice | null>(null);
   const [visibleMediaInfo, setVisibleMediaInfo] = useState<string | null>(null);
+  const [isLocalPreviewCollapsed, setIsLocalPreviewCollapsed] = useState(false);
+  const [localPreviewPosition, setLocalPreviewPosition] = useState<PreviewPosition | null>(null);
 
   // Call timer state
   const [callDuration, setCallDuration] = useState(0);
@@ -98,10 +110,19 @@ export default function SalaClient({
 
   // Attach local stream to video ref
   useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
+    if (!localVideoRef.current) return;
+
+    if (!localStream || isCameraOff || isLocalPreviewCollapsed) {
+      localVideoRef.current.srcObject = null;
+      return;
     }
-  }, [localStream]);
+
+    localVideoRef.current.srcObject = localStream;
+    void localVideoRef.current.play().catch(() => {
+      // The element is muted and playsInline, so autoplay should work. Ignore
+      // transient play races while React remounts the preview.
+    });
+  }, [localStream, isCameraOff, isLocalPreviewCollapsed]);
 
   // Attach remote stream to video ref
   useEffect(() => {
@@ -285,6 +306,62 @@ export default function SalaClient({
     }
   };
 
+  const clampPreviewPosition = (x: number, y: number): PreviewPosition => {
+    const stage = videoStageRef.current;
+    const preview = localPreviewRef.current;
+    const padding = 16;
+
+    if (!stage || !preview) {
+      return { x, y };
+    }
+
+    const maxX = Math.max(padding, stage.clientWidth - preview.offsetWidth - padding);
+    const maxY = Math.max(padding, stage.clientHeight - preview.offsetHeight - padding);
+
+    return {
+      x: Math.min(Math.max(x, padding), maxX),
+      y: Math.min(Math.max(y, padding), maxY),
+    };
+  };
+
+  const handlePreviewPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+
+    const target = event.target as HTMLElement;
+    if (target.closest("button")) return;
+
+    const stage = videoStageRef.current;
+    const preview = localPreviewRef.current;
+    if (!stage || !preview) return;
+
+    const stageRect = stage.getBoundingClientRect();
+    const previewRect = preview.getBoundingClientRect();
+    const offsetX = event.clientX - previewRect.left;
+    const offsetY = event.clientY - previewRect.top;
+
+    preview.setPointerCapture(event.pointerId);
+    setLocalPreviewPosition({
+      x: previewRect.left - stageRect.left,
+      y: previewRect.top - stageRect.top,
+    });
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const nextX = moveEvent.clientX - stageRect.left - offsetX;
+      const nextY = moveEvent.clientY - stageRect.top - offsetY;
+      setLocalPreviewPosition(clampPreviewPosition(nextX, nextY));
+    };
+
+    const stopDragging = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopDragging);
+      window.removeEventListener("pointercancel", stopDragging);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopDragging, { once: true });
+    window.addEventListener("pointercancel", stopDragging, { once: true });
+  };
+
   // Format stopwatch counter nicely
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60).toString().padStart(2, "0");
@@ -371,7 +448,10 @@ export default function SalaClient({
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 mb-6">
         
         {/* Videos Area (col-span-2) */}
-        <div className="lg:col-span-2 relative flex flex-col justify-between min-h-[350px] bg-obsidian rounded-xl overflow-hidden border border-border/20 shadow-2xl">
+        <div
+          ref={videoStageRef}
+          className="lg:col-span-2 relative flex flex-col justify-between min-h-[350px] bg-obsidian rounded-xl overflow-hidden border border-border/20 shadow-2xl"
+        >
           
           {/* Main Remote Video */}
           <div className="absolute inset-0 z-0 bg-neutral-900/50 flex items-center justify-center">
@@ -420,20 +500,62 @@ export default function SalaClient({
           </div>
 
           {/* Floating Local Video (PiP) */}
-          <div className="absolute top-4 right-4 z-10 w-28 sm:w-36 h-36 sm:h-48 rounded-xl overflow-hidden border border-accent/30 shadow-2xl bg-black">
-            {localStream && !isCameraOff ? (
-              <video
-                ref={localVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover -scale-x-100"
-              />
+          <div
+            ref={localPreviewRef}
+            onPointerDown={handlePreviewPointerDown}
+            className={`absolute z-10 overflow-hidden border border-accent/30 shadow-2xl bg-black/95 select-none touch-none transition-[width,height,border-radius,box-shadow] duration-200 ${
+              isLocalPreviewCollapsed
+                ? "w-14 h-14 rounded-full cursor-grab active:cursor-grabbing"
+                : "w-40 h-24 sm:w-52 sm:h-32 rounded-xl cursor-grab active:cursor-grabbing"
+            }`}
+            style={
+              localPreviewPosition
+                ? { left: localPreviewPosition.x, top: localPreviewPosition.y }
+                : { top: 16, right: 16 }
+            }
+          >
+            {isLocalPreviewCollapsed ? (
+              <button
+                type="button"
+                onClick={() => setIsLocalPreviewCollapsed(false)}
+                className="w-full h-full flex items-center justify-center text-accent hover:bg-accent/10 transition-colors focus:outline-none"
+                title="Expandir vista propia"
+                aria-label="Expandir vista propia"
+              >
+                <Maximize2 className="w-5 h-5" />
+              </button>
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center text-center p-3 text-muted-foreground bg-muted/20">
-                <User className="w-6 h-6 opacity-35" />
-                <span className="text-[10px] mt-1 font-semibold">Tú</span>
-              </div>
+              <>
+                {localStream && !isCameraOff ? (
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover -scale-x-100"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-center p-3 text-muted-foreground bg-muted/20">
+                    <User className="w-6 h-6 opacity-35" />
+                    <span className="text-[10px] mt-1 font-semibold">Vos</span>
+                  </div>
+                )}
+
+                <div className="absolute top-2 left-2 right-2 flex items-center justify-between gap-2">
+                  <div className="h-7 px-2 rounded-lg bg-black/50 backdrop-blur-md border border-white/10 flex items-center text-white/75">
+                    <GripHorizontal className="w-4 h-4" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsLocalPreviewCollapsed(true)}
+                    className="w-7 h-7 rounded-lg bg-black/50 backdrop-blur-md border border-white/10 text-white/80 hover:text-white hover:bg-black/70 flex items-center justify-center transition-colors focus:outline-none"
+                    title="Contraer vista propia"
+                    aria-label="Contraer vista propia"
+                  >
+                    <Minimize2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </>
             )}
           </div>
 

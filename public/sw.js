@@ -1,6 +1,5 @@
-const CACHE_NAME = "unlar-connect-v1";
+const CACHE_NAME = "unlar-connect-v2";
 const STATIC_ASSETS = [
-  "/",
   "/manifest.json",
   "/icons/icon-192x192.png",
   "/icons/icon-512x512.png",
@@ -41,6 +40,19 @@ self.addEventListener("fetch", (event) => {
   // Skip chrome extensions and non-http requests
   if (!url.protocol.startsWith("http")) return;
 
+  // Skip cross-origin requests. Supabase, Google OAuth, and CDN requests
+  // must stay fully browser-controlled so auth redirects cannot hang.
+  if (url.origin !== self.location.origin) return;
+
+  // Skip Next.js build assets to avoid serving stale compiled files.
+  if (url.pathname.startsWith("/_next/")) return;
+
+  // Let HTML navigations go straight to Next.js. This avoids stale dashboard
+  // shells and noisy rejected fetches during local development.
+  if (request.mode === "navigate" || request.headers.get("accept")?.includes("text/html")) {
+    return;
+  }
+
   // Network-first for API calls and server actions
   if (
     url.pathname.startsWith("/api/") ||
@@ -53,14 +65,15 @@ self.addEventListener("fetch", (event) => {
           // Clone and cache successful responses
           if (response.ok) {
             const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseClone);
-            });
+            event.waitUntil(
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone))
+            );
           }
           return response;
         })
-        .catch(() => {
-          return caches.match(request);
+        .catch(async () => {
+          const cachedResponse = await caches.match(request);
+          return cachedResponse || Response.error();
         })
     );
     return;
@@ -72,27 +85,34 @@ self.addEventListener("fetch", (event) => {
       if (cachedResponse) {
         // Return cached version, fetch update in background
         event.waitUntil(
-          fetch(request).then((networkResponse) => {
-            if (networkResponse.ok) {
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(request, networkResponse);
-              });
-            }
-          })
+          fetch(request)
+            .then((networkResponse) => {
+              if (networkResponse.ok) {
+                return caches.open(CACHE_NAME).then((cache) => {
+                  return cache.put(request, networkResponse);
+                });
+              }
+            })
+            .catch(() => undefined)
         );
         return cachedResponse;
       }
 
       // Not in cache, fetch from network
-      return fetch(request).then((response) => {
-        if (response.ok) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone);
-          });
-        }
-        return response;
-      });
+      return fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const responseClone = response.clone();
+            event.waitUntil(
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone))
+            );
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cachedResponse = await caches.match(request);
+          return cachedResponse || Response.error();
+        });
     })
   );
 });

@@ -43,6 +43,22 @@ export interface TutoringCalendarEvent {
   is_tutor: boolean;
 }
 
+type SupabaseRelation<T> = T | T[] | null;
+
+interface TutoringCalendarRow extends DbTutoringSession {
+  subject: SupabaseRelation<Pick<DbSubject, "name">>;
+  tutor: SupabaseRelation<Pick<DbUser, "id" | "name" | "last_name">>;
+  student: SupabaseRelation<Pick<DbUser, "id" | "name" | "last_name">>;
+}
+
+function unwrapRelation<T>(value: SupabaseRelation<T>): T | null {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  return value;
+}
+
 // ============================================================
 // fetchTutorProfilesForMatching
 // Returns tutors with their subjects, availability, and a match score.
@@ -98,6 +114,10 @@ export async function fetchTutorProfilesForMatching(
 
     // Fetch availability for all tutors
     const tutorIds = Array.from(tutorMap.keys());
+    if (tutorIds.length === 0) {
+      return { success: true, data: [] };
+    }
+
     const { data: availabilityData } = await supabase
       .from("tutor_availability")
       .select("*")
@@ -369,10 +389,10 @@ export async function fetchTutoringCalendar(): Promise<ActionResponse<TutoringCa
 
     if (error) throw error;
 
-    const events: TutoringCalendarEvent[] = (data ?? []).map((s: any) => {
-      const tutor = Array.isArray(s.tutor) ? s.tutor[0] : s.tutor;
-      const student = Array.isArray(s.student) ? s.student[0] : s.student;
-      const subject = Array.isArray(s.subject) ? s.subject[0] : s.subject;
+    const events: TutoringCalendarEvent[] = ((data ?? []) as TutoringCalendarRow[]).map((s) => {
+      const tutor = unwrapRelation(s.tutor);
+      const student = unwrapRelation(s.student);
+      const subject = unwrapRelation(s.subject);
       const isTutor = s.tutor_id === session.userId;
       const peer = isTutor ? student : tutor;
 

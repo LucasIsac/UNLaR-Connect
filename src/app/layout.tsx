@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Montserrat } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
+import ServiceWorkerRegister from "@/components/pwa/ServiceWorkerRegister";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -50,7 +51,7 @@ export default function RootLayout({
     <html lang="es" className={`${inter.variable} ${montserrat.variable}`} suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <script
           suppressHydrationWarning
@@ -122,25 +123,9 @@ export default function RootLayout({
             `,
           }}
         />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js')
-                    .then(function(registration) {
-                      console.log('SW registered:', registration.scope);
-                    })
-                    .catch(function(error) {
-                      console.log('SW registration failed:', error);
-                    });
-                });
-              }
-            `,
-          }}
-        />
       </head>
       <body className="font-sans antialiased custom-scrollbar" suppressHydrationWarning>
+        <ServiceWorkerRegister />
         <ThemeProvider>
           {children}
 
