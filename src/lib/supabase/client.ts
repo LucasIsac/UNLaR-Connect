@@ -18,18 +18,25 @@ export function createClient(): SupabaseClient {
 }
 
 export function unsubscribeRealtimeChannel(channel: RealtimeChannel) {
-  // Delay channel removal slightly to prevent "WebSocket is closed before the connection is established"
-  // warnings that happen during rapid component unmount/remount in development (React Strict Mode / HMR).
-  setTimeout(() => {
-    if (browserClient) {
-      void browserClient.removeChannel(channel);
-      return;
+  if (browserClient) {
+    // Synchronously remove the channel from the internal client cache
+    // to prevent reuse and callbacks addition crash during rapid component unmount/remount (React Strict Mode / HMR).
+    const realtime = (browserClient as any).realtime;
+    if (realtime && Array.isArray(realtime.channels)) {
+      realtime.channels = realtime.channels.filter((c: any) => c !== channel);
     }
 
-    try {
-      void channel.unsubscribe();
-    } catch {
-      // Ignore teardown races during development remounts.
-    }
-  }, 100);
+    // Delay the actual network unsubscription slightly to allow the connection
+    // handshake to complete, avoiding "WebSocket is closed before the connection is established" warning.
+    setTimeout(() => {
+      void browserClient.removeChannel(channel);
+    }, 100);
+    return;
+  }
+
+  try {
+    void channel.unsubscribe();
+  } catch {
+    // Ignore teardown races during development remounts.
+  }
 }
