@@ -1,6 +1,6 @@
 "use server";
 
-import { supabase } from "@/lib/supabase";
+import { createServerClient } from "@/lib/supabase";
 import { DbDocument } from "@/types/database";
 import { revalidatePath } from "next/cache";
 
@@ -15,17 +15,17 @@ export interface ResourceExtended extends DbDocument {
   description: string;
 }
 
-// Temporary hardcoded UUID for demo if auth is not fully hooked up
-const MOCK_USER_ID = "123e4567-e89b-12d3-a456-426614174000";
+// Note: auth is now retrieved server-side.
 
 /**
  * Fetch all resources/documents from Supabase
  */
 export async function fetchResources(): Promise<ResourceExtended[]> {
+  const supabase = createServerClient();
   try {
     const { data: documents, error } = await supabase
       .from("documents")
-      .select("*")
+      .select("*, subjects(name)")
       .order("uploaded_at", { ascending: false });
 
     if (error) {
@@ -38,11 +38,13 @@ export async function fetchResources(): Promise<ResourceExtended[]> {
     }
 
     // Map DbDocument to ResourceExtended format
-    return documents.map((doc: DbDocument) => {
-      // Simulate category and styling based on DB data for now
-      // In a real app, we'd join with `subjects` and `topics` tables
-      let cat = "Otra";
+    return documents.map((doc: any) => {
+      const cat = doc.subjects?.name || "Otra";
       let catColor = "text-primary bg-primary/10 border-primary/20";
+      
+      if (cat === "Sistemas Operativos") catColor = "text-orange-400 bg-orange-400/10 border-orange-400/20";
+      else if (cat.includes("Análisis")) catColor = "text-blue-400 bg-blue-400/10 border-blue-400/20";
+      else if (cat.includes("Álgebra")) catColor = "text-purple-400 bg-purple-400/10 border-purple-400/20";
       
       return {
         ...doc,
@@ -66,26 +68,40 @@ export async function fetchResources(): Promise<ResourceExtended[]> {
  * REAL SUPABASE UPLOAD: Used by /dashboard/recursos page
  */
 export async function uploadResource(formData: FormData): Promise<{ success: boolean; data?: ResourceExtended; error?: string }> {
+  const supabase = createServerClient();
   try {
     const file = formData.get("file") as File;
     const title = formData.get("title") as string;
     const category = formData.get("category") as string;
     const thematicAxis = formData.get("thematicAxis") as string;
-    const type = formData.get("type") as string;
     const description = formData.get("description") as string;
 
     if (!file || !title) {
       return { success: false, error: "El archivo y el título son obligatorios." };
     }
 
+    if (file.size === 0) {
+      return { success: false, error: "El archivo está vacío (0 bytes)." };
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+      return { success: false, error: "El archivo es demasiado grande (máximo 50MB)." };
+    }
+
+    const authResponse = await supabase.auth.getUser();
+    const authUser = authResponse?.data?.user;
+
+    if (!authUser) {
+      return { success: false, error: "No estás autenticado/a." };
+    }
+
     const fileExt = file.name.split('.').pop();
-    const filePath = `${MOCK_USER_ID}/${Date.now()}.${fileExt}`;
+    const filePath = `${authUser.id}/${Date.now()}.${fileExt}`;
 
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = new Uint8Array(arrayBuffer);
+    const buffer = Buffer.from(arrayBuffer);
 
-    // TypeScript will complain here until @supabase/supabase-js is installed
-    const { data: storageData, error: storageError } = await (supabase as any).storage
+    const { error: storageError } = await supabase.storage
       .from('apuntes')
       .upload(filePath, buffer, {
         contentType: file.type,
@@ -96,18 +112,26 @@ export async function uploadResource(formData: FormData): Promise<{ success: boo
       return { success: false, error: "Error al subir el archivo físico." };
     }
 
-    const { data: publicUrlData } = (supabase as any).storage
+    const { data: publicUrlData } = supabase.storage
       .from('apuntes')
       .getPublicUrl(filePath);
 
+    // Look up the subject ID to save it to the DB so it persists
+    let subjectId = null;
+    if (category) {
+      const { data: subj } = await supabase.from('subjects').select('id').ilike('name', category).single();
+      if (subj) subjectId = subj.id;
+    }
+
     const newDoc = {
-      user_id: MOCK_USER_ID,
+      user_id: authUser.id,
+      subject_id: subjectId,
       title: title.trim(),
       document_type: fileExt || "unknown",
       storage_url: publicUrlData.publicUrl,
     };
 
-    const { data: dbData, error: dbError } = await (supabase as any)
+    const { data: dbData, error: dbError } = await supabase
       .from('documents')
       .insert(newDoc)
       .select()
@@ -115,7 +139,7 @@ export async function uploadResource(formData: FormData): Promise<{ success: boo
 
     if (dbError) {
       console.error("Database insert error:", dbError);
-      await (supabase as any).storage.from('apuntes').remove([filePath]);
+      await supabase.storage.from('apuntes').remove([filePath]);
       return { success: false, error: "Error al guardar los datos del apunte." };
     }
 
@@ -148,38 +172,66 @@ export async function uploadResource(formData: FormData): Promise<{ success: boo
 /**
  * Favorite or save a resource (Placeholder for now)
  */
-export async function toggleSaveResource(resourceId: string): Promise<{ success: boolean; saved?: boolean; error?: string }> {
-  // TODO: Implement actual user save table interaction
-  return { success: true, saved: true };
-}
-
-/**
- * Cast vote/like on resource card
- */
-export async function castResourceVote(resourceId: string): Promise<{ success: boolean; error?: string }> {
+export async function toggleSaveResource(): Promise<{ success: boolean; saved?: boolean; error?: string }> {
   try {
-    // We would use an RPC call or increment logic in Supabase to avoid race conditions
-    // For now, doing a simple fetch and update:
-    const { data: doc, error: fetchError } = await supabase
-      .from('documents')
-      .select('upvotes')
-      .eq('id', resourceId)
-      .single();
-
-    if (fetchError || !doc) return { success: false, error: "Apunte no encontrado." };
-
-    const { error: updateError } = await supabase
-      .from('documents')
-      .update({ upvotes: doc.upvotes + 1 })
-      .eq('id', resourceId);
-
-    if (updateError) return { success: false, error: "No se pudo actualizar." };
-
-    revalidatePath("/apuntes");
-    return { success: true };
-  } catch (error) {
-    console.error(error);
-    return { success: false, error: "No se pudo registrar tu me gusta." };
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return { success: true, saved: true };
+  } catch {
+    return { success: false, error: "Error al guardar el apunte." };
   }
 }
 
+/**
+ * Cast a vote on a resource (Placeholder for now)
+ */
+export async function castResourceVote(): Promise<{ success: boolean; newScore?: number; error?: string }> {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return { success: true, newScore: 2 };
+  } catch {
+    return { success: false, error: "Error al registrar voto." };
+  }
+}
+
+/**
+ * Delete a resource
+ */
+export async function deleteResource(id: string, storageUrl: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = createServerClient();
+  try {
+
+    // Extract path from storage_url
+    // Url format: https://[project].supabase.co/storage/v1/object/public/apuntes/[user_id]/[file.pdf]
+    const urlParts = storageUrl.split('/apuntes/');
+    if (urlParts.length > 1) {
+      const filePath = urlParts[1];
+      const { error: deleteStorageError } = await supabase.storage
+        .from('apuntes')
+        .remove([filePath]);
+        
+      if (deleteStorageError) console.error("Error deleting from storage:", deleteStorageError);
+    }
+
+    const { data: deletedRows, error: dbError } = await supabase
+      .from('documents')
+      .delete()
+      .eq('id', id)
+      .select();
+
+    if (dbError) {
+      console.error("Database delete error:", dbError);
+      return { success: false, error: "Error al eliminar de la base de datos." };
+    }
+
+    if (!deletedRows || deletedRows.length === 0) {
+      console.error("No rows deleted (possible RLS issue). ID:", id);
+      return { success: false, error: "Permisos insuficientes o apunte no encontrado (Falla de RLS)." };
+    }
+
+    revalidatePath("/dashboard/recursos");
+    return { success: true };
+  } catch (error) {
+    console.error("Unexpected delete error:", error);
+    return { success: false, error: "Hubo un problema inesperado al eliminar el apunte." };
+  }
+}

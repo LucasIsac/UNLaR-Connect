@@ -12,18 +12,17 @@ import {
   LayoutGrid,
   List,
   RefreshCw,
-  X,
-  Plus,
   Search,
-  Code2,
-  Check,
   FileText,
-  ChevronLeft,
-  ChevronRight,
   Send,
+  X,
   MessageCircle,
   Eye,
-  Star
+  Star,
+  Trash2,
+  Info,
+  CheckCircle,
+  XCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -31,8 +30,11 @@ import {
   uploadResource,
   toggleSaveResource,
   castResourceVote,
+  deleteResource,
   ResourceExtended
 } from "@/actions/recursos";
+import { fetchSubjects } from "@/actions/perfil";
+import { DbSubject } from "@/types/database";
 
 const tabs = ["Recientes", "Más Valorados", "Mis Guardados"];
 
@@ -42,6 +44,14 @@ export default function RecursosPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [gridView, setGridView] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Filters state
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
+  const [filterCarrera, setFilterCarrera] = useState("Todas");
+  const [filterAno, setFilterAno] = useState("Todos");
+  const [filterMateria, setFilterMateria] = useState("Todas");
+  const [filterTipo, setFilterTipo] = useState("Todos");
+  const [subjectsDataList, setSubjectsDataList] = useState<DbSubject[]>([]);
 
   // AI Active Context states (keeps a list of Resource objects currently active)
   const [aiContextList, setAiContextList] = useState<ResourceExtended[]>([]);
@@ -54,43 +64,63 @@ export default function RecursosPage() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
 
-  // Simulated PDF pages state
-  const [currentPage, setCurrentPage] = useState(1);
-  const totalMockPages = 12;
+
 
   // Sidebar Form States
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("Sistemas Operativos");
   const [newAxis, setNewAxis] = useState("Gestión de Memoria");
   const [newType, setNewType] = useState("Apunte de Teoría");
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [isMateriaDropdownOpen, setIsMateriaDropdownOpen] = useState(false);
+  const [isEjeDropdownOpen, setIsEjeDropdownOpen] = useState(false);
+  const [materiaFilter, setMateriaFilter] = useState("");
+  const [ejeFilter, setEjeFilter] = useState("");
   const [file, setFile] = useState<File | null>(null);
+
+  const normalizeString = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  const [predefinedMaterias, setPredefinedMaterias] = useState<string[]>(["Cargando materias..."]);
+  const predefinedEjes = ["Gestión de Memoria", "Consultas SQL", "Integrales Múltiples", "Programación Funcional"];
 
   // Drag & drop styling state
   const [isDragging, setIsDragging] = useState(false);
 
-  // Success toast message
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // Premium Toast state
+  const [toastMessage, setToastMessage] = useState<{ msg: string; type: "success" | "error" | "info" } | null>(null);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  const [resourceToDelete, setResourceToDelete] = useState<{ id: string, storageUrl: string, title: string } | null>(null);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
+  const showToast = (msg: string, type: "success" | "error" | "info" = "info") => {
+    setToastMessage({ msg, type });
     setTimeout(() => {
       setToastMessage(null);
     }, 4000);
   };
 
-  // Fetch resources on mount
+  // Fetch resources and subjects on mount
   useEffect(() => {
     async function loadData() {
       try {
-        const data = await fetchResources();
+        const [data, subjectsData] = await Promise.all([
+          fetchResources(),
+          fetchSubjects()
+        ]);
         setResources(data);
+        
+        if (subjectsData && subjectsData.length > 0) {
+          setPredefinedMaterias(subjectsData.map((s) => s.name));
+          setSubjectsDataList(subjectsData);
+        } else {
+          setPredefinedMaterias(["Sistemas Operativos", "Bases de Datos", "Paradigmas de Programación"]);
+        }
+
         // Set second item as initial active context
         if (data.length > 1) {
           setAiContextList([data[1]]);
         }
       } catch (err) {
-        console.error("Error loading resources:", err);
+        console.error("Error loading data:", err);
       } finally {
         setLoading(false);
       }
@@ -132,7 +162,7 @@ export default function RecursosPage() {
   const handleUploadApunteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !file) {
-      showToast("Por favor completá todos los campos y seleccioná un archivo.");
+      showToast("Por favor completá todos los campos y seleccioná un archivo.", "error");
       return;
     }
 
@@ -142,21 +172,22 @@ export default function RecursosPage() {
       formData.append("file", file);
       formData.append("title", newTitle);
       formData.append("category", newCategory);
-      formData.append("thematicAxis", newAxis);
+      formData.append("thematicAxis", newAxis || "General");
       formData.append("type", newType);
-      formData.append("description", `Material sobre ${newAxis} (${newType}).`);
+      formData.append("description", newAxis ? `Material sobre ${newAxis} (${newType}).` : `Material de tipo ${newType}.`);
 
       const response = await uploadResource(formData);
       if (response.success && response.data) {
         setResources((prev) => [response.data!, ...prev]);
-        showToast("¡Apunte subido! Sumaste 50 puntos de Karma y ya está listo para el Asistente AI 🚀");
+        showToast("¡Apunte subido con éxito! Listo para la IA.", "success");
         setNewTitle("");
         setFile(null);
       } else {
-        showToast(response.error || "No se pudo registrar tu apunte.");
+        showToast(response.error || "No se pudo registrar tu apunte.", "error");
       }
     } catch (err) {
       console.error(err);
+      showToast("Ocurrió un error inesperado al subir.", "error");
     } finally {
       setActionInProgress(null);
     }
@@ -193,6 +224,30 @@ export default function RecursosPage() {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleDeleteResourceSubmit = async (rscId: string, storageUrl: string) => {
+    setResourceToDelete(null);
+    
+    // Optimistic UI Update
+    setResources((prev) => prev.filter((r) => r.id !== rscId));
+    setSelectedResource(null);
+    showToast("Eliminando apunte...", "info");
+
+    try {
+      const response = await deleteResource(rscId, storageUrl);
+      if (response.success) {
+        showToast("Apunte eliminado de forma permanente.", "success");
+      } else {
+        showToast(response.error || "No se pudo eliminar el apunte.", "error");
+        // Revert optimistic update
+        const fetchMissing = await fetchResources();
+        setResources(fetchMissing);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Error inesperado al eliminar.", "error");
     }
   };
 
@@ -239,7 +294,23 @@ export default function RecursosPage() {
       rsc.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
       rsc.authorName.toLowerCase().includes(searchQuery.toLowerCase());
       
-    return matchesSearch;
+    // 3. Carrera filter
+    const matchesCarrera = filterCarrera === "Todas" || filterCarrera === "Sistemas"; // Defaults to Sistemas for now
+
+    // 4. Año filter
+    let matchesAno = filterAno === "Todos";
+    if (!matchesAno) {
+      const subject = subjectsDataList.find(s => s.name === rsc.category);
+      matchesAno = subject ? subject.year.toString() === filterAno : false;
+    }
+
+    // 5. Materia filter
+    const matchesMateria = filterMateria === "Todas" || rsc.category === filterMateria;
+
+    // 6. Tipo filter
+    const matchesTipo = filterTipo === "Todos" || rsc.document_type === filterTipo;
+
+    return matchesSearch && matchesCarrera && matchesAno && matchesMateria && matchesTipo;
   }).sort((a, b) => {
     if (activeTab === 1) {
       return b.likes - a.likes; // "Más Valorados"
@@ -251,18 +322,26 @@ export default function RecursosPage() {
     <DashboardLayout>
       <div className="animate-fade-in dashboard-bg min-h-full pb-10">
         
-        {/* Dynamic Success Toast */}
+        {/* Dynamic Premium Toast */}
         <AnimatePresence>
           {toastMessage && (
             <motion.div
-              className="fixed bottom-6 right-6 z-50 bg-primary-container text-obsidian border border-accent/20 px-5 py-3 rounded-2xl shadow-xl shadow-accent/10 flex items-center gap-3 font-semibold text-sm"
+              className={`fixed bottom-6 right-6 z-50 border px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3 font-semibold text-sm backdrop-blur-xl ${
+                toastMessage.type === "success" 
+                  ? "bg-emerald-950/90 text-emerald-100 border-emerald-500/50 shadow-emerald-900/50" 
+                  : toastMessage.type === "error"
+                  ? "bg-red-950/90 text-red-100 border-red-500/50 shadow-red-900/50"
+                  : "bg-primary-container/90 text-obsidian border-accent/30 shadow-accent/20"
+              }`}
               initial={{ opacity: 0, y: 30, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.9 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
             >
-              <Bot className="w-5 h-5 animate-pulse text-accent-foreground" />
-              <span>{toastMessage}</span>
+              {toastMessage.type === "success" && <CheckCircle className="w-5 h-5 text-emerald-400 drop-shadow-md" />}
+              {toastMessage.type === "error" && <XCircle className="w-5 h-5 text-red-400 drop-shadow-md" />}
+              {toastMessage.type === "info" && <Bot className="w-5 h-5 animate-pulse text-accent-foreground" />}
+              <span>{toastMessage.msg}</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -293,26 +372,116 @@ export default function RecursosPage() {
               />
             </div>
 
-            <button className="px-3 py-1.5 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 transition-colors flex items-center gap-1.5">
-              Carrera: <span className="text-accent">Sistemas</span>
-              <ChevronDown className="w-3.5 h-3.5" />
-            </button>
-            <button className="px-3 py-1.5 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 transition-colors flex items-center gap-1.5">
-              Año: <span className="text-accent">Todos</span>
-              <ChevronDown className="w-3.5 h-3.5" />
-            </button>
-            <button className="px-3 py-1.5 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 transition-colors flex items-center gap-1.5">
-              Tipo: <span className="text-accent">PDFs</span>
-              <ChevronDown className="w-3.5 h-3.5" />
-            </button>
+            {/* Carrera Filter */}
+            <div className="relative">
+              <button
+                onClick={() => setOpenFilter(openFilter === "carrera" ? null : "carrera")}
+                className="px-3 py-1.5 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 transition-colors flex items-center gap-1.5"
+              >
+                Carrera: <span className="text-accent">{filterCarrera}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openFilter === "carrera" ? "rotate-180" : ""}`} />
+              </button>
+              <AnimatePresence>
+                {openFilter === "carrera" && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
+                    className="absolute top-full left-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col min-w-[120px]"
+                  >
+                    {["Todas", "Sistemas"].map(opt => (
+                      <button key={opt} onClick={() => { setFilterCarrera(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${filterCarrera === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
+                        {opt}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Año Filter */}
+            <div className="relative">
+              <button
+                onClick={() => setOpenFilter(openFilter === "ano" ? null : "ano")}
+                className="px-3 py-1.5 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 transition-colors flex items-center gap-1.5"
+              >
+                Año: <span className="text-accent">{filterAno}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openFilter === "ano" ? "rotate-180" : ""}`} />
+              </button>
+              <AnimatePresence>
+                {openFilter === "ano" && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
+                    className="absolute top-full left-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col min-w-[100px]"
+                  >
+                    {["Todos", "1", "2", "3", "4", "5"].map(opt => (
+                      <button key={opt} onClick={() => { setFilterAno(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${filterAno === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
+                        {opt}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Materia Filter */}
+            <div className="relative">
+              <button
+                onClick={() => setOpenFilter(openFilter === "materia" ? null : "materia")}
+                className="px-3 py-1.5 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 transition-colors flex items-center gap-1.5 max-w-[200px] truncate"
+              >
+                Materia: <span className="text-accent truncate">{filterMateria}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform shrink-0 ${openFilter === "materia" ? "rotate-180" : ""}`} />
+              </button>
+              <AnimatePresence>
+                {openFilter === "materia" && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
+                    className="absolute top-full right-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-y-auto max-h-60 custom-scrollbar z-20 flex flex-col min-w-[200px]"
+                  >
+                    <button onClick={() => { setFilterMateria("Todas"); setOpenFilter(null); }} className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${filterMateria === "Todas" ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
+                      Todas
+                    </button>
+                    {predefinedMaterias.map(opt => (
+                      <button key={opt} onClick={() => { setFilterMateria(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${filterMateria === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
+                        {opt}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Tipo Filter */}
+            <div className="relative">
+              <button
+                onClick={() => setOpenFilter(openFilter === "tipo" ? null : "tipo")}
+                className="px-3 py-1.5 bg-glass border border-border/40 text-muted-foreground rounded-full text-xs font-semibold hover:bg-muted/10 transition-colors flex items-center gap-1.5"
+              >
+                Tipo: <span className="text-accent">{filterTipo}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openFilter === "tipo" ? "rotate-180" : ""}`} />
+              </button>
+              <AnimatePresence>
+                {openFilter === "tipo" && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
+                    className="absolute top-full right-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col min-w-[180px]"
+                  >
+                    {["Todos", "Apunte de Teoría", "Trabajo Práctico Resuelto", "Guía de Ejercicios", "Examen Final", "Otro"].map(opt => (
+                      <button key={opt} onClick={() => { setFilterTipo(opt); setOpenFilter(null); }} className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${filterTipo === opt ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}>
+                        {opt}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
 
         {/* Main Columns Container */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
           
           {/* Left / Center Content: Resource list and tabs */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="lg:col-span-3 space-y-4">
             
             {/* Navigation Tabs and Grid Layout Switcher */}
             <div className="flex items-center gap-4 border-b border-border/10 pb-2 mb-4 overflow-x-auto select-none">
@@ -494,7 +663,7 @@ export default function RecursosPage() {
           </div>
 
           {/* Right sidebar column: Upload zone and AI active context list */}
-          <div className="space-y-6">
+          <div className="lg:col-span-2 space-y-6">
 
             {/* Loading placeholder sidebars if true */}
             {loading ? (
@@ -506,17 +675,26 @@ export default function RecursosPage() {
             ) : (
               <>
                 {/* Dynamic AI Active Context List */}
-                <div className="bg-glass rounded-2xl p-5 relative border border-border/10">
-                  <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none select-none">
-                    <Bot className="w-20 h-20 text-accent" />
+                <div className="bg-glass rounded-2xl p-6 relative border border-border/20 shadow-xl shadow-accent/5 group/ai">
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-accent/5 to-transparent pointer-events-none" />
+                  <div className="absolute -top-6 -right-6 p-4 opacity-10 pointer-events-none select-none blur-[2px] group-hover/ai:blur-none transition-all duration-700">
+                    <Bot className="w-32 h-32 text-accent" />
                   </div>
-                  <h3 className="font-heading text-sm font-bold text-accent mb-3 flex items-center gap-2">
-                    <Bot className="w-4 h-4" />
-                    Contexto Activo AI
-                  </h3>
-                  <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
-                    Tenés <strong className="text-foreground">{aiContextList.length} apuntes</strong> seleccionados para consultar directo con el Asistente AI.
-                  </p>
+                  
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-heading text-base font-bold text-accent flex items-center gap-2">
+                        <Bot className="w-5 h-5 animate-pulse" />
+                        Asistente de IA
+                      </h3>
+                      <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> En línea
+                      </span>
+                    </div>
+                    
+                    <p className="text-xs text-muted-foreground mb-4 leading-relaxed pr-6">
+                      Construí tu contexto seleccionando apuntes. Tenés <strong className="text-foreground">{aiContextList.length}</strong> listos para consultar.
+                    </p>
                   
                   <AnimatePresence initial={false}>
                     {aiContextList.length === 0 ? (
@@ -561,15 +739,17 @@ export default function RecursosPage() {
                       }
                     }}
                     disabled={aiContextList.length === 0}
-                    className="w-full border border-accent/40 text-accent hover:bg-accent/15 transition-all text-xs font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none"
+                    className="w-full bg-card/50 border border-accent/40 text-accent hover:bg-accent hover:text-accent-foreground hover:shadow-lg hover:shadow-accent/20 transition-all duration-300 text-sm font-bold py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none mt-2"
                   >
-                    Preguntar al Asistente IA
+                    <MessageCircle className="w-4 h-4" />
+                    Iniciar Chat con IA
                   </button>
+                  </div>
                 </div>
 
                 {/* Sidebar upload form */}
-                <div className="bg-glass rounded-2xl p-6 border border-outline-variant shadow-lg relative overflow-hidden group">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-primary-container to-terracotta-soft opacity-10 blur-xl group-hover:opacity-20 transition-opacity" />
+                <div className="bg-glass rounded-2xl p-7 border border-outline-variant shadow-lg relative group">
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary-container to-terracotta-soft opacity-10 blur-xl group-hover:opacity-20 transition-opacity pointer-events-none" />
                   
                   <div className="relative z-10">
                     <h3 className="font-heading text-lg font-bold text-cream-bone mb-4 text-center">Subí tu Material</h3>
@@ -587,47 +767,130 @@ export default function RecursosPage() {
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-semibold text-muted-foreground mb-1">Materia</label>
-                          <select
-                            value={newCategory}
-                            onChange={(e) => setNewCategory(e.target.value)}
-                            className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                          >
-                            <option>Sistemas Operativos</option>
-                            <option>Bases de Datos</option>
-                            <option>Paradigmas de Prog.</option>
-                            <option>Análisis Matemático II</option>
-                          </select>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              required
+                              placeholder="Ej: Sistemas Operativos"
+                              value={newCategory}
+                              onChange={(e) => { setNewCategory(e.target.value); setMateriaFilter(e.target.value); setIsMateriaDropdownOpen(true); }}
+                              onFocus={(e) => { setMateriaFilter(""); setIsMateriaDropdownOpen(true); e.target.select(); }}
+                              onBlur={() => setTimeout(() => setIsMateriaDropdownOpen(false), 200)}
+                              className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-2.5 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
+                            />
+                            <AnimatePresence>
+                              {isMateriaDropdownOpen && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: -5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
+                                  className="absolute top-full left-0 right-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-y-auto max-h-40 custom-scrollbar z-20 flex flex-col"
+                                >
+                                  {predefinedMaterias.filter(m => normalizeString(m).includes(normalizeString(materiaFilter))).sort((a,b) => a.localeCompare(b)).length > 0 ? (
+                                    predefinedMaterias.filter(m => normalizeString(m).includes(normalizeString(materiaFilter))).sort((a,b) => a.localeCompare(b)).map((m) => (
+                                      <button
+                                        key={m}
+                                        type="button"
+                                        onMouseDown={(e) => { e.preventDefault(); setNewCategory(m); setMateriaFilter(m); setIsMateriaDropdownOpen(false); }}
+                                        className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${newCategory === m ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}
+                                      >
+                                        {m}
+                                      </button>
+                                    ))
+                                  ) : (
+                                    <div className="px-3 py-2 text-xs text-muted-foreground italic">Presioná enter para agregar &quot;{newCategory}&quot;</div>
+                                  )}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-muted-foreground mb-1">Eje Temático</label>
-                          <select
-                            value={newAxis}
-                            onChange={(e) => setNewAxis(e.target.value)}
-                            className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                          >
-                            <option>Gestión de Memoria</option>
-                            <option>Consultas SQL</option>
-                            <option>Integrales Múltiples</option>
-                            <option>Programación Funcional</option>
-                          </select>
+                          <label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-1">
+                            Eje Temático (Opcional)
+                            <div className="relative group/tooltip flex items-center">
+                              <Info className="w-3.5 h-3.5 text-muted-foreground/70 hover:text-accent cursor-help transition-colors" />
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-popover text-popover-foreground text-[10px] rounded-lg shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-20 text-center border border-border/40">
+                                Un sub-tema específico de la materia. Ej: &quot;Gestión de Memoria&quot; o &quot;Integrales&quot;. Ayuda a la IA a entender mejor el contexto.
+                              </div>
+                            </div>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              placeholder="Ej: Gestión de Memoria"
+                              value={newAxis}
+                              onChange={(e) => { setNewAxis(e.target.value); setEjeFilter(e.target.value); setIsEjeDropdownOpen(true); }}
+                              onFocus={(e) => { setEjeFilter(""); setIsEjeDropdownOpen(true); e.target.select(); }}
+                              onBlur={() => setTimeout(() => setIsEjeDropdownOpen(false), 200)}
+                              className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-2.5 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
+                            />
+                            <AnimatePresence>
+                              {isEjeDropdownOpen && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: -5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
+                                  className="absolute top-full left-0 right-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-y-auto max-h-40 custom-scrollbar z-20 flex flex-col"
+                                >
+                                  {predefinedEjes.filter(e => normalizeString(e).includes(normalizeString(ejeFilter))).sort((a,b) => a.localeCompare(b)).length > 0 ? (
+                                    predefinedEjes.filter(e => normalizeString(e).includes(normalizeString(ejeFilter))).sort((a,b) => a.localeCompare(b)).map((ej) => (
+                                      <button
+                                        key={ej}
+                                        type="button"
+                                        onMouseDown={(ev) => { ev.preventDefault(); setNewAxis(ej); setEjeFilter(ej); setIsEjeDropdownOpen(false); }}
+                                        className={`text-left px-3 py-2 text-xs hover:bg-accent/15 transition-colors ${newAxis === ej ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}
+                                      >
+                                        {ej}
+                                      </button>
+                                    ))
+                                  ) : (
+                                    <div className="px-3 py-2 text-xs text-muted-foreground italic">{newAxis ? `Se agregará "${newAxis}"` : "Escribí para buscar o crear"}</div>
+                                  )}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
                         </div>
                       </div>
 
                       <div>
                         <label className="block text-xs font-semibold text-muted-foreground mb-1">Tipo de Archivo</label>
-                        <select
-                          value={newType}
-                          onChange={(e) => setNewType(e.target.value)}
-                          className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                        >
-                          <option>Apunte de Teoría</option>
-                          <option>Trabajo Práctico Resuelto</option>
-                          <option>Guía de Ejercicios</option>
-                          <option>Otro</option>
-                        </select>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
+                            className="w-full bg-card/65 border border-border/40 rounded-xl py-2 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all flex justify-between items-center"
+                          >
+                            <span>{newType}</span>
+                            <ChevronDown className={`w-3.5 h-3.5 opacity-50 transition-transform ${isTypeDropdownOpen ? "rotate-180" : ""}`} />
+                          </button>
+                          
+                          <AnimatePresence>
+                            {isTypeDropdownOpen && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -5, transition: { duration: 0.15 } }}
+                                className="absolute top-full left-0 right-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl overflow-hidden z-20 flex flex-col"
+                              >
+                                {["Apunte de Teoría", "Trabajo Práctico Resuelto", "Guía de Ejercicios", "Otro"].map((type) => (
+                                  <button
+                                    key={type}
+                                    type="button"
+                                    onClick={() => { setNewType(type); setIsTypeDropdownOpen(false); }}
+                                    className={`text-left px-3 py-2.5 text-xs hover:bg-accent/15 transition-colors ${newType === type ? 'text-accent font-semibold bg-accent/5' : 'text-foreground'}`}
+                                  >
+                                    {type}
+                                  </button>
+                                ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
                       </div>
 
                       {/* Dashed Drag & Drop File Selector */}
@@ -638,7 +901,20 @@ export default function RecursosPage() {
                           e.preventDefault(); 
                           setIsDragging(false); 
                           const droppedFile = e.dataTransfer.files[0];
-                          if (droppedFile) setFile(droppedFile);
+                          if (droppedFile) {
+                            if (droppedFile.size === 0) {
+                              showToast("El archivo está vacío (0 bytes).", "error");
+                              return;
+                            }
+                            if (droppedFile.size > 50 * 1024 * 1024) {
+                              showToast("El archivo es demasiado grande (máx 50MB).", "error");
+                              return;
+                            }
+                            setFile(droppedFile);
+                            const nameParts = droppedFile.name.split('.');
+                            const title = nameParts.length > 1 ? nameParts.slice(0, -1).join('.') : droppedFile.name;
+                            setNewTitle(title);
+                          }
                         }}
                         className={`border-2 border-dashed rounded-xl p-5 hover:border-accent/50 transition-colors bg-card/30 cursor-pointer flex flex-col items-center justify-center text-center w-full block ${
                           isDragging ? "border-accent bg-accent/5" : "border-border/30"
@@ -647,8 +923,26 @@ export default function RecursosPage() {
                         <input 
                           type="file" 
                           className="hidden" 
+                          onClick={(e) => {
+                            // Reset value so onChange fires even if same file is selected
+                            (e.target as HTMLInputElement).value = '';
+                          }}
                           onChange={(e) => {
-                            if (e.target.files?.[0]) setFile(e.target.files[0]);
+                            const selected = e.target.files?.[0];
+                            if (selected) {
+                              if (selected.size === 0) {
+                                showToast("El archivo está vacío (0 bytes).", "error");
+                                return;
+                              }
+                              if (selected.size > 50 * 1024 * 1024) {
+                                showToast("El archivo es demasiado grande (máx 50MB).", "error");
+                                return;
+                              }
+                              setFile(selected);
+                              const nameParts = selected.name.split('.');
+                              const title = nameParts.length > 1 ? nameParts.slice(0, -1).join('.') : selected.name;
+                              setNewTitle(title);
+                            }
                           }}
                           accept=".pdf,.png,.jpg,.jpeg"
                         />
@@ -661,7 +955,7 @@ export default function RecursosPage() {
                         ) : (
                           <>
                             <span className="text-xs text-foreground font-semibold mb-0.5">Arrastrá tu archivo o hacé clic acá</span>
-                            <span className="text-[10px] text-muted-foreground">PDF, PNG, JPG (Máx 10MB)</span>
+                            <span className="text-[10px] text-muted-foreground">PDF, PNG, JPG (Máx 50MB)</span>
                           </>
                         )}
                       </label>
@@ -671,8 +965,7 @@ export default function RecursosPage() {
                         disabled={actionInProgress === "upload-resource"}
                         className="w-full bg-accent text-accent-foreground font-semibold py-3 rounded-full hover:bg-accent/90 hover:scale-[1.01] active:scale-99 transition-all flex items-center justify-center gap-2 shadow-lg shadow-accent/15 mt-4 disabled:opacity-40"
                       >
-                        <Plus className="w-4 h-4" />
-                        Subir y Procesar con IA
+                        Subir archivo
                       </button>
                     </form>
                   </div>
@@ -699,7 +992,7 @@ export default function RecursosPage() {
             />
 
             <motion.div
-              className="bg-glass rounded-3xl p-6 border border-accent/20 w-full max-w-4xl relative z-10 shadow-2xl flex flex-col max-h-[90vh]"
+              className="bg-glass rounded-3xl p-6 border border-accent/20 w-full max-w-7xl relative z-10 shadow-2xl flex flex-col h-[92vh] max-h-[1000px]"
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -728,67 +1021,34 @@ export default function RecursosPage() {
               </div>
 
               {/* Two Column details body */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto custom-scrollbar pr-1 flex-1 pb-4">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden pr-1 flex-1 pb-2 h-full">
                 
-                {/* Left Column: PDF Previewer Mockup */}
-                <div className="space-y-4">
-                  <h3 className="font-heading text-xs font-bold text-cream-bone uppercase tracking-wider flex items-center gap-2">
+                {/* Left Column: Real PDF Previewer */}
+                <div className="lg:col-span-8 flex flex-col h-full space-y-4">
+                  <h3 className="font-heading text-xs font-bold text-cream-bone uppercase tracking-wider flex items-center gap-2 shrink-0">
                     <Eye className="w-4 h-4 text-accent" />
                     Vista Previa del Documento
                   </h3>
 
-                  {/* Document preview block */}
-                  <div className="bg-obsidian/75 rounded-2xl p-6 aspect-[4/3] border border-border/10 flex flex-col justify-between relative overflow-hidden select-none">
-                    
-                    {/* Glowing background dots decoration */}
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-accent/5 blur-[30px] rounded-full" />
-                    
-                    {/* PDF header details mockup */}
-                    <div className="flex justify-between items-center text-[10px] text-muted-foreground border-b border-white/5 pb-2">
-                      <span className="font-mono truncate w-2/3">{selectedResource.title.toLowerCase().replace(/\s+/g, '-')}.pdf</span>
-                      <span className="font-semibold text-accent uppercase">PDF Reader</span>
-                    </div>
-
-                    {/* PDF main preview pages mockup */}
-                    <div className="flex-1 flex flex-col justify-center items-center text-center py-6 space-y-3">
-                      <FileText className="w-12 h-12 text-accent/80 animate-pulse" />
-                      <div className="space-y-1 w-full max-w-[250px]">
-                        <p className="text-xs font-semibold text-cream-bone leading-tight">
-                          Resumen - Universidad Nacional de La Rioja
-                        </p>
-                        <p className="text-[10px] text-muted-foreground italic truncate">
-                          Sistemas & Apuntes de {selectedResource.category}
-                        </p>
-                        
-                        {/* Mock content text lines */}
-                        <div className="w-full h-1 bg-muted/20 rounded mt-3" />
-                        <div className="w-3/4 h-1 bg-muted/20 rounded mx-auto" />
-                      </div>
-                    </div>
-
-                    {/* PDF page controllers footer */}
-                    <div className="flex justify-between items-center text-xs text-muted-foreground border-t border-white/5 pt-2 select-none">
-                      <button
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        className="p-1 hover:text-foreground disabled:opacity-30 transition-opacity"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <span className="font-mono">Página {currentPage} de {totalMockPages}</span>
-                      <button
-                        onClick={() => setCurrentPage((p) => Math.min(totalMockPages, p + 1))}
-                        disabled={currentPage === totalMockPages}
-                        className="p-1 hover:text-foreground disabled:opacity-30 transition-opacity"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-
+                  {/* Document actual PDF preview block */}
+                  <div className="bg-obsidian/75 rounded-2xl border border-border/10 flex-1 relative overflow-hidden min-h-[400px]">
+                    <iframe 
+                      src={`${selectedResource.storage_url}#view=FitH`} 
+                      className="w-full h-full border-none"
+                      title={`Preview de ${selectedResource.title}`}
+                    />
                   </div>
 
                   {/* Actions buttons */}
                   <div className="flex gap-2">
+                    <button
+                      onClick={() => setResourceToDelete({ id: selectedResource.id, storageUrl: selectedResource.storage_url, title: selectedResource.title })}
+                      className="px-4 rounded-xl border border-destructive/20 text-destructive hover:bg-destructive/10 transition-all flex items-center justify-center gap-1.5 text-xs font-semibold"
+                      title="Eliminar apunte"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+
                     <button
                       onClick={() => showToast("¡Apunte descargado! Guardado en descargas local.")}
                       className="flex-1 bg-accent text-accent-foreground font-semibold py-2.5 rounded-xl hover:bg-accent/90 transition-all text-xs flex items-center justify-center gap-2 shadow-lg shadow-accent/15"
@@ -812,7 +1072,7 @@ export default function RecursosPage() {
                 </div>
 
                 {/* Right Column: Dynamic RAG Chat Interface Terminal mockup */}
-                <div className="flex flex-col h-[380px] bg-obsidian/45 rounded-2xl border border-border/10 p-4 relative overflow-hidden">
+                <div className="flex flex-col h-full lg:col-span-4 bg-obsidian/45 rounded-2xl border border-border/10 p-4 relative overflow-hidden">
                   
                   {/* Glowing background amber decoration */}
                   <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 blur-[50px] rounded-full pointer-events-none" />
@@ -888,6 +1148,46 @@ export default function RecursosPage() {
 
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Premium Delete Confirmation Modal */}
+      <AnimatePresence>
+        {resourceToDelete && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
+            onClick={() => setResourceToDelete(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-card border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-[0_0_50px_-12px_rgba(239,68,68,0.3)] relative overflow-hidden flex flex-col items-center text-center"
+            >
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 via-red-500 to-orange-500" />
+              <div className="w-14 h-14 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center mb-4 text-red-500">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-heading font-extrabold text-foreground mb-2">¿Eliminar Apunte?</h3>
+              <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+                Vas a eliminar de forma permanente <strong>&quot;{resourceToDelete.title}&quot;</strong>. Esta acción no se puede deshacer.
+              </p>
+              <div className="flex w-full gap-3">
+                <button
+                  onClick={() => setResourceToDelete(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-border/60 text-muted-foreground font-semibold text-sm hover:bg-muted/10 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleDeleteResourceSubmit(resourceToDelete.id, resourceToDelete.storageUrl)}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm shadow-lg shadow-red-500/25 transition-colors"
+                >
+                  Sí, eliminar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 

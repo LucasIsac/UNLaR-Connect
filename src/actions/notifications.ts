@@ -52,9 +52,9 @@ export async function markNotificationAsReadAction(
 
     revalidatePath("/", "layout");
     return { success: true };
-  } catch (err: any) {
+  } catch (err) {
     console.error("Error marking notification as read:", err);
-    return { success: false, error: err.message || "No se pudo marcar la notificación como leída." };
+    return { success: false, error: err instanceof Error ? err.message : "No se pudo marcar la notificación como leída." };
   }
 }
 
@@ -78,8 +78,8 @@ export async function markAllNotificationsAsReadAction(): Promise<{ success: boo
 
     revalidatePath("/", "layout");
     return { success: true };
-  } catch (err: any) {
+  } catch (err) {
     console.error("Error marking all notifications as read:", err);
-    return { success: false, error: err.message || "No se pudieron marcar las notificaciones." };
+    return { success: false, error: err instanceof Error ? err.message : "No se pudieron marcar las notificaciones." };
   }
 }
