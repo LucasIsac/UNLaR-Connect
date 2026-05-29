@@ -20,6 +20,12 @@ UNLaR-Connect está desarrollado como un monolito altamente eficiente, con tipad
 
 ```text
 unlar-connect/
+├── docs/                    # DOCUMENTACIÓN TÉCNICA DEL SISTEMA
+│   ├── architecture.md      # Arquitectura monolítica, Server Actions y diseño
+│   ├── database_schema.md   # Esquema, triggers, y políticas de seguridad RLS
+│   ├── rag_ai_pipeline.md   # Ingesta, chunking y chat de IA con pgvector
+│   └── testing_and_verification.md # Guía detallada de pruebas y WebRTC
+│
 ├── .agents/                 # DIRECTRICES ESPECÍFICAS PARA AGENTES DE IA
 │   ├── rules/               # Estilo de código, localización y estándares de componentes
 │   ├── skills/              # Integraciones con Supabase, pgvector y LLM
@@ -65,6 +71,17 @@ unlar-connect/
 ├── tsconfig.json            # Reglas de configuración estrictas de TypeScript
 └── package.json             # Manifiesto de dependencias del proyecto
 ```
+
+---
+
+## Documentación del Sistema
+
+Para comprender a fondo el diseño técnico de la plataforma, consulte la carpeta de documentación detallada en [/docs](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/docs):
+
+*   **[Arquitectura y Estructura](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/docs/architecture.md)**: Detalle del diseño monolítico con Server Actions ("backend invisible"), tokens de diseño HSL y directrices móviles.
+*   **[Esquema de Base de Datos y Seguridad](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/docs/database_schema.md)**: Tabla de glosario de entidades, triggers automáticos en PostgreSQL para karma y políticas RLS.
+*   **[Procesamiento Vectorial y RAG](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/docs/rag_ai_pipeline.md)**: Flujos de ingesta, fragmentación semántica sliding-window, embeddings de Gemini y Groq LLM.
+*   **[Guía de Pruebas y Verificación](file:///c:/Users/Leo/Documents/Programming/github/repositories/UNLaR-Connect/docs/testing_and_verification.md)**: Instrucciones paso a paso para QA, incluyendo videollamadas WebRTC y flujos de RAG.
 
 ---
 
