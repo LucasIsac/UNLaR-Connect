@@ -138,7 +138,6 @@ export default function RecursosPage() {
       }
     ]);
     setChatInput("");
-    setCurrentPage(1);
   }, [selectedResource]);
 
   const handleToggleAiContext = (rsc: ResourceExtended, e: React.MouseEvent) => {
