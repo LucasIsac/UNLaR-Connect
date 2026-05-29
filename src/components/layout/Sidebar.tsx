@@ -56,7 +56,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     {
       label: "Asistente IA",
       icon: Bot,
-      href: "/asistente",
+      href: "/chat",
       isAi: true,
     },
     {
