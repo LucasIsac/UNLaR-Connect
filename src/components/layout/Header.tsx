@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Menu, Search, Bell, Award, User, LogOut, Settings, Calendar, Trophy, Sparkles, Check, Trash2, X, ArrowLeft, SlidersHorizontal } from "lucide-react";
+import { Menu, Search, Bell, Award, User, LogOut, Settings, Calendar, Trophy, Sparkles, Check, Trash2, X, ArrowLeft, SlidersHorizontal, Sun, Moon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ThemeToggle from "../ui/ThemeToggle";
+import { useTheme } from "../ui/ThemeProvider";
 import Logo from "../ui/Logo";
 import { fetchCombinedHeaderData } from "@/actions/perfil";
 import type { CombinedHeaderData, UserProfileExtended } from "@/actions/perfil";
@@ -60,6 +61,8 @@ export default function Header({
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   
+  const { theme, toggleTheme } = useTheme();
+
   // Ref hooks for click outside listeners
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -570,8 +573,10 @@ export default function Header({
           )}
         </div>
 
-        {/* Theme Toggler */}
-        <ThemeToggle />
+        {/* Theme Toggler (desktop only) */}
+        <div className="hidden md:block">
+          <ThemeToggle />
+        </div>
 
         {/* User Profile Avatar dropdown center */}
         <div className="relative" ref={profileRef}>
@@ -629,6 +634,24 @@ export default function Header({
                 <Settings className="w-4 h-4 text-muted-foreground" />
                 <span>Configuración</span>
               </button>
+
+              {/* Theme Toggle (mobile only) */}
+              <div className="md:hidden">
+                <button
+                  onClick={() => {
+                    setIsProfileOpen(false);
+                    toggleTheme();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/30 rounded-xl transition-all"
+                >
+                  {theme === "dark" ? (
+                    <Sun className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <Moon className="w-4 h-4 text-muted-foreground" />
+                  )}
+                  <span>{theme === "dark" ? "Modo Claro" : "Modo Oscuro"}</span>
+                </button>
+              </div>
               
               <div className="h-[1px] bg-border/15 my-1" />
 
