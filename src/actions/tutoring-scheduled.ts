@@ -24,6 +24,10 @@ export interface TutorProfileForMatching {
   availability: DbTutorAvailability[];
   is_online: boolean;
   match_score: number;
+  email: string | null;
+  phone_number: string | null;
+  contact_visibility: boolean;
+  tutor_price: number;
 }
 
 export interface ScheduledSessionExtended extends DbTutoringSession {
@@ -78,7 +82,7 @@ export async function fetchTutorProfilesForMatching(
       .from("tutor_subjects")
       .select(`
         tutor:users!tutor_id(
-          id, name, last_name, avatar_url, tutor_rating, total_reviews, role_id
+          id, name, last_name, avatar_url, tutor_rating, total_reviews, role_id, email, phone_number, contact_visibility, tutor_price
         ),
         subject:subjects(id, name, year)
       `);
@@ -97,12 +101,12 @@ export async function fetchTutorProfilesForMatching(
     }>();
 
     for (const row of tutorSubjects ?? []) {
-      const tutor = (Array.isArray(row.tutor) ? row.tutor[0] : row.tutor) as unknown as (DbUser & { role_id: number });
+      const tutor = (Array.isArray(row.tutor) ? row.tutor[0] : row.tutor) as unknown as (DbUser & { role_id: number; email: string | null; phone_number: string | null; contact_visibility: boolean; tutor_price: number });
       const subject = (Array.isArray(row.subject) ? row.subject[0] : row.subject) as unknown as DbSubject;
 
       if (!tutor || !tutor.id) continue;
-      // Only active tutors (role_id === 3) can appear in scheduled tutoring
-      if (tutor.role_id !== 3) continue;
+      // Only active tutors (role_id === 3) or Admins (role_id === 1) can appear in scheduled tutoring
+      if (tutor.role_id !== 3 && tutor.role_id !== 1) continue;
 
       if (!tutorMap.has(tutor.id)) {
         tutorMap.set(tutor.id, { user: tutor, subjects: [] });
@@ -166,6 +170,10 @@ export async function fetchTutorProfilesForMatching(
         availability,
         is_online: false, // Will be updated client-side via presence
         match_score: matchScore,
+        email: user.email || null,
+        phone_number: user.phone_number || null,
+        contact_visibility: user.contact_visibility ?? true,
+        tutor_price: user.tutor_price || 0,
       });
     }
 
@@ -203,6 +211,7 @@ export async function requestScheduledTutoring(params: {
   subjectId: number;
   scheduledStart: string;
   scheduledEnd: string;
+  initialMessage?: string;
 }): Promise<ActionResponse<DbTutoringSession>> {
   try {
     const session = await getVerifiedSession();
@@ -260,6 +269,14 @@ export async function requestScheduledTutoring(params: {
       .single();
 
     if (error) throw error;
+
+    if (params.initialMessage && params.initialMessage.trim().length > 0) {
+      await supabase.from("tutoring_session_messages").insert({
+        session_id: data.id,
+        sender_id: session.userId,
+        content: params.initialMessage.trim(),
+      });
+    }
 
     // Create notification for the tutor
     const { data: studentProfile } = await supabase
@@ -384,7 +401,7 @@ export async function fetchTutoringCalendar(): Promise<ActionResponse<TutoringCa
         student:users!student_id(id, name, last_name)
       `)
       .or(`tutor_id.eq.${session.userId},student_id.eq.${session.userId}`)
-      .in("status", ["pending", "confirmed"])
+      .in("status", ["pending", "confirmed", "canceled"])
       .order("scheduled_start", { ascending: true });
 
     if (error) throw error;
@@ -396,14 +413,16 @@ export async function fetchTutoringCalendar(): Promise<ActionResponse<TutoringCa
       const isTutor = s.tutor_id === session.userId;
       const peer = isTutor ? student : tutor;
 
+      const peerNameFallback = peer ? `${peer.name || ""} ${peer.last_name || ""}`.trim() : (s.meeting_link || "Acuerdo Privado");
+
       return {
         id: s.id,
-        title: `${subject?.name || "Tutoría"} con ${peer?.name || ""} ${peer?.last_name || ""}`,
+        title: `${subject?.name || "Tutoría"} con ${peerNameFallback}`,
         start: s.scheduled_start,
         end: s.scheduled_end,
         status: s.status,
         subject_name: subject?.name || "Sin materia",
-        peer_name: `${peer?.name || ""} ${peer?.last_name || ""}`.trim(),
+        peer_name: peerNameFallback,
         is_tutor: isTutor,
       };
     });
@@ -510,6 +529,106 @@ export async function cancelScheduledSession(
     const msg = error instanceof Error ? error.message : "Error desconocido";
     console.error("[cancelScheduledSession]", msg);
     return { success: false, error: "No pudimos cancelar la tutoría." };
+  }
+}
+
+// ============================================================================
+// CHAT MESSAGING FOR SCHEDULED SESSIONS
+// ============================================================================
+
+export interface SessionMessage {
+  id: string;
+  session_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+  sender?: {
+    name: string;
+    last_name: string;
+    avatar_url: string | null;
+  };
+}
+
+export async function fetchSessionMessages(sessionId: string): Promise<{ success: boolean; data?: SessionMessage[]; error?: string }> {
+  try {
+    const supabase = createServerClient();
+    const session = await getVerifiedSession();
+
+    if (!session) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // Fetch messages with sender info
+    const { data, error } = await supabase
+      .from("tutoring_session_messages")
+      .select(`
+        id, session_id, sender_id, content, created_at,
+        sender:users!sender_id(name, last_name, avatar_url)
+      `)
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching messages:", error);
+      return { success: false, error: "Failed to load messages" };
+    }
+
+    const messages = (data ?? []).map((msg: any) => ({
+      id: msg.id,
+      session_id: msg.session_id,
+      sender_id: msg.sender_id,
+      content: msg.content,
+      created_at: msg.created_at,
+      sender: msg.sender ? (Array.isArray(msg.sender) ? msg.sender[0] : msg.sender) : undefined,
+    })) as SessionMessage[];
+
+    return { success: true, data: messages };
+  } catch (err) {
+    console.error("Unexpected error:", err);
+    return { success: false, error: "Internal server error" };
+  }
+}
+
+export async function sendSessionMessage(sessionId: string, content: string): Promise<{ success: boolean; data?: SessionMessage; error?: string }> {
+  try {
+    const supabase = createServerClient();
+    const session = await getVerifiedSession();
+
+    if (!session) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const { data, error } = await supabase
+      .from("tutoring_session_messages")
+      .insert({
+        session_id: sessionId,
+        sender_id: session.userId,
+        content: content.trim(),
+      })
+      .select(`
+        id, session_id, sender_id, content, created_at,
+        sender:users!sender_id(name, last_name, avatar_url)
+      `)
+      .single();
+
+    if (error) {
+      console.error("Error sending message:", error);
+      return { success: false, error: "Failed to send message" };
+    }
+
+    const newMessage: SessionMessage = {
+      id: data.id,
+      session_id: data.session_id,
+      sender_id: data.sender_id,
+      content: data.content,
+      created_at: data.created_at,
+      sender: data.sender ? (Array.isArray(data.sender) ? data.sender[0] : data.sender) : undefined,
+    };
+
+    return { success: true, data: newMessage };
+  } catch (err) {
+    console.error("Unexpected error:", err);
+    return { success: false, error: "Internal server error" };
   }
 }
 

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Calendar, Clock, BookOpen, Loader2, CheckCircle } from "lucide-react";
+import Image from "next/image";
+import { X, Calendar, CalendarDays, Clock, BookOpen, Loader2, CheckCircle, MessageSquare } from "lucide-react";
 import { TutorProfileForMatching, fetchTutorAvailabilityForDate, requestScheduledTutoring } from "@/actions/tutoring-scheduled";
 import { Select } from "@/components/ui/Select";
 
@@ -24,6 +25,7 @@ export default function RequestTutoringModal({
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [availableSlots, setAvailableSlots] = useState<{ start_time: string; end_time: string }[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<{ start_time: string; end_time: string } | null>(null);
+  const [message, setMessage] = useState("");
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,14 +90,15 @@ export default function RequestTutoringModal({
     setError(null);
 
     try {
-      const scheduledStart = `${selectedDate}T${selectedSlot.start_time}`;
-      const scheduledEnd = `${selectedDate}T${selectedSlot.end_time}`;
+      const scheduledStart = selectedSlot ? `${selectedDate}T${selectedSlot.start_time}` : "1970-01-01T00:00:00Z";
+      const scheduledEnd = selectedSlot ? `${selectedDate}T${selectedSlot.end_time}` : "1970-01-01T00:00:00Z";
 
       const result = await requestScheduledTutoring({
         tutorId: tutor.id,
         subjectId: selectedSubjectId,
         scheduledStart,
         scheduledEnd,
+        initialMessage: message,
       });
 
       if (result.success) {
@@ -125,7 +128,7 @@ export default function RequestTutoringModal({
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-heading font-bold text-xl text-foreground">
-            Pedí una tutoría
+            Contactar y Agendar
           </h2>
           <button
             onClick={onClose}
@@ -138,10 +141,12 @@ export default function RequestTutoringModal({
         {/* Tutor Info */}
         <div className="flex items-center gap-4 mb-6 p-4 bg-muted/20 rounded-xl border border-border/20">
           {tutor.avatar_url ? (
-            <img
+            <Image
               src={tutor.avatar_url}
               alt={`${tutor.name} ${tutor.last_name}`}
-              className="w-12 h-12 rounded-full object-cover border-2 border-accent/20"
+              width={48}
+              height={48}
+              className="rounded-full object-cover border-2 border-accent/20"
             />
           ) : (
             <div className="w-12 h-12 rounded-full bg-accent/10 border-2 border-accent/20 flex items-center justify-center text-accent font-bold">
@@ -177,11 +182,11 @@ export default function RequestTutoringModal({
             />
           </div>
 
-          {/* Date Selection */}
-          <div>
-            <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              <Calendar className="w-3.5 h-3.5" />
-              Fecha
+          {/* Date Selection (Optional) */}
+          <div className="mb-4">
+            <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              <CalendarDays className="w-3.5 h-3.5" />
+              Elegir fecha (Opcional)
             </label>
             <input
               type="date"
@@ -199,42 +204,56 @@ export default function RequestTutoringModal({
           </div>
 
           {/* Time Slot Selection */}
+          {selectedDate && (
+            <div>
+              <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                <Clock className="w-3.5 h-3.5" />
+                Horario disponible
+              </label>
+              
+              {isLoadingSlots ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-accent" />
+                </div>
+              ) : availableSlots.length === 0 ? (
+                <div className="text-center py-6 bg-muted/10 rounded-xl border border-dashed border-border/20">
+                  <Clock className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    No hay horarios disponibles para esta fecha.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {availableSlots.map((slot, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setSelectedSlot(slot)}
+                      className={`p-3 rounded-xl border text-sm font-medium transition-all ${
+                        selectedSlot?.start_time === slot.start_time
+                          ? "border-accent bg-accent/10 text-accent"
+                          : "border-border/30 hover:border-border/50 text-foreground"
+                      }`}
+                    >
+                      {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Initial Message Selection */}
           <div>
             <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              <Clock className="w-3.5 h-3.5" />
-              Horario disponible
+              <MessageSquare className="w-3.5 h-3.5" />
+              Mensaje inicial (Opcional)
             </label>
-            
-            {isLoadingSlots ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-accent" />
-              </div>
-            ) : availableSlots.length === 0 ? (
-              <div className="text-center py-6 bg-muted/10 rounded-xl border border-dashed border-border/20">
-                <Clock className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  {selectedDate 
-                    ? "No hay horarios disponibles para esta fecha."
-                    : "Elegí una fecha para ver horarios disponibles."}
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {availableSlots.map((slot, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedSlot(slot)}
-                    className={`p-3 rounded-xl border text-sm font-medium transition-all ${
-                      selectedSlot?.start_time === slot.start_time
-                        ? "border-accent bg-accent/10 text-accent"
-                        : "border-border/30 hover:border-border/50 text-foreground"
-                    }`}
-                  >
-                    {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
-                  </button>
-                ))}
-              </div>
-            )}
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Hola, necesito ayuda con..."
+              className="w-full bg-background/50 border border-border/30 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-accent resize-none h-24"
+            />
           </div>
 
           {/* Error message */}
@@ -244,24 +263,30 @@ export default function RequestTutoringModal({
             </div>
           )}
 
-          {/* Submit button */}
-          <button
-            onClick={handleSubmit}
-            disabled={!selectedSubjectId || !selectedDate || !selectedSlot || isSubmitting}
-            className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold h-12 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-accent/10 hover:shadow-accent/20 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Enviando solicitud...</span>
-              </>
-            ) : (
-              <>
-                <CheckCircle className="w-5 h-5" />
-                <span>Confirmar tutoría</span>
-              </>
-            )}
-          </button>
+          {/* Submit buttons */}
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="flex-1 bg-muted/50 hover:bg-muted text-foreground px-4 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!selectedSubjectId || isSubmitting}
+              className="flex-[2] bg-accent hover:bg-accent/90 text-accent-foreground px-4 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                "Enviar Solicitud"
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

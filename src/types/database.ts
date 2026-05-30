@@ -28,6 +28,9 @@ export interface DbUser {
   created_at: string;
   deleted_at?: string;
   avatar_url?: string;
+  tutor_price?: number;
+  contact_visibility?: boolean;
+  phone_number?: string;
 }
 
 export interface DbSubject {
@@ -176,6 +179,7 @@ export interface DbPostReply {
   is_accepted: boolean;
   created_at: string;
   image_url?: string;
+  author?: { name: string; last_name: string };
 }
 
 export interface DbBadge {

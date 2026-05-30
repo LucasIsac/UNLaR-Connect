@@ -218,7 +218,7 @@ export default function Header({
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <header suppressHydrationWarning className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-8 md:px-20 lg:px-28 h-16 bg-background/50 backdrop-blur-xl border-b border-border/40 shadow-sm transition-colors duration-300">
+    <header suppressHydrationWarning className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-8 md:px-20 lg:px-28 h-16 bg-background/95 border-b border-border/40 shadow-sm transition-colors duration-300">
       {/* Left: Brand Logo (desktop) & Mobile toggle */}
       <div suppressHydrationWarning className="flex items-center gap-6 shrink-0">
         {/* Desktop Brand Logo */}
@@ -279,7 +279,7 @@ export default function Header({
 
           {/* Bento Filters Panel (Popover) */}
           {isSearchFocused && (
-            <div className="absolute left-0 right-0 mt-2 bg-card/90 backdrop-blur-2xl border border-border/30 rounded-2xl shadow-2xl p-4 space-y-4 animate-fade-in z-50">
+            <div className="absolute left-0 right-0 mt-2 bg-background/60 backdrop-blur-2xl border border-border/30 dark:border-white/10 rounded-2xl shadow-2xl p-4 space-y-4 animate-fade-in z-50">
               {/* Scope Row */}
               <div className="space-y-1.5">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
@@ -505,7 +505,7 @@ export default function Header({
 
           {/* Notifications List floating modal */}
           {isNotificationsOpen && (
-            <div className="absolute right-0 mt-3 w-80 bg-card/90 backdrop-blur-xl border border-border/40 rounded-2xl shadow-2xl p-4 space-y-3 z-50 animate-fade-in-up">
+            <div className="fixed top-16 left-4 right-4 z-50 w-auto bg-background/60 backdrop-blur-2xl border border-border/40 dark:border-white/10 rounded-2xl shadow-2xl p-4 space-y-3 animate-fade-in-up md:absolute md:top-auto md:left-auto md:right-0 md:mt-3 md:w-80">
               <div className="flex justify-between items-center border-b border-border/10 pb-2">
                 <span className="text-xs font-bold text-cream-bone flex items-center gap-1.5">
                   <Bell className="w-4 h-4 text-accent" />
@@ -601,7 +601,7 @@ export default function Header({
 
           {/* Profile options card */}
           {isProfileOpen && (
-            <div className="absolute right-0 mt-3 w-56 bg-card/90 backdrop-blur-xl border border-border/40 rounded-2xl shadow-2xl p-2.5 space-y-1.5 z-50 animate-fade-in-up">
+            <div className="absolute right-0 mt-3 w-56 bg-background/60 backdrop-blur-2xl border border-border/40 dark:border-white/10 rounded-2xl shadow-2xl p-2.5 space-y-1.5 z-50 animate-fade-in-up">
               {/* User details header */}
               {profile && (
                 <div className="px-3.5 py-2.5 border-b border-border/10 mb-1 select-none">
@@ -641,11 +641,22 @@ export default function Header({
               </button>
             </div>
           )}
-      {/* Mobile Search Overlay */}
+      {/* Mobile Search Dropdown Backdrop */}
       {isMobileSearchOpen && showSearch && (
-        <div className="fixed inset-0 z-[100] bg-background flex flex-col animate-fade-in md:hidden">
+        <div 
+          className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm md:hidden animate-fade-in"
+          onClick={() => setIsMobileSearchOpen(false)}
+        />
+      )}
+
+      {/* Mobile Search Dropdown Card */}
+      {isMobileSearchOpen && showSearch && (
+        <div 
+          className="fixed top-[72px] left-4 right-4 z-50 max-h-[80vh] overflow-y-auto bg-background/60 backdrop-blur-2xl border border-border/40 dark:border-white/10 rounded-3xl shadow-2xl p-5 flex flex-col gap-4 animate-fade-in-up md:hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Top Search Input Bar */}
-          <div className="h-16 px-4 border-b border-border/40 flex items-center gap-3 bg-card/60 backdrop-blur-xl">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setIsMobileSearchOpen(false)}
               className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
@@ -678,7 +689,7 @@ export default function Header({
           </div>
 
           {/* Scrollable Filters Content */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar bg-background">
+          <div className="space-y-6">
             {/* Scope Row */}
             <div className="space-y-2">
               <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
@@ -800,7 +811,7 @@ export default function Header({
           </div>
 
           {/* Mobile Apply Actions Bar */}
-          <div className="p-4 border-t border-border/40 bg-card/60 backdrop-blur-xl flex gap-3">
+          <div className="border-t border-border/20 pt-4 flex gap-3 mt-2 shrink-0">
             {(searchQuery || selectedCategory !== "Todas" || (selectedStatus && selectedStatus !== "all")) && (
               <button
                 onClick={() => {

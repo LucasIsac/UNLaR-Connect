@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { 
   Trophy, 
@@ -189,10 +190,13 @@ export default function DashboardClient({
   initialEvents = [],
   canCreateEvents = false,
 }: DashboardClientProps) {
+  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(initialStats);
   const [sessions, setSessions] = useState<UpcomingSessionExtended[]>(initialSessions);
   const [posts, setPosts] = useState<ForumPostExtended[]>(initialPosts);
   const [events, setEvents] = useState<EventExtended[]>(initialEvents);
+  const [showAllSessions, setShowAllSessions] = useState(false);
+  const [showAllPosts, setShowAllPosts] = useState(false);
   const [showCreateEvent, setShowCreateEvent] = useState(false);
   const loading = false;
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
@@ -474,8 +478,10 @@ export default function DashboardClient({
 
     try {
       const response = await updateSessionStatus(sessionId, newStatus);
-      if (response.success && response.data) {
-        setSessions(response.data);
+      if (response.success) {
+        // Optimistic UI is already applied, just tell Next.js to refresh in background
+        // and do not overwrite with potentially stale response.data
+        router.refresh();
       } else {
         // Rollback on failure
         setSessions(previousSessions);
@@ -639,6 +645,9 @@ export default function DashboardClient({
     );
   }
 
+  const visibleSessions = showAllSessions ? sessions : sessions.slice(0, 3);
+  const visiblePosts = showAllPosts ? posts : posts.slice(0, 3);
+
   return (
     <DashboardLayout initialHeaderData={initialHeaderData}>
       {/* Toast Notification Container */}
@@ -787,10 +796,21 @@ export default function DashboardClient({
         <motion.section className="grid grid-cols-1 lg:grid-cols-2 gap-8" variants={itemVariants}>
           {/* Left: Próximas Tutorías Timeline */}
           <div>
-            <h3 className="font-heading text-xl font-black text-cream-bone mb-6 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-secondary" />
-              <span>Próximas Tutorías</span>
-            </h3>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-heading text-xl font-black text-cream-bone flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-secondary" />
+                <span>Próximas Tutorías</span>
+              </h3>
+              {sessions.length > 3 && (
+                <button 
+                  onClick={() => setShowAllSessions(!showAllSessions)}
+                  className="text-xs font-bold text-accent hover:text-accent/80 transition-colors flex items-center gap-1 group focus:outline-none"
+                >
+                  <span>{showAllSessions ? "Ver menos" : "Ver todas"}</span>
+                  <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${showAllSessions ? 'rotate-90' : 'group-hover:translate-x-0.5'}`} />
+                </button>
+              )}
+            </div>
             
             <div className="relative border-l border-border/20 ml-4 pl-8 space-y-6">
               <AnimatePresence initial={false}>
@@ -804,7 +824,7 @@ export default function DashboardClient({
                     <p className="text-sm text-muted-foreground font-medium">No tenés tutorías programadas por ahora.</p>
                   </motion.div>
                 ) : (
-                  sessions.map((session) => {
+                  visibleSessions.map((session) => {
                     const isPending = session.status === 'pending';
                     const isConfirmed = session.status === 'confirmed';
 
@@ -905,17 +925,27 @@ export default function DashboardClient({
                 <MessageSquare className="w-5 h-5 text-secondary" />
                 <span>Actividad en el Foro</span>
               </h3>
-              <button 
-                onClick={() => handleOpenPostDetails(posts[0])}
-                className="text-xs font-bold text-accent hover:text-accent/80 transition-colors flex items-center gap-1 group focus:outline-none"
-              >
-                <span>Ver posts</span>
-                <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-              </button>
+              <div className="flex items-center gap-3">
+                <Link 
+                  href="/foro"
+                  className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
+                >
+                  Ir al foro
+                </Link>
+                {posts.length > 3 && (
+                  <button 
+                    onClick={() => setShowAllPosts(!showAllPosts)}
+                    className="text-xs font-bold text-accent hover:text-accent/80 transition-colors flex items-center gap-1 group focus:outline-none"
+                  >
+                    <span>{showAllPosts ? "Ver menos" : "Ver todos"}</span>
+                    <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${showAllPosts ? 'rotate-90' : 'group-hover:translate-x-0.5'}`} />
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="space-y-4">
-              {posts.map((post) => (
+              {visiblePosts.map((post) => (
                 <div 
                   key={post.id} 
                   onClick={() => handleOpenPostDetails(post)}

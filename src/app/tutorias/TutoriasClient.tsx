@@ -14,7 +14,7 @@ import {
   openLiveTutoringRoom,
   joinLiveTutoringRoom,
   fetchCallHistory,
-  CallRoomExtended
+  CallRoomExtended,
 } from "@/actions/consultas";
 import {
   TutorProfileForMatching,
@@ -29,6 +29,10 @@ import {
 import TutorCard from "@/components/consultas/TutorCard";
 import ScheduledTutorCard from "@/components/consultas/ScheduledTutorCard";
 import RequestTutoringModal from "@/components/consultas/RequestTutoringModal";
+import TutorProfileModal from "@/components/consultas/TutorProfileModal";
+import ReviewTutorModal from "@/components/consultas/ReviewTutorModal";
+import SessionChatModal from "@/components/consultas/SessionChatModal";
+import CreateCustomTutoringModal from "@/components/consultas/CreateCustomTutoringModal";
 import TutoringCalendar from "@/components/consultas/TutoringCalendar";
 import { Select } from "@/components/ui/Select";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -47,7 +51,8 @@ import {
   Check,
   X,
   CalendarDays,
-  List
+  List,
+  MessageSquare
 } from "lucide-react";
 import { DbSubject } from "@/types/database";
 import type { CombinedHeaderData } from "@/actions/perfil";
@@ -102,10 +107,18 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [selectedTutor, setSelectedTutor] = useState<TutorProfileForMatching | null>(null);
   const [showRequestModal, setShowRequestModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [scheduledSessions, setScheduledSessions] = useState<ScheduledSessionExtended[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [calendarEvents, setCalendarEvents] = useState<TutoringCalendarEvent[]>([]);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [activeChatSession, setActiveChatSession] = useState<{ id: string; title: string; peerName: string } | null>(null);
+  const [showCustomTutoringModal, setShowCustomTutoringModal] = useState(false);
+  const [reviewTutorTarget, setReviewTutorTarget] = useState<{ id: string; name: string } | null>(null);
+
+  // Derived subjects for the current user (if they are a tutor)
+  const myTutorData = tutorProfiles.find((t) => t.id === currentUser.id);
+  const mySubjects = myTutorData?.subjects && myTutorData.subjects.length > 0 ? myTutorData.subjects : subjects;
 
   // ==================== DATA LOADING ====================
   useEffect(() => {
@@ -277,6 +290,11 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
   const filteredAvailableTutors = getAvailableTutors();
 
   // ==================== SCHEDULED TAB HANDLERS ====================
+  const handleViewTutorProfile = (tutor: TutorProfileForMatching) => {
+    setSelectedTutor(tutor);
+    setShowProfileModal(true);
+  };
+
   const handleRequestTutoring = (tutor: TutorProfileForMatching) => {
     setSelectedTutor(tutor);
     setShowRequestModal(true);
@@ -432,6 +450,59 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
         />
       )}
 
+      {showProfileModal && selectedTutor && (
+        <TutorProfileModal
+          tutor={selectedTutor}
+          onClose={() => {
+            setShowProfileModal(false);
+            setSelectedTutor(null);
+          }}
+          onRequestTutoring={() => {
+            setShowProfileModal(false);
+            setShowRequestModal(true);
+          }}
+        />
+      )}
+
+      {activeChatSession && (
+        <SessionChatModal
+          sessionId={activeChatSession.id}
+          currentUserId={currentUser.id}
+          sessionTitle={activeChatSession.title}
+          peerName={activeChatSession.peerName}
+          onClose={() => setActiveChatSession(null)}
+        />
+      )}
+
+      {showCustomTutoringModal && (
+        <CreateCustomTutoringModal
+          tutorSubjects={mySubjects}
+          onClose={() => setShowCustomTutoringModal(false)}
+          onSuccess={() => {
+            setShowCustomTutoringModal(false);
+            // Refresh data
+            fetchScheduledSessions().then((res) => {
+              if (res.success && res.data) setScheduledSessions(res.data);
+            });
+            fetchTutoringCalendar().then((res) => {
+              if (res.success && res.data) setCalendarEvents(res.data);
+            });
+          }}
+        />
+      )}
+
+      {/* Review Tutor Modal */}
+      {reviewTutorTarget && (
+        <ReviewTutorModal
+          tutorId={reviewTutorTarget.id}
+          tutorName={reviewTutorTarget.name}
+          onClose={() => setReviewTutorTarget(null)}
+          onSuccess={() => {
+            setReviewTutorTarget(null);
+          }}
+        />
+      )}
+
       {/* Page Header */}
       <div className="mb-8 flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -489,8 +560,8 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               }`}
             >
-              <Calendar className="w-3.5 h-3.5" />
-              Programadas
+              <Users className="w-3.5 h-3.5" />
+              Tutores
               {pendingSessionsCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center">
                   {pendingSessionsCount}
@@ -577,6 +648,8 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                       onRequestCall={handleRequestCall}
                       isRequesting={isRequesting}
                       selectedSubjectId={selectedSubjectId}
+                      currentUserId={currentUser.id}
+                      onRateTutor={(id, name) => setReviewTutorTarget({ id, name })}
                     />
                   ))}
                 </div>
@@ -797,12 +870,16 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-5">
                 {filteredTutorProfiles.map((tutor) => (
                   <ScheduledTutorCard
                     key={tutor.id}
                     tutor={tutor}
+                    isOnline={!!onlineTutors[tutor.id]}
+                    currentUserId={currentUser.id}
+                    onRateTutor={(id, name) => setReviewTutorTarget({ id, name })}
                     onRequestTutoring={handleRequestTutoring}
+                    onClick={() => handleViewTutorProfile(tutor)}
                   />
                 ))}
               </div>
@@ -848,10 +925,20 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
 
             {viewMode === "list" && (
               <div className="bg-glass rounded-2xl p-4 sm:p-5 border border-border/40 space-y-3 shadow-md">
-                <h3 className="font-heading font-bold text-sm text-foreground flex items-center gap-2 border-b border-border/20 pb-2.5">
-                  <Calendar className="w-4.5 h-4.5 text-accent" />
-                  Mis Tutorías Programadas
-                </h3>
+                <div className="flex items-center justify-between border-b border-border/20 pb-2.5">
+                  <h3 className="font-heading font-bold text-sm text-foreground flex items-center gap-2">
+                    <Calendar className="w-4.5 h-4.5 text-accent" />
+                    Mis Tutorías Programadas
+                  </h3>
+                  {(currentUser.role_id === 1 || currentUser.role_id === 3) && (
+                    <button
+                      onClick={() => setShowCustomTutoringModal(true)}
+                      className="bg-accent/10 hover:bg-accent/20 text-accent px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors"
+                    >
+                      + Crear Personalizada
+                    </button>
+                  )}
+                </div>
 
                 {loadingSessions ? (
                   <div className="space-y-3 animate-pulse">
@@ -890,17 +977,23 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                       const isTutorRole = session.tutor_id === currentUser.id;
                       const peer = isTutorRole ? session.student : session.tutor;
 
-                      const formattedDate = new Date(session.scheduled_start).toLocaleDateString("es-AR", {
+                      const sessionDate = new Date(session.scheduled_start);
+                      const isTbd = sessionDate.getFullYear() === 1970;
+                      
+                      const formattedDate = sessionDate.toLocaleDateString("es-AR", {
                         day: "2-digit",
                         month: "2-digit",
                       });
-                      const startTime = new Date(session.scheduled_start).toLocaleTimeString("es-AR", {
+
+                      const startTime = sessionDate.toLocaleTimeString("es-AR", {
                         hour: "2-digit",
                         minute: "2-digit",
+                        hour12: false,
                       });
                       const endTime = new Date(session.scheduled_end).toLocaleTimeString("es-AR", {
                         hour: "2-digit",
                         minute: "2-digit",
+                        hour12: false,
                       });
 
                       return (
@@ -919,10 +1012,10 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1 min-w-0">
                               <h4 className="font-semibold text-sm text-foreground truncate">
-                                {session.subject?.name || "Tutoría"}
+                                {session.subject?.name || "Tutoría Personalizada"}
                               </h4>
                               <p className="text-xs text-muted-foreground mt-0.5">
-                                {isTutorRole ? "Alumno:" : "Tutor:"} {peer?.name} {peer?.last_name}
+                                {isTutorRole ? "Alumno:" : "Tutor:"} {peer ? `${peer.name} ${peer.last_name}` : (session.meeting_link || "Acuerdo Privado")}
                               </p>
                             </div>
                             <span
@@ -941,25 +1034,44 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                           </div>
 
                           <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
-                            <Calendar className="w-3 h-3" />
-                            <span>{formattedDate}</span>
-                            <Clock className="w-3 h-3 ml-2" />
-                            <span>{startTime} - {endTime}</span>
+                            <Calendar className="w-3 h-3 shrink-0" />
+                            {isTbd ? (
+                              <span className="font-semibold text-accent uppercase tracking-wider text-[10px]">A acordar por chat</span>
+                            ) : (
+                              <>
+                                <span>{formattedDate}</span>
+                                <Clock className="w-3 h-3 ml-2 shrink-0" />
+                                <span>{startTime} - {endTime}</span>
+                              </>
+                            )}
                           </div>
 
-                          <div className="flex gap-2">
-                            {isPending && isTutorRole && (
+                          <div className="flex flex-wrap gap-2 mt-auto">
+                            <button
+                              onClick={() => setActiveChatSession({
+                                id: session.id,
+                                title: session.subject?.name || "Tutoría Personalizada",
+                                peerName: peer ? `${peer.name} ${peer.last_name}` : (session.meeting_link || "Acuerdo Privado"),
+                              })}
+                              disabled={!peer} // Cannot chat with an unlinked user
+                              className="flex-1 min-w-[80px] h-8 bg-accent/10 hover:bg-accent/20 text-accent text-[11px] font-bold px-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                              Chat
+                            </button>
+
+                            {isPending && isTutorRole && !isTbd && (
                               <>
                                 <button
                                   onClick={() => handleSessionResponse(session.id, true)}
-                                  className="flex-1 h-8 bg-accent hover:bg-accent/90 text-accent-foreground text-xs font-semibold rounded-lg flex items-center justify-center gap-1 transition-all"
+                                  className="flex-1 min-w-[80px] h-8 bg-accent hover:bg-accent/90 text-accent-foreground text-[11px] font-semibold px-2 rounded-lg flex items-center justify-center gap-1 transition-all"
                                 >
                                   <Check className="w-3.5 h-3.5" />
                                   Aceptar
                                 </button>
                                 <button
                                   onClick={() => handleSessionResponse(session.id, false)}
-                                  className="flex-1 h-8 border border-border hover:border-destructive hover:text-destructive bg-card/20 text-muted-foreground text-xs font-semibold rounded-lg flex items-center justify-center gap-1 transition-all"
+                                  className="flex-1 min-w-[80px] h-8 border border-border hover:border-destructive hover:text-destructive bg-card/20 text-muted-foreground text-[11px] font-semibold px-2 rounded-lg flex items-center justify-center gap-1 transition-all"
                                 >
                                   <X className="w-3.5 h-3.5" />
                                   Rechazar
@@ -970,22 +1082,22 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                             {isPending && !isTutorRole && (
                               <button
                                 onClick={() => handleCancelSession(session.id)}
-                                className="flex-1 h-8 border border-border hover:border-destructive hover:text-destructive bg-card/20 text-muted-foreground text-xs font-semibold rounded-lg flex items-center justify-center gap-1 transition-all"
+                                className="flex-1 min-w-[120px] h-8 border border-border hover:border-destructive hover:text-destructive bg-card/20 text-muted-foreground text-[11px] font-semibold px-2 rounded-lg flex items-center justify-center gap-1 transition-all"
                               >
                                 <X className="w-3.5 h-3.5" />
                                 Cancelar solicitud
                               </button>
                             )}
 
-                            {isConfirmed && session.meeting_link && (
+                            {isConfirmed && session.meeting_link && session.meeting_link.startsWith("http") && (
                               <a
                                 href={session.meeting_link}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex-1 h-8 bg-accent hover:bg-accent/90 text-accent-foreground text-xs font-semibold rounded-lg flex items-center justify-center gap-1 transition-all"
+                                className="flex-[2] min-w-[120px] h-8 bg-accent hover:bg-accent/90 text-accent-foreground text-[11px] font-semibold px-2 rounded-lg flex items-center justify-center gap-1 transition-all"
                               >
                                 <Video className="w-3.5 h-3.5" />
-                                Unirse a la llamada
+                                <span className="truncate">Llamada</span>
                               </a>
                             )}
 

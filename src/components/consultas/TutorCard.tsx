@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Star, BookOpen, Video } from "lucide-react";
 import { AvailableTutor } from "@/actions/consultas";
 
@@ -8,6 +9,8 @@ interface TutorCardProps {
   onRequestCall: (tutorId: string, subjectId: number | null) => void;
   isRequesting: boolean;
   selectedSubjectId?: number | null;
+  currentUserId: string;
+  onRateTutor: (tutorId: string, tutorName: string) => void;
 }
 
 export default function TutorCard({
@@ -15,6 +18,8 @@ export default function TutorCard({
   onRequestCall,
   isRequesting,
   selectedSubjectId,
+  currentUserId,
+  onRateTutor,
 }: TutorCardProps) {
   // Get subject names or format the subjects nicely
   const getSubjectBadges = () => {
@@ -57,10 +62,12 @@ export default function TutorCard({
         {/* Header/Info section */}
         <div className="flex items-start gap-4 mb-4">
           {tutor.avatar_url ? (
-            <img
+            <Image
               src={tutor.avatar_url}
               alt={`${tutor.name} ${tutor.last_name}`}
-              className="w-12 h-12 rounded-full object-cover border-2 border-accent/20"
+              width={48}
+              height={48}
+              className="rounded-full object-cover border-2 border-accent/20"
             />
           ) : (
             <div className="w-12 h-12 rounded-full bg-accent/10 border-2 border-accent/20 flex items-center justify-center text-accent font-bold text-sm">
@@ -72,7 +79,7 @@ export default function TutorCard({
             <h3 className="font-heading font-semibold text-lg text-foreground truncate">
               {tutor.name} {tutor.last_name}
             </h3>
-            <div className="flex items-center gap-1.5 mt-1 text-sm">
+            <div className="flex items-center gap-1.5 mt-1 text-sm flex-wrap">
               <div className="flex items-center text-amber-500">
                 <Star className="w-4 h-4 fill-amber-500 shrink-0" />
                 <span className="font-bold ml-1">{rating}</span>
@@ -80,6 +87,18 @@ export default function TutorCard({
               <span className="text-muted-foreground">
                 ({participantCount}/{maxParticipants} en sala)
               </span>
+              
+              {currentUserId !== tutor.id && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRateTutor(tutor.id, `${tutor.name} ${tutor.last_name}`);
+                  }}
+                  className="ml-2 px-2 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 text-[10px] font-bold rounded-md transition-colors"
+                >
+                  Calificar
+                </button>
+              )}
             </div>
           </div>
         </div>

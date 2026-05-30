@@ -165,7 +165,7 @@ export default function UniConnectHero() {
 
       {/* Elegant scrolling bounce vector indicator */}
       <div
-        className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 opacity-0 translate-y-4 animate-fade-in-up"
+        className="absolute bottom-6 left-0 right-0 w-fit mx-auto flex flex-col items-center gap-1.5 opacity-0 translate-y-4 animate-fade-in-up"
         style={{
           animationDelay: "1850ms",
         }}

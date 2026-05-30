@@ -1,7 +1,28 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import * as THREE from "three";
+import {
+  Scene,
+  FogExp2,
+  PerspectiveCamera,
+  WebGLRenderer,
+  CanvasTexture,
+  LinearFilter,
+  BufferGeometry,
+  BufferAttribute,
+  Float32BufferAttribute,
+  ShaderMaterial,
+  AdditiveBlending,
+  Points,
+  Group,
+  SphereGeometry,
+  MeshBasicMaterial,
+  Mesh,
+  LineBasicMaterial,
+  LineSegments,
+  MathUtils,
+  Clock,
+} from "three";
 import { generateCampusPointData, CAMPUS_NODES } from "@/lib/buildingGeometry";
 
 // CUSTOMIZABLE PARAMETERS FOR THE 3D SCENE
@@ -31,17 +52,17 @@ export default function ThreeHeroCanvas() {
     let width = container.clientWidth;
     let height = container.clientHeight;
 
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x0c0a09, 0.007); // Subtle ambient fog matching Deep Obsidian
+    const scene = new Scene();
+    scene.fog = new FogExp2(0x0c0a09, 0.007); // Subtle ambient fog matching Deep Obsidian
 
     // Camera with responsive FOV
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+    const camera = new PerspectiveCamera(45, width / height, 0.1, 1000);
     
     // Position camera initially at high isometric-style angle
     camera.position.set(0, CONFIG.cameraHeightStart, CONFIG.cameraDistanceStart);
     camera.lookAt(0, 4, 0);
 
-    const renderer = new THREE.WebGLRenderer({
+    const renderer = new WebGLRenderer({
       canvas,
       antialias: true,
       alpha: true,
@@ -71,8 +92,8 @@ export default function ThreeHeroCanvas() {
         ctx.fillRect(0, 0, size, size);
       }
       
-      const texture = new THREE.CanvasTexture(tCanvas);
-      texture.minFilter = THREE.LinearFilter;
+      const texture = new CanvasTexture(tCanvas);
+      texture.minFilter = LinearFilter;
       return texture;
     }
 
@@ -81,10 +102,10 @@ export default function ThreeHeroCanvas() {
     // --- 3. GENERATE CAMPUS GEOMETRY ---
     const campusData = generateCampusPointData(CONFIG.particleDensity);
     
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(campusData.positions, 3));
-    geometry.setAttribute("color", new THREE.BufferAttribute(campusData.colors, 3));
-    geometry.setAttribute("aSize", new THREE.BufferAttribute(campusData.sizes, 1));
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new BufferAttribute(campusData.positions, 3));
+    geometry.setAttribute("color", new BufferAttribute(campusData.colors, 3));
+    geometry.setAttribute("aSize", new BufferAttribute(campusData.sizes, 1));
 
     // Custom Shaders for ultra-high GPU performance & complex visual behaviors
     const vertexShader = `
@@ -163,7 +184,7 @@ export default function ThreeHeroCanvas() {
       }
     `;
 
-    const pointsMaterial = new THREE.ShaderMaterial({
+    const pointsMaterial = new ShaderMaterial({
       vertexShader,
       fragmentShader,
       uniforms: {
@@ -174,32 +195,32 @@ export default function ThreeHeroCanvas() {
       },
       transparent: true,
       depthWrite: false, // Prevents dark rectangular border artifacts between overlapping particles
-      blending: THREE.AdditiveBlending,
+      blending: AdditiveBlending,
       vertexColors: true,
     });
 
-    const pointCloud = new THREE.Points(geometry, pointsMaterial);
+    const pointCloud = new Points(geometry, pointsMaterial);
     scene.add(pointCloud);
 
     // --- 4. ACCENT CONNECTION LINES & PULSING NODES ---
     // Create subtle connecting nodes on the campus map to hint at "connections"
-    const nodeGroup = new THREE.Group();
+    const nodeGroup = new Group();
     scene.add(nodeGroup);
 
-    const nodeGeometry = new THREE.SphereGeometry(0.55, 16, 16);
-    const nodeMaterials: THREE.MeshBasicMaterial[] = [];
-    const nodeMeshes: THREE.Mesh[] = [];
+    const nodeGeometry = new SphereGeometry(0.55, 16, 16);
+    const nodeMaterials: MeshBasicMaterial[] = [];
+    const nodeMeshes: Mesh[] = [];
 
     CAMPUS_NODES.forEach((node) => {
       // By default created as transparent basic materials (mutated dynamically by the observer)
-      const mat = new THREE.MeshBasicMaterial({
+      const mat = new MeshBasicMaterial({
         color: 0xf59e0b,
         transparent: true,
         opacity: 0.85,
       });
       nodeMaterials.push(mat);
 
-      const mesh = new THREE.Mesh(nodeGeometry, mat);
+      const mesh = new Mesh(nodeGeometry, mat);
       mesh.position.set(node.x, node.y, node.z);
       nodeMeshes.push(mesh);
       nodeGroup.add(mesh);
@@ -225,17 +246,17 @@ export default function ThreeHeroCanvas() {
       linePositions.push(n2.x, n2.y, n2.z);
     });
 
-    const lineGeometry = new THREE.BufferGeometry();
-    lineGeometry.setAttribute("position", new THREE.Float32BufferAttribute(linePositions, 3));
+    const lineGeometry = new BufferGeometry();
+    lineGeometry.setAttribute("position", new Float32BufferAttribute(linePositions, 3));
 
-    const lineMaterial = new THREE.LineBasicMaterial({
+    const lineMaterial = new LineBasicMaterial({
       color: 0xf59e0b,
       transparent: true,
       opacity: 0.22,
-      blending: THREE.AdditiveBlending,
+      blending: AdditiveBlending,
     });
 
-    const networkLines = new THREE.LineSegments(lineGeometry, lineMaterial);
+    const networkLines = new LineSegments(lineGeometry, lineMaterial);
     scene.add(networkLines);
 
     // --- Dynamic Theme Listener (MutationObserver) ---
@@ -260,9 +281,9 @@ export default function ThreeHeroCanvas() {
       nodeMeshes.forEach((mesh, idx) => {
         const isServer = CAMPUS_NODES[idx].type === "server";
         if (isDark) {
-          (mesh.material as THREE.MeshBasicMaterial).color.setHex(isServer ? 0xe2775f : 0xf59e0b);
+          (mesh.material as MeshBasicMaterial).color.setHex(isServer ? 0xe2775f : 0xf59e0b);
         } else {
-          (mesh.material as THREE.MeshBasicMaterial).color.setHex(isServer ? 0x944a23 : 0x855300);
+          (mesh.material as MeshBasicMaterial).color.setHex(isServer ? 0x944a23 : 0x855300);
         }
       });
     }
@@ -287,12 +308,12 @@ export default function ThreeHeroCanvas() {
       scrollProgress = Math.min(1, Math.max(0, scrollY / scrollMax));
 
       // 1. Zoom Camera (Interpolate Camera Z & Height)
-      const currentDistance = THREE.MathUtils.lerp(
+      const currentDistance = MathUtils.lerp(
         CONFIG.cameraDistanceStart,
         CONFIG.cameraDistanceEnd,
         scrollProgress
       );
-      const currentHeight = THREE.MathUtils.lerp(
+      const currentHeight = MathUtils.lerp(
         CONFIG.cameraHeightStart,
         CONFIG.cameraHeightEnd,
         scrollProgress
@@ -335,7 +356,7 @@ export default function ThreeHeroCanvas() {
     handleScroll(); // Trigger once on load to align initial scroll state
 
     // --- 6. ANIMATION TICK LOOP ---
-    const clock = new THREE.Clock();
+    const clock = new Clock();
     let animationFrameId: number;
 
     const tick = () => {
@@ -363,12 +384,12 @@ export default function ThreeHeroCanvas() {
         const autoOrbit = elapsedTime * CONFIG.rotationSpeed;
         
         // Combine automatic drift and manual scroll position
-        const currentDistance = THREE.MathUtils.lerp(
+        const currentDistance = MathUtils.lerp(
           CONFIG.cameraDistanceStart,
           CONFIG.cameraDistanceEnd,
           scrollProgress
         );
-        const currentHeight = THREE.MathUtils.lerp(
+        const currentHeight = MathUtils.lerp(
           CONFIG.cameraHeightStart,
           CONFIG.cameraHeightEnd,
           scrollProgress

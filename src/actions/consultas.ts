@@ -259,7 +259,7 @@ export async function fetchAvailableTutors(
           subject:subjects(id, name, year)
         )
       `)
-      .eq("role_id", 3);
+      .in("role_id", [1, 3]);
 
     if (error) throw error;
 
@@ -449,6 +449,39 @@ export async function requestCall(
     const msg = error instanceof Error ? error.message : "Error desconocido";
     console.error("[requestCall]", msg);
     return { success: false, error: "No pudimos crear la consulta. Intentá de nuevo." };
+  }
+}
+
+// ============================================================
+// createOpenCall
+// Tutor creates a call room where they are both student and tutor
+// initially. When a real student joins, they take over student_id.
+// ============================================================
+export async function createOpenCall(): Promise<ActionResponse<DbCallRoom>> {
+  try {
+    const session = await getVerifiedSession();
+    if (!session) return { success: false, error: "No estás autenticado/a." };
+
+    const supabase = createServerClient();
+
+    const { data, error } = await supabase
+      .from("call_rooms")
+      .insert({
+        student_id: session.userId, // Temporary: tutor acts as student until someone joins
+        tutor_id: session.userId,
+        status: "accepted" as CallRoomStatus,
+        started_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return { success: true, data: data as DbCallRoom };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Error desconocido";
+    console.error("[createOpenCall]", msg);
+    return { success: false, error: "No pudimos crear la sala abierta." };
   }
 }
 

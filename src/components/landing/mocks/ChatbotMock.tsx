@@ -135,7 +135,7 @@ export default function ChatbotMock({ isDark }: { isDark: boolean }) {
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_bottom_right,rgba(245,158,11,0.025)_0%,transparent_60%)]" />
 
       {/* HISTORIAL SIDEBAR (Left panel inside chat screen) */}
-      <aside className="w-36 sm:w-44 bg-card/60 border-r border-border/10 flex flex-col shrink-0 p-3 h-full gap-3 select-none">
+      <aside className="hidden sm:flex w-36 sm:w-44 bg-card/60 border-r border-border/10 flex flex-col shrink-0 p-3 h-full gap-3 select-none">
         <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block pl-1">
           Historial
         </span>

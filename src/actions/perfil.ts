@@ -198,6 +198,45 @@ export async function toggleTutorStatus(
 }
 
 /**
+ * Update specific tutor configuration preferences (price, contact visibility)
+ */
+export async function updateTutorPreferences(
+  tutorPrice: number | null,
+  contactVisibility: boolean,
+  phoneNumber: string
+): Promise<{ success: boolean; data?: UserProfileExtended; error?: string }> {
+  try {
+    const db = createServerClient();
+    const authUserResponse = await db.auth.getUser();
+    const authUser = authUserResponse?.data?.user;
+
+    if (!authUser) {
+      return { success: false, error: "No estás autenticado/a." };
+    }
+
+    const { error } = await db
+      .from("users")
+      .update({
+        tutor_price: tutorPrice,
+        contact_visibility: contactVisibility,
+        phone_number: phoneNumber || null
+      })
+      .eq("id", authUser.id);
+
+    if (error) throw error;
+
+    invalidateCache(CACHE_TAGS.userProfile(authUser.id));
+    invalidateCache(CACHE_TAGS.dashboardStats(authUser.id));
+
+    const updated = await fetchUserProfile();
+    return { success: true, data: updated };
+  } catch (err: any) {
+    console.error("Error updating tutor preferences in Supabase:", err);
+    return { success: false, error: err.message || "Hubo un error al actualizar las preferencias de tutor." };
+  }
+}
+
+/**
  * UNCACHED: Fetch subjects student is registered to teach
  */
 async function fetchTutorSubjectsUncached(userId: string, accessToken: string): Promise<DbSubject[]> {
@@ -514,4 +553,102 @@ export async function fetchCombinedHeaderData(): Promise<CombinedHeaderData> {
   ]);
 
   return { profile, notifications };
+}
+
+// ==========================================
+// READ: Public profile for other users
+// ==========================================
+
+export interface PublicProfile {
+  id: string;
+  name: string;
+  last_name: string;
+  avatar_url?: string;
+  career_name?: string;
+  points: number;
+  karmaLevel: number;
+  badgesCount: number;
+  postsCount: number;
+  repliesCount: number;
+  resourcesCount: number;
+  isTutor: boolean;
+  tutor_rating?: number;
+}
+
+export async function fetchPublicProfile(userId: string): Promise<PublicProfile | null> {
+  try {
+    const supabase = createServerClient();
+
+    // Simple query first - just get user data
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("id, name, last_name, avatar_url, points, career_id")
+      .eq("id", userId)
+      .is("deleted_at", null)
+      .single();
+
+    if (error) {
+      console.error("[fetchPublicProfile] Error fetching user:", error.message, error.code);
+      return null;
+    }
+    if (!user) {
+      console.error("[fetchPublicProfile] User not found for id:", userId);
+      return null;
+    }
+
+    console.log("[fetchPublicProfile] Found user:", user.name, user.id);
+
+    // Get career name separately
+    let careerName = "General";
+    if (user.career_id) {
+      const { data: career } = await supabase
+        .from("careers")
+        .select("name")
+        .eq("id", user.career_id)
+        .single();
+      if (career) careerName = career.name;
+    }
+
+    // Count posts
+    const { count: postsCount } = await supabase
+      .from("posts")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
+
+    // Count replies
+    const { count: repliesCount } = await supabase
+      .from("post_replies")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
+
+    // Count resources
+    const { count: resourcesCount } = await supabase
+      .from("documents")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
+
+    // Count badges
+    const { count: badgesCount } = await supabase
+      .from("user_badges")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
+
+    return {
+      id: user.id,
+      name: user.name,
+      last_name: user.last_name || "",
+      avatar_url: user.avatar_url,
+      career_name: careerName,
+      points: user.points || 0,
+      karmaLevel: Math.floor((user.points || 0) / 250) + 1,
+      badgesCount: badgesCount || 0,
+      postsCount: postsCount || 0,
+      repliesCount: repliesCount || 0,
+      resourcesCount: resourcesCount || 0,
+      isTutor: false,
+    };
+  } catch (error) {
+    console.error("[fetchPublicProfile] Error:", error);
+    return null;
+  }
 }
