@@ -225,20 +225,35 @@ export interface DbNotification {
 }
 
 // ============================================================
-// Consultas Express — live 1-on-1 tutoring calls
+// Consultas Express — live tutoring calls
 // ============================================================
 
-export type CallRoomStatus = 'requested' | 'accepted' | 'active' | 'ended' | 'rejected' | 'missed';
+export type CallRoomStatus = 'requested' | 'open' | 'accepted' | 'active' | 'ended' | 'rejected' | 'missed';
+export type CallRoomKind = 'direct' | 'open';
+export type CallParticipantRole = 'tutor' | 'student';
 
 export interface DbCallRoom {
   id: string; // UUID
   subject_id: number | null;
-  student_id: string; // UUID
+  student_id: string | null; // UUID
   tutor_id: string; // UUID
   status: CallRoomStatus;
+  room_kind: CallRoomKind;
+  max_participants: number;
   created_at: string;
   started_at: string | null;
   ended_at: string | null;
+}
+
+export interface DbCallRoomParticipant {
+  id: string; // UUID
+  room_id: string; // UUID
+  user_id: string; // UUID
+  role: CallParticipantRole;
+  is_host: boolean;
+  joined_at: string;
+  left_at: string | null;
+  created_at: string;
 }
 
 export interface DbCallMessage {

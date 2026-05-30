@@ -107,14 +107,13 @@ export default function ResourcesMock({ isDark }: { isDark: boolean }) {
       </div>
 
       {/* Grid of Note Cards (2 Columns to avoid squeezing) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 overflow-y-auto pr-1 flex-1 py-0.5 scrollbar-none">
-        <AnimatePresence mode="popLayout">
+      <div className="flex flex-col sm:grid sm:grid-cols-2 gap-3.5 overflow-y-auto pr-1 flex-1 py-0.5 scrollbar-none">
+        <AnimatePresence>
           {filteredDocuments.length > 0 ? (
             filteredDocuments.map((doc, idx) => (
               <motion.div
                 key={doc.title}
-                layout
-                className="rounded-2xl p-4 bg-card/50 border border-border/20 flex flex-col justify-between relative overflow-hidden group hover:border-accent/30 hover:bg-card/75 transition-all duration-300 shadow-sm h-fit self-start w-full"
+                className="rounded-2xl p-4 bg-card/50 border border-border/20 flex flex-col justify-between relative overflow-hidden group hover:border-accent/30 hover:bg-card/75 transition-all duration-300 shadow-sm h-fit self-start w-full shrink-0"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}

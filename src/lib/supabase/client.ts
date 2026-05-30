@@ -19,24 +19,13 @@ export function createClient(): SupabaseClient {
 
 export function unsubscribeRealtimeChannel(channel: RealtimeChannel) {
   if (browserClient) {
-    // Synchronously remove the channel from the internal client cache
-    // to prevent reuse and callbacks addition crash during rapid component unmount/remount (React Strict Mode / HMR).
-    const realtime = (browserClient as any).realtime;
-    if (realtime && Array.isArray(realtime.channels)) {
-      realtime.channels = realtime.channels.filter((c: any) => c !== channel);
-    }
-
-    // Delay the actual network unsubscription slightly to allow the connection
-    // handshake to complete, avoiding "WebSocket is closed before the connection is established" warning.
-    setTimeout(() => {
-      void browserClient?.removeChannel(channel);
-    }, 100);
+    void browserClient.removeChannel(channel);
     return;
   }
 
   try {
     void channel.unsubscribe();
   } catch {
-    // Ignore teardown races during development remounts.
+    // Ignore teardown races.
   }
 }

@@ -15,6 +15,17 @@ export default function ScreenShowcase() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
+  // Check viewport width dynamically to disable scroll hijacking on mobile/tablets
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -39,8 +50,9 @@ export default function ScreenShowcase() {
     offset: ["start start", "end end"],
   });
 
-  // Dynamically map scroll progress to active index
+  // Dynamically map scroll progress to active index (desktop only)
   useMotionValueEvent(scrollYProgress, "change", (latest) => {
+    if (isMobile) return;
     // 3 sections spanning from 0 to 1
     if (latest < 0.35) {
       setActiveIndex(0);
@@ -92,13 +104,13 @@ export default function ScreenShowcase() {
       ref={containerRef}
       id="features"
       className="relative z-10 w-full"
-      style={{ height: "320vh" }} // tall height on desktop gives space for sticky scroll triggers
+      style={{ height: isMobile ? "auto" : "320vh" }} // auto height on mobile, 320vh on desktop
     >
       {/* BACKGROUND GRAPHIC DETAILS */}
       <div className="absolute inset-0 pointer-events-none z-0">
-        <div className="sticky top-0 h-screen w-full overflow-hidden">
+        <div className={isMobile ? "absolute inset-0 overflow-hidden" : "sticky top-0 h-screen w-full overflow-hidden"}>
           <div
-            className="absolute top-1/4 right-1/4 w-[500px] h-[500px] rounded-full blur-[140px] pointer-events-none transition-all duration-1000 -z-10 opacity-30"
+            className="absolute top-1/4 right-1/4 w-[280px] h-[280px] sm:w-[500px] sm:h-[500px] rounded-full blur-[100px] sm:blur-[140px] pointer-events-none transition-all duration-1000 -z-10 opacity-20 sm:opacity-30"
             style={{
               background: activeFeature.glowColor,
             }}
@@ -106,12 +118,12 @@ export default function ScreenShowcase() {
         </div>
       </div>
 
-      {/* STICKY CONTENT WRAPPER */}
-      <div className="sticky top-0 h-screen w-full overflow-hidden flex items-center">
-        <div className="max-w-6xl mx-auto w-full px-6 flex flex-col justify-center h-full pt-28 pb-14">
+      {/* STICKY/RELATIVE CONTENT WRAPPER */}
+      <div className={isMobile ? "relative h-auto py-12 md:py-16 w-full flex flex-col justify-start overflow-visible" : "sticky top-0 h-screen w-full overflow-hidden flex items-center"}>
+        <div className={isMobile ? "max-w-6xl mx-auto w-full px-4 flex flex-col gap-6" : "max-w-6xl mx-auto w-full px-6 flex flex-col justify-center h-full pt-28 pb-14"}>
           
-          {/* HEADER SECTION (Top-aligned inside sticky box) */}
-          <div className="mb-6 md:mb-8 shrink-0 text-center md:text-left">
+          {/* HEADER SECTION */}
+          <div className="mb-2 shrink-0 text-center md:text-left">
             <motion.p
               className="text-[10px] font-black text-accent/80 tracking-[0.25em] uppercase mb-3 block"
               initial={{ opacity: 0 }}
@@ -131,144 +143,198 @@ export default function ScreenShowcase() {
           </div>
 
           {/* SPLIT LAYOUT CONTAINER */}
-          <div className="grid grid-cols-12 gap-8 md:gap-12 items-center flex-grow overflow-hidden h-[70vh] max-h-[610px]">
+          <div className={isMobile ? "flex flex-col gap-6 w-full" : "grid grid-cols-12 gap-8 md:gap-12 items-center flex-grow overflow-hidden h-[70vh] max-h-[610px]"}>
             
             {/* LEFT COLUMN: FEATURES STORYLINE & PROGRESS INDICATOR */}
-            <div className="col-span-12 md:col-span-4 flex gap-6 h-full items-center pl-3.5">
+            <div className={isMobile ? "w-full flex flex-col gap-4" : "col-span-12 md:col-span-4 flex gap-6 h-full items-center pl-3.5"}>
               
-              {/* Vertical Node-Link Progress Indicator (Desktop only) */}
-              <div className="relative h-[85%] hidden md:flex flex-col items-center shrink-0 w-10">
-                <div className="absolute top-4 bottom-4 w-[1.5px] bg-border/25 rounded" />
-                
-                {/* Scroll progress path overlay */}
-                <motion.div 
-                  className="absolute top-4 w-[1.5px] bg-accent origin-top rounded"
-                  style={{ 
-                    scaleY: scrollYProgress,
-                    height: "calc(100% - 32px)"
-                  }}
-                />
+              {/* Interactive Quick-Tab Selector inside Top (Shown on mobile above the content for better usability) */}
+              {isMobile && (
+                <div className="flex flex-nowrap overflow-x-auto whitespace-nowrap gap-2 py-2 px-3.5 rounded-2xl bg-card/45 border border-border/10 w-full justify-start select-none scrollbar-none">
+                  {features.map((feat, idx) => {
+                    const isActive = activeIndex === idx;
+                    
+                    return (
+                      <button
+                        key={feat.title}
+                        onClick={() => setActiveIndex(idx)}
+                        className={`text-[9.5px] font-black uppercase tracking-wider px-4 py-2.5 rounded-xl transition-all shrink-0 ${
+                          isActive
+                            ? "bg-accent/15 border border-accent/25 text-accent shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {feat.title}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-                {features.map((feat, idx) => {
-                  const Icon = feat.icon;
-                  const isActive = activeIndex === idx;
+              {/* Vertical Node-Link Progress Indicator (Desktop only) */}
+              {!isMobile && (
+                <div className="relative h-[85%] hidden md:flex flex-col items-center shrink-0 w-10">
+                  <div className="absolute top-4 bottom-4 w-[1.5px] bg-border/25 rounded" />
                   
-                  return (
-                    <motion.div
-                      key={feat.title}
-                      className="absolute z-10 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer"
-                      style={{
-                        top: `${idx * 50}%`,
-                        y: "-50%"
-                      }}
-                      onClick={() => {
-                        if (containerRef.current) {
-                          // Scroll smoothly to this section segment
-                          const containerTop = containerRef.current.offsetTop;
-                          const segmentHeight = containerRef.current.offsetHeight / 3;
-                          window.scrollTo({
-                            top: containerTop + idx * segmentHeight + 50,
-                            behavior: "smooth"
-                          });
-                        }
-                      }}
-                      animate={{
-                        backgroundColor: isActive ? (isDark ? "#1d1b1a" : "#eae8e4") : (isDark ? "#151312" : "#fbf9f5"),
-                        borderColor: isActive ? "#f59e0b" : "rgba(245,158,11,0.2)",
-                        borderWidth: "1.5px",
-                        boxShadow: isActive ? "0 0 12px rgba(245,158,11,0.3)" : "none",
-                      }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <Icon className={`w-3 h-3 ${isActive ? "text-accent" : "text-muted-foreground/60"}`} />
-                    </motion.div>
-                  );
-                })}
-              </div>
+                  {/* Scroll progress path overlay */}
+                  <motion.div 
+                    className="absolute top-4 w-[1.5px] bg-accent origin-top rounded"
+                    style={{ 
+                      scaleY: scrollYProgress,
+                      height: "calc(100% - 32px)"
+                    }}
+                  />
+
+                  {features.map((feat, idx) => {
+                    const Icon = feat.icon;
+                    const isActive = activeIndex === idx;
+                    
+                    return (
+                      <motion.div
+                        key={feat.title}
+                        className="absolute z-10 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer"
+                        style={{
+                          top: `${idx * 50}%`,
+                          y: "-50%"
+                        }}
+                        onClick={() => {
+                          if (containerRef.current) {
+                            const containerTop = containerRef.current.offsetTop;
+                            const segmentHeight = containerRef.current.offsetHeight / 3;
+                            window.scrollTo({
+                              top: containerTop + idx * segmentHeight + 50,
+                              behavior: "smooth"
+                            });
+                          }
+                        }}
+                        animate={{
+                          backgroundColor: isActive ? (isDark ? "#1d1b1a" : "#eae8e4") : (isDark ? "#151312" : "#fbf9f5"),
+                          borderColor: isActive ? "#f59e0b" : "rgba(245,158,11,0.2)",
+                          borderWidth: "1.5px",
+                          boxShadow: isActive ? "0 0 12px rgba(245,158,11,0.3)" : "none",
+                        }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <Icon className={`w-3 h-3 ${isActive ? "text-accent" : "text-muted-foreground/60"}`} />
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Descriptions container */}
-              <div className="flex-1 flex flex-col gap-6 justify-center">
-                {features.map((feat, idx) => {
-                  const isActive = activeIndex === idx;
-                  
-                  return (
+              <div className={isMobile ? "w-full min-h-[140px] flex flex-col justify-center" : "flex-1 flex flex-col gap-6 justify-center"}>
+                {isMobile ? (
+                  /* Mobile: Render only the active description card with smooth layout animation transitions */
+                  <AnimatePresence mode="wait">
                     <motion.div
-                      key={feat.title}
-                      className="flex flex-col text-left cursor-pointer"
-                      onClick={() => {
-                        if (containerRef.current) {
-                          const containerTop = containerRef.current.offsetTop;
-                          const segmentHeight = containerRef.current.offsetHeight / 3;
-                          window.scrollTo({
-                            top: containerTop + idx * segmentHeight + 50,
-                            behavior: "smooth"
-                          });
-                        }
-                      }}
-                      animate={{
-                        opacity: isActive ? 1.0 : 0.35,
-                        scale: isActive ? 1.02 : 0.98,
-                        x: isActive ? 4 : 0,
-                      }}
-                      transition={{ type: "spring", stiffness: 250, damping: 22 }}
+                      key={activeIndex}
+                      className="flex flex-col text-left rounded-2xl p-4 bg-card/30 border border-border/10 backdrop-blur-md"
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -12 }}
+                      transition={{ duration: 0.22 }}
                     >
                       <span className="text-[10px] font-black uppercase text-accent/80 tracking-wider mb-1">
-                        {feat.tagline}
+                        {activeFeature.tagline}
                       </span>
-                      <h3 className="font-heading font-black text-lg md:text-xl text-foreground mb-2 flex items-center gap-2">
-                        <span>{feat.title}</span>
-                        {isActive && (
-                          <motion.span 
-                            layoutId="accentDot" 
-                            className="w-1.5 h-1.5 rounded-full bg-accent"
-                          />
-                        )}
+                      <h3 className="font-heading font-black text-lg text-foreground mb-2">
+                        {activeFeature.title}
                       </h3>
-                      <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
-                        {feat.description}
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {activeFeature.description}
                       </p>
                     </motion.div>
-                  );
-                })}
+                  </AnimatePresence>
+                ) : (
+                  /* Desktop storyline view */
+                  features.map((feat, idx) => {
+                    const isActive = activeIndex === idx;
+                    
+                    return (
+                      <motion.div
+                        key={feat.title}
+                        className="flex flex-col text-left cursor-pointer"
+                        onClick={() => {
+                          if (containerRef.current) {
+                            const containerTop = containerRef.current.offsetTop;
+                            const segmentHeight = containerRef.current.offsetHeight / 3;
+                            window.scrollTo({
+                              top: containerTop + idx * segmentHeight + 50,
+                              behavior: "smooth"
+                            });
+                          }
+                        }}
+                        animate={{
+                          opacity: isActive ? 1.0 : 0.35,
+                          scale: isActive ? 1.02 : 0.98,
+                          x: isActive ? 4 : 0,
+                        }}
+                        transition={{ type: "spring", stiffness: 250, damping: 22 }}
+                      >
+                        <span className="text-[10px] font-black uppercase text-accent/80 tracking-wider mb-1">
+                          {feat.tagline}
+                        </span>
+                        <h3 className="font-heading font-black text-lg md:text-xl text-foreground mb-2 flex items-center gap-2">
+                          <span>{feat.title}</span>
+                          {isActive && (
+                            <motion.span 
+                              layoutId="accentDot" 
+                              className="w-1.5 h-1.5 rounded-full bg-accent"
+                            />
+                          )}
+                        </h3>
+                        <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
+                          {feat.description}
+                        </p>
+                      </motion.div>
+                    );
+                  })
+                )}
               </div>
             </div>
 
             {/* RIGHT COLUMN: SCREEN MOCK CONTAINER */}
-            <div className="col-span-12 md:col-span-8 flex flex-col items-center justify-center h-full">
-              {/* Interactive Quick-Tab Selector (Header above mockup frame) */}
-              <div className="flex gap-1.5 mb-4 px-2 py-1 rounded-xl bg-card/45 border border-border/10 shrink-0">
-                {features.map((feat, idx) => {
-                  const isActive = activeIndex === idx;
-                  
-                  return (
-                    <button
-                      key={feat.title}
-                      onClick={() => {
-                        if (containerRef.current) {
-                          const containerTop = containerRef.current.offsetTop;
-                          const segmentHeight = containerRef.current.offsetHeight / 3;
-                          window.scrollTo({
-                            top: containerTop + idx * segmentHeight + 50,
-                            behavior: "smooth"
-                          });
-                        }
-                      }}
-                      className={`text-[9px] font-bold uppercase tracking-wider px-3.5 py-1.5 rounded-lg transition-all ${
-                        isActive
-                          ? "bg-accent/15 border border-accent/25 text-accent"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {feat.title}
-                    </button>
-                  );
-                })}
-              </div>
+            <div className={isMobile ? "w-full flex flex-col items-center" : "col-span-12 md:col-span-8 flex flex-col items-center justify-center h-full"}>
+              
+              {/* Interactive Quick-Tab Selector (Header above mockup frame - Desktop only) */}
+              {!isMobile && (
+                <div className="flex gap-1.5 mb-4 px-2 py-1 rounded-xl bg-card/45 border border-border/10 shrink-0">
+                  {features.map((feat, idx) => {
+                    const isActive = activeIndex === idx;
+                    
+                    return (
+                      <button
+                        key={feat.title}
+                        onClick={() => {
+                          if (containerRef.current) {
+                            const containerTop = containerRef.current.offsetTop;
+                            const segmentHeight = containerRef.current.offsetHeight / 3;
+                            window.scrollTo({
+                              top: containerTop + idx * segmentHeight + 50,
+                              behavior: "smooth"
+                            });
+                          }
+                        }}
+                        className={`text-[9px] font-bold uppercase tracking-wider px-3.5 py-1.5 rounded-lg transition-all ${
+                          isActive
+                            ? "bg-accent/15 border border-accent/25 text-accent"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {feat.title}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Main screen mock frame */}
               <div
-                className="relative w-full h-[90%] max-h-[540px] rounded-2xl overflow-hidden border border-border/15 transition-all duration-500 bg-card/35 backdrop-blur-md shadow-2xl flex flex-col"
+                className="relative w-full rounded-2xl overflow-hidden border border-border/15 transition-all duration-500 bg-card/35 backdrop-blur-md shadow-2xl flex flex-col"
                 style={{
+                  height: isMobile ? "490px" : "90%",
+                  maxHeight: isMobile ? "none" : "540px",
                   boxShadow: isDark
                     ? "0 0 60px rgba(245,158,11,0.02), 0 30px 60px rgba(0,0,0,0.5)"
                     : "0 0 60px rgba(245,158,11,0.01), 0 30px 60px rgba(120,53,15,0.05)",
