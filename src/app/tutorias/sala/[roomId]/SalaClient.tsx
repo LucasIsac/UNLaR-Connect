@@ -30,6 +30,7 @@ import {
   PhoneOff,
   Sparkles,
   Users,
+  X,
 } from "lucide-react";
 
 interface SalaClientProps {
@@ -103,6 +104,8 @@ function VideoTile({
     return `RTC: ${connectionState}`;
   })();
 
+  const showLoader = !isCurrentUser && connectionState !== "connected" && connectionState !== "failed";
+
   useEffect(() => {
     if (!videoRef.current) return;
 
@@ -130,7 +133,7 @@ function VideoTile({
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-muted/20">
           <div className="relative w-20 h-20 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center text-accent font-heading font-black text-xl shadow-lg shadow-accent/10">
-            {stream ? getInitials(participant) : <Loader2 className="w-8 h-8 animate-spin" />}
+            {showLoader ? <Loader2 className="w-8 h-8 animate-spin" /> : getInitials(participant)}
           </div>
           <h4 className="mt-4 font-heading font-bold text-sm text-foreground">
             {displayName}
@@ -162,7 +165,7 @@ function VideoTile({
         />
       </div>
 
-      {isCurrentUser && isMuted && (
+      {isMuted && (
         <span className="absolute top-3 right-3 rounded-full bg-destructive/15 border border-destructive/25 px-2 py-1 text-[10px] font-bold text-destructive">
           Mic off
         </span>
@@ -185,7 +188,7 @@ export default function SalaClient({
     room.participants
   );
   const [messages, setMessages] = useState<CallMessageExtended[]>([]);
-  const [showChat, setShowChat] = useState(true);
+  const [showChat, setShowChat] = useState(false);
   const [activeTab, setActiveTab] = useState<"chat" | "resources">("chat");
   const [unreadCount, setUnreadCount] = useState(0);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -449,8 +452,8 @@ export default function SalaClient({
     activeParticipants.length <= 1
       ? "grid-cols-1"
       : activeParticipants.length === 2
-      ? "grid-cols-1 md:grid-cols-2"
-      : "grid-cols-1 sm:grid-cols-2";
+      ? "grid-cols-1 sm:grid-cols-2"
+      : "grid-cols-2";
 
   return (
     <div className="h-full min-h-0 grid grid-rows-[auto_minmax(0,1fr)_auto] gap-4 relative">
@@ -478,34 +481,36 @@ export default function SalaClient({
         </div>
       )}
 
-      <div className="bg-glass px-6 py-3 rounded-xl border border-border/20 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg z-10 backdrop-blur-xl shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse shrink-0" />
-          <div>
-            <h2 className="font-heading font-black text-sm text-foreground flex items-center gap-1.5 leading-none">
+      <div className="bg-glass px-4 py-2 sm:px-6 sm:py-3 rounded-xl border border-border/20 flex flex-row items-center justify-between gap-3 shadow-lg z-10 backdrop-blur-xl shrink-0 w-full">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-accent animate-pulse shrink-0" />
+          <div className="min-w-0">
+            <h2 className="font-heading font-black text-xs sm:text-sm text-foreground flex items-center gap-1.5 leading-none truncate">
               Tutoría en Vivo
-              <Sparkles className="w-4 h-4 text-accent animate-pulse" />
+              <Sparkles className="w-3.5 h-3.5 text-accent animate-pulse shrink-0 hidden sm:inline" />
             </h2>
-            <span className="text-xs text-muted-foreground mt-0.5 block leading-none">
+            <span className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 block leading-none truncate">
               Materia: <span className="text-accent font-semibold">{room.subject?.name || "General"}</span>
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 bg-muted/40 px-3.5 py-1.5 rounded-full border border-border/10 text-xs font-mono font-bold shrink-0">
-            <Clock className="w-3.5 h-3.5 text-accent shrink-0" />
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-1.5 bg-muted/40 px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-full border border-border/10 text-[10px] sm:text-xs font-mono font-bold shrink-0">
+            <Clock className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-accent shrink-0" />
             <span>{formatTime(callDuration)}</span>
           </div>
-          <div className="flex items-center gap-1.5 bg-muted/40 px-3.5 py-1.5 rounded-full border border-border/10 text-xs font-bold shrink-0">
-            <Users className="w-3.5 h-3.5 text-accent shrink-0" />
+          <div className="flex items-center gap-1 sm:gap-1.5 bg-muted/40 px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-full border border-border/10 text-[10px] sm:text-xs font-bold shrink-0">
+            <Users className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-accent shrink-0" />
             <span>{activeParticipants.length}/{room.max_participants}</span>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 overflow-hidden">
-        <div className="lg:col-span-2 relative grid grid-rows-[minmax(0,1fr)_auto_auto] min-h-0 bg-obsidian rounded-xl overflow-hidden border border-border/20 shadow-2xl p-3">
+      <div className="relative flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
+        <div className={`relative grid grid-rows-[minmax(0,1fr)_auto_auto] min-h-0 bg-obsidian rounded-xl overflow-hidden border border-border/20 shadow-2xl p-3 transition-all ${
+          showChat ? "lg:col-span-2" : "lg:col-span-3"
+        }`}>
           <div className={`grid ${gridClass} auto-rows-fr gap-3 h-full min-h-0 overflow-hidden`}>
             {activeParticipants.map((participant) => {
               const isCurrentUser = participant.user_id === currentUserId;
@@ -571,11 +576,11 @@ export default function SalaClient({
         </div>
 
         {showChat && (
-          <div className="flex flex-col h-full min-h-0 lg:col-span-1 min-w-0 overflow-hidden">
-            <div className="flex border-b border-border/20 mb-3 bg-glass p-1 rounded-xl gap-1 shrink-0 border">
+          <div className="absolute inset-0 z-30 lg:static lg:z-auto flex flex-col h-full min-h-0 lg:col-span-1 min-w-0 overflow-hidden bg-background/95 lg:bg-transparent p-4 lg:p-0 rounded-xl border border-border/20 lg:border-none shadow-2xl lg:shadow-none backdrop-blur-md lg:backdrop-blur-none">
+            <div className="flex border-b border-border/20 mb-3 bg-glass p-1 rounded-xl gap-1 shrink-0 border items-center">
               <button
                 onClick={() => handleTabChange("chat")}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-lg transition-all ${
+                className={`flex-grow flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-lg transition-all ${
                   activeTab === "chat"
                     ? "bg-accent text-accent-foreground"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
@@ -586,7 +591,7 @@ export default function SalaClient({
               </button>
               <button
                 onClick={() => handleTabChange("resources")}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-lg transition-all ${
+                className={`flex-grow flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-lg transition-all ${
                   activeTab === "resources"
                     ? "bg-accent text-accent-foreground"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
@@ -594,6 +599,14 @@ export default function SalaClient({
               >
                 <FileText className="w-3.5 h-3.5" />
                 <span>Apuntes</span>
+              </button>
+              
+              <button
+                onClick={() => setShowChat(false)}
+                className="lg:hidden p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/30 transition-all shrink-0 ml-1"
+                title="Volver a la llamada"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
 
