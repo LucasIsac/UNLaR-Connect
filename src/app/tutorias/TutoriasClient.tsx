@@ -7,12 +7,12 @@ import {
   createClient as createBrowserClient,
   unsubscribeRealtimeChannel,
 } from "@/lib/supabase/client";
-import { useCallPresence } from "@/hooks/useCallPresence";
 import { 
   AvailableTutor, 
-  fetchAvailableTutors, 
-  requestCall, 
-  respondToCall,
+  OpenLiveTutoringRoom,
+  fetchOpenLiveTutoringRooms,
+  openLiveTutoringRoom,
+  joinLiveTutoringRoom,
   fetchCallHistory,
   CallRoomExtended
 } from "@/actions/consultas";
@@ -30,13 +30,11 @@ import TutorCard from "@/components/consultas/TutorCard";
 import ScheduledTutorCard from "@/components/consultas/ScheduledTutorCard";
 import RequestTutoringModal from "@/components/consultas/RequestTutoringModal";
 import TutoringCalendar from "@/components/consultas/TutoringCalendar";
-import IncomingCallBanner from "@/components/consultas/IncomingCallBanner";
 import { Select } from "@/components/ui/Select";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { 
   Video, 
   Calendar, 
-  ToggleLeft, 
   ToggleRight, 
   Users, 
   Search, 
@@ -55,15 +53,11 @@ import { DbSubject } from "@/types/database";
 import type { CombinedHeaderData } from "@/actions/perfil";
 
 type TabType = "live" | "scheduled";
-type IncomingCall = {
-  roomId: string;
-  studentName: string;
-  subjectName: string;
-};
 type CallRoomRealtimeRow = {
   id: string;
   status: string;
-  student_id: string;
+  student_id: string | null;
+  tutor_id?: string;
   subject_id: number | null;
 };
 
@@ -95,24 +89,10 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
     ...subjects.map((sub) => ({ value: sub.id, label: sub.name })),
   ];
   
-  // Realtime Presence for tutors
-  const { onlineTutors, isAvailable, toggleAvailability } = useCallPresence(
-    currentUser.id,
-    {
-      name: currentUser.name,
-      last_name: currentUser.last_name,
-      avatar_url: currentUser.avatar_url,
-      role_id: currentUser.role_id,
-    }
-  );
-
   // ==================== LIVE TAB STATE ====================
-  const [allTutors, setAllTutors] = useState<AvailableTutor[]>([]);
+  const [openLiveRooms, setOpenLiveRooms] = useState<OpenLiveTutoringRoom[]>([]);
   const [loadingTutors, setLoadingTutors] = useState(true);
-  const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
-  const [activeCallRoomId, setActiveCallRoomId] = useState<string | null>(null);
   const [isRequesting, setIsRequesting] = useState(false);
-  const [isResponding, setIsResponding] = useState(false);
   const [pendingCallMessage, setPendingCallMessage] = useState<string | null>(null);
   const [history, setHistory] = useState<CallRoomExtended[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
@@ -133,11 +113,6 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
       try {
         const { data: subs } = await supabase.from("subjects").select("*").order("name");
         setSubjects(subs || []);
-
-        const tutorsRes = await fetchAvailableTutors();
-        if (tutorsRes.success && tutorsRes.data) {
-          setAllTutors(tutorsRes.data);
-        }
 
         const historyRes = await fetchCallHistory();
         if (historyRes.success && historyRes.data) {
@@ -161,7 +136,6 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
       } catch (err) {
         console.error("Error loading tutorias initial data:", err);
       } finally {
-        setLoadingTutors(false);
         setLoadingHistory(false);
         setLoadingProfiles(false);
         setLoadingSessions(false);
@@ -171,79 +145,53 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
     loadInitialData();
   }, []);
 
+  useEffect(() => {
+    async function loadOpenRooms() {
+      setLoadingTutors(true);
+      const roomsRes = await fetchOpenLiveTutoringRooms(selectedSubjectId ?? undefined);
+      if (roomsRes.success && roomsRes.data) {
+        setOpenLiveRooms(roomsRes.data);
+      }
+      setLoadingTutors(false);
+    }
+
+    void loadOpenRooms();
+  }, [selectedSubjectId]);
+
   // ==================== REALTIME SUBSCRIPTIONS ====================
   useEffect(() => {
-    if (currentUser.role_id !== 1 && currentUser.role_id !== 3) return;
+    async function refreshOpenRooms() {
+      const roomsRes = await fetchOpenLiveTutoringRooms(selectedSubjectId ?? undefined);
+      if (roomsRes.success && roomsRes.data) {
+        setOpenLiveRooms(roomsRes.data);
+      }
+    }
 
     const channel = supabase
-      .channel("tutor_call_listeners")
+      .channel("live_tutoring_rooms")
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "call_rooms",
-          filter: `tutor_id=eq.${currentUser.id}`,
-        },
-        async (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-          const newRoom = payload.new as Partial<CallRoomRealtimeRow>;
-          if (newRoom.status === "requested" && newRoom.id && newRoom.student_id) {
-            const { data: student } = await supabase
-              .from("users")
-              .select("name, last_name")
-              .eq("id", newRoom.student_id)
-              .single();
-
-            let subjectName = "Consulta Express";
-            if (newRoom.subject_id) {
-              const { data: subject } = await supabase
-                .from("subjects")
-                .select("name")
-                .eq("id", newRoom.subject_id)
-                .single();
-              if (subject) {
-                subjectName = subject.name;
-              }
-            }
-
-            setIncomingCall({
-              roomId: newRoom.id,
-              studentName: student ? `${student.name} ${student.last_name}` : "Estudiante",
-              subjectName,
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      unsubscribeRealtimeChannel(channel);
-    };
-  }, [currentUser.id, currentUser.role_id, supabase]);
-
-  useEffect(() => {
-    if (!activeCallRoomId) return;
-
-    const channel = supabase
-      .channel(`active_call_room_listener_${activeCallRoomId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "call_rooms",
-          filter: `id=eq.${activeCallRoomId}`,
         },
         (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-          const updatedRoom = payload.new as Partial<CallRoomRealtimeRow>;
-          if (updatedRoom.status === "accepted" || updatedRoom.status === "active") {
-            router.push(`/tutorias/sala/${activeCallRoomId}`);
-          } else if (updatedRoom.status === "rejected") {
-            alert("El tutor rechazó la consulta en este momento.");
-            setIsRequesting(false);
-            setActiveCallRoomId(null);
-            setPendingCallMessage(null);
+          const room = payload.new as Partial<CallRoomRealtimeRow>;
+          if (!room.id || room.tutor_id === currentUser.id || room.status === "open" || room.status === "active" || room.status === "ended") {
+            void refreshOpenRooms();
           }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "call_room_participants",
+        },
+        () => {
+          void refreshOpenRooms();
         }
       )
       .subscribe();
@@ -251,65 +199,79 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
     return () => {
       unsubscribeRealtimeChannel(channel);
     };
-  }, [activeCallRoomId]);
+  }, [currentUser.id, selectedSubjectId, supabase]);
 
   // ==================== LIVE TAB HANDLERS ====================
-  const handleRequestCall = async (tutorId: string, subjectId: number | null) => {
+  const handleOpenLiveRoom = async () => {
     setIsRequesting(true);
-    setPendingCallMessage("Llamando al tutor...");
+    setPendingCallMessage("Creando tu tutoría en vivo...");
     
-    const res = await requestCall(tutorId, subjectId);
+    const res = await openLiveTutoringRoom(selectedSubjectId);
     if (res.success && res.data) {
-      setActiveCallRoomId(res.data.id);
-      setPendingCallMessage("Esperando que el tutor acepte la consulta...");
+      router.push(`/tutorias/sala/${res.data.id}`);
     } else {
-      alert(res.error || "No se pudo realizar el llamado.");
+      alert(res.error || "No pudimos crear la tutoría.");
       setIsRequesting(false);
       setPendingCallMessage(null);
     }
   };
 
-  const handleAcceptCall = async () => {
-    if (!incomingCall) return;
-    setIsResponding(true);
-    const res = await respondToCall(incomingCall.roomId, true);
+  const handleRequestCall = async (tutorId: string) => {
+    if (tutorId === currentUser.id) {
+      alert("Esta es tu tutoría en vivo. Entrá desde el botón de crear sala.");
+      return;
+    }
+
+    const room = openLiveRooms.find((liveRoom) => liveRoom.tutor.id === tutorId);
+    if (!room) {
+      alert("Esta tutoría ya no está disponible.");
+      return;
+    }
+
+    setIsRequesting(true);
+    setPendingCallMessage("Solicitando acceso a la tutoría...");
+
+    const res = await joinLiveTutoringRoom(room.id);
     if (res.success && res.data) {
-      router.push(`/tutorias/sala/${incomingCall.roomId}`);
+      router.push(`/tutorias/sala/${res.data.id}`);
     } else {
-      alert(res.error || "Error al aceptar la consulta.");
-      setIsResponding(false);
-      setIncomingCall(null);
+      alert(res.error || "No pudimos sumarte a la tutoría.");
+      setIsRequesting(false);
+      setPendingCallMessage(null);
     }
   };
 
-  const handleRejectCall = async () => {
-    if (!incomingCall) return;
-    setIsResponding(true);
-    await respondToCall(incomingCall.roomId, false);
-    setIsResponding(false);
-    setIncomingCall(null);
-  };
-
   const getAvailableTutors = (): AvailableTutor[] => {
-    return allTutors.filter((tutor) => {
-      const isOnline = onlineTutors[tutor.id]?.available;
-      if (!isOnline) return false;
+    return openLiveRooms
+      .filter((room) => room.tutor.id !== currentUser.id)
+      .map((room) => ({
+        id: room.tutor.id,
+        name: room.tutor.name,
+        last_name: room.tutor.last_name,
+        avatar_url: room.tutor.avatar_url,
+        tutor_rating: Number(room.tutor.tutor_rating) || 0,
+        total_reviews: room.participant_count,
+        subjects: room.subject ? [room.subject] : [],
+        live_room_id: room.id,
+        participant_count: room.participant_count,
+        max_participants: room.max_participants,
+      }))
+      .filter((tutor) => {
+        if (selectedSubjectId) {
+          const teachesSubject = tutor.subjects.some((s) => s.id === selectedSubjectId);
+          if (!teachesSubject) return false;
+        }
 
-      if (selectedSubjectId) {
-        const teachesSubject = tutor.subjects.some((s) => s.id === selectedSubjectId);
-        if (!teachesSubject) return false;
-      }
+        if (searchQuery.trim()) {
+          const query = searchQuery.toLowerCase();
+          const fullName = `${tutor.name} ${tutor.last_name}`.toLowerCase();
+          const matchesName = fullName.includes(query);
+          const matchesSubject = tutor.subjects.some((s) => s.name.toLowerCase().includes(query));
+          if (!matchesName && !matchesSubject) return false;
+        }
 
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        const fullName = `${tutor.name} ${tutor.last_name}`.toLowerCase();
-        const matchesName = fullName.includes(query);
-        const matchesSubject = tutor.subjects.some((s) => s.name.toLowerCase().includes(query));
-        if (!matchesName && !matchesSubject) return false;
-      }
-
-      return true;
-    });
+        return true;
+      });
   };
 
   const filteredAvailableTutors = getAvailableTutors();
@@ -428,16 +390,6 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
   return (
     <DashboardLayout initialHeaderData={initialHeaderData} showSearch={false}>
       <div className="space-y-4 animate-fade-in pb-6">
-      {incomingCall && (
-        <IncomingCallBanner
-          studentName={incomingCall.studentName}
-          subjectName={incomingCall.subjectName}
-          onAccept={handleAcceptCall}
-          onReject={handleRejectCall}
-          isResponding={isResponding}
-        />
-      )}
-
       {isRequesting && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-glass border border-accent/20 rounded-xl p-8 max-w-sm w-full text-center space-y-6 shadow-2xl">
@@ -458,11 +410,7 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
             </div>
             <button
               onClick={() => {
-                if (activeCallRoomId) {
-                  respondToCall(activeCallRoomId, false);
-                }
                 setIsRequesting(false);
-                setActiveCallRoomId(null);
                 setPendingCallMessage(null);
               }}
               className="w-full bg-muted text-foreground hover:bg-muted/80 font-semibold py-2.5 rounded-xl transition-all"
@@ -501,21 +449,19 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
             <div className="flex items-center gap-2 bg-glass py-1.5 px-3 rounded-xl border border-border/40 shrink-0 select-none">
               <div className="text-right">
                 <span className="text-[10px] text-muted-foreground block font-semibold uppercase tracking-wider">
-                  Tu disponibilidad
+                  Creá una tutoría
                 </span>
-                <span className={`text-xs font-bold block ${isAvailable ? "text-emerald-500" : "text-muted-foreground"}`}>
-                  {isAvailable ? "Estoy disponible" : "No disponible"}
+                <span className="text-xs font-bold block text-muted-foreground">
+                  Hasta 4 personas
                 </span>
               </div>
               <button
-                onClick={() => toggleAvailability(!isAvailable)}
+                onClick={handleOpenLiveRoom}
+                disabled={isRequesting}
                 className="text-accent transition-all hover:scale-105"
+                title="Crear una tutoría en vivo"
               >
-                {isAvailable ? (
-                  <ToggleRight className="w-9 h-9 fill-accent text-background" />
-                ) : (
-                  <ToggleLeft className="w-9 h-9 text-muted-foreground" />
-                )}
+                <ToggleRight className="w-9 h-9 fill-accent text-background" />
               </button>
             </div>
           )}
@@ -570,7 +516,7 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                   Tutores Activos en Línea
                 </h2>
                 <span className="bg-accent/15 text-accent px-2.5 py-0.5 rounded-full text-[10px] font-bold animate-pulse">
-                  {Object.keys(onlineTutors).length} online
+                  {openLiveRooms.length} salas
                 </span>
               </div>
 
@@ -618,7 +564,7 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                   <div>
                     <h3 className="font-semibold text-foreground text-xs">No hay tutores disponibles</h3>
                     <p className="text-[11px] text-muted-foreground mt-0.5 max-w-xs mx-auto leading-relaxed">
-                      Nadie está disponible en este momento con tus filtros. Avisale a un compañero para que active su disponibilidad.
+                      No hay tutorías en vivo con tus filtros. Avisale a un compañero para que cree una sala.
                     </p>
                   </div>
                 </div>
@@ -665,6 +611,7 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                   {history.map((room) => {
                     const isStudent = room.student_id === currentUser.id;
                     const peer = isStudent ? room.tutor : room.student;
+                    const groupPeer = room.participants.find((participant) => participant.user_id !== currentUser.id)?.user;
                     const formattedDate = new Date(room.created_at).toLocaleDateString([], {
                       day: "2-digit",
                       month: "2-digit",
@@ -678,7 +625,11 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-foreground truncate max-w-[150px]">
-                              {peer ? `${peer.name} ${peer.last_name?.[0] || ""}.` : "Compañero/a"}
+                              {peer
+                                ? `${peer.name} ${peer.last_name?.[0] || ""}.`
+                                : groupPeer
+                                ? `${groupPeer.name} ${groupPeer.last_name?.[0] || ""}.`
+                                : "Tutoría grupal"}
                             </span>
                             <span className="text-[10px] text-muted-foreground/60">{formattedDate}</span>
                           </div>

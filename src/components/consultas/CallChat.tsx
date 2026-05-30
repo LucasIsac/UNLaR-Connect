@@ -2,10 +2,10 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Send, MessageSquare } from "lucide-react";
-import { DbCallMessage } from "@/types/database";
+import { CallMessageExtended } from "@/actions/consultas";
 
 interface CallChatProps {
-  messages: DbCallMessage[];
+  messages: CallMessageExtended[];
   currentUserId: string;
   onSendMessage: (content: string) => void;
 }
@@ -50,6 +50,9 @@ export default function CallChat({
         ) : (
           messages.map((msg) => {
             const isMe = msg.sender_id === currentUserId;
+            const senderName = isMe
+              ? "Vos"
+              : `${msg.sender?.name ?? "Compañero/a"} ${msg.sender?.last_name ?? ""}`.trim();
             return (
               <div
                 key={msg.id}
@@ -57,6 +60,9 @@ export default function CallChat({
                   isMe ? "self-end items-end" : "self-start items-start"
                 }`}
               >
+                <span className="text-[10px] text-muted-foreground mb-1 px-1 font-semibold">
+                  {senderName}
+                </span>
                 <div
                   className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed shadow-sm ${
                     isMe
