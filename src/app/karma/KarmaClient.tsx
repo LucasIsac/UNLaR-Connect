@@ -14,15 +14,19 @@ import {
   Calendar, 
   Upload, 
   ArrowLeft,
-  X 
+  X,
+  Send,
+  Star
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { simulateKarmaAporte, KarmaStats } from "@/actions/karma";
+import { simulateKarmaAporte, KarmaStats, UserActivitySummary } from "@/actions/karma";
 import { DbBadge } from "@/types/database";
 import Link from "next/link";
+import FormattedNumber from "@/components/ui/FormattedNumber";
 
 interface KarmaClientProps {
   initialStats: KarmaStats;
+  initialActivity: UserActivitySummary;
 }
 
 interface ActiveBadge extends DbBadge {
@@ -30,8 +34,10 @@ interface ActiveBadge extends DbBadge {
   awardRecord?: { awarded_at: string } | null;
 }
 
-export default function KarmaClient({ initialStats }: KarmaClientProps) {
+export default function KarmaClient({ initialStats, initialActivity }: KarmaClientProps) {
   const [stats, setStats] = useState<KarmaStats>(initialStats);
+  const [activity] = useState<UserActivitySummary>(initialActivity);
+  const [activeActivityTab, setActiveActivityTab] = useState<"posts" | "replies" | "resources" | null>(null);
   const [showToast, setShowToast] = useState<string | null>(null);
   const [activeModalBadge, setActiveModalBadge] = useState<ActiveBadge | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -218,7 +224,7 @@ export default function KarmaClient({ initialStats }: KarmaClientProps) {
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">NIVEL {stats.karmaLevel}</p>
                 </div>
                 <div className="text-right">
-                  <span className="text-2xl font-black text-accent block leading-none">{stats.userPoints.toLocaleString()} pts</span>
+                  <span className="text-2xl font-black text-accent block leading-none"><FormattedNumber value={stats.userPoints} /> pts</span>
                   <span className="text-[10px] text-muted-foreground font-semibold">XP acumulado total</span>
                 </div>
               </div>
@@ -306,6 +312,118 @@ export default function KarmaClient({ initialStats }: KarmaClientProps) {
               })}
             </div>
           </div>
+        </motion.div>
+
+        {/* Mi Actividad Section */}
+        <motion.div className="space-y-4" variants={itemVariants}>
+          <h2 className="font-heading text-xl font-bold text-foreground flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-accent" />
+            <span>Mi Actividad</span>
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Resumen de tus aportes en la plataforma y los puntos que generaste.
+          </p>
+
+          {/* Activity Stats Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <button
+              onClick={() => setActiveActivityTab("posts")}
+              className="bg-glass rounded-2xl p-4 border border-border/10 hover:border-accent/30 transition-all group text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-accent" />
+                </div>
+                <span className="text-2xl font-black text-foreground">{activity.postsCount}</span>
+              </div>
+              <h4 className="text-xs font-bold text-foreground mb-1">Hilos Creados</h4>
+              <p className="text-[10px] text-muted-foreground">+{activity.postsCount * 15} pts ganados</p>
+            </button>
+
+            <button
+              onClick={() => setActiveActivityTab("replies")}
+              className="bg-glass rounded-2xl p-4 border border-border/10 hover:border-accent/30 transition-all group text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                  <Send className="w-5 h-5 text-blue-400" />
+                </div>
+                <span className="text-2xl font-black text-foreground">{activity.repliesCount}</span>
+              </div>
+              <h4 className="text-xs font-bold text-foreground mb-1">Respuestas</h4>
+              <p className="text-[10px] text-muted-foreground">+{activity.repliesCount * 10} pts ganados</p>
+            </button>
+
+            <button
+              onClick={() => setActiveActivityTab("resources")}
+              className="bg-glass rounded-2xl p-4 border border-border/10 hover:border-accent/30 transition-all group text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
+                  <Upload className="w-5 h-5 text-green-400" />
+                </div>
+                <span className="text-2xl font-black text-foreground">{activity.resourcesCount}</span>
+              </div>
+              <h4 className="text-xs font-bold text-foreground mb-1">Recursos Subidos</h4>
+              <p className="text-[10px] text-muted-foreground">+{activity.resourcesCount * 50} pts ganados</p>
+            </button>
+
+            <div className="bg-glass rounded-2xl p-4 border border-border/10">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                  <Star className="w-5 h-5 text-purple-400" />
+                </div>
+                <span className="text-2xl font-black text-foreground">{stats.earnedBadges.length}</span>
+              </div>
+              <h4 className="text-xs font-bold text-foreground mb-1">Medallas</h4>
+              <p className="text-[10px] text-muted-foreground">Insignias desbloqueadas</p>
+            </div>
+          </div>
+
+          {/* Recent Activity */}
+          {(activity.recentPosts.length > 0 || activity.recentResources.length > 0) && (
+            <div className="bg-glass rounded-2xl border border-border/10 p-4">
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Actividad Reciente</h3>
+              <div className="space-y-2">
+                {activity.recentPosts.slice(0, 3).map((post) => (
+                  <Link
+                    key={post.id}
+                    href="/foro"
+                    className="flex items-center justify-between p-2.5 bg-card/30 rounded-xl hover:bg-card/50 transition-colors group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <MessageSquare className="w-4 h-4 text-accent shrink-0" />
+                      <span className="text-xs text-foreground truncate">{post.title}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[10px] text-accent font-bold">+{post.upvotes}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {new Date(post.created_at).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+                {activity.recentResources.slice(0, 3).map((resource) => (
+                  <Link
+                    key={resource.id}
+                    href="/recursos"
+                    className="flex items-center justify-between p-2.5 bg-card/30 rounded-xl hover:bg-card/50 transition-colors group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Upload className="w-4 h-4 text-green-400 shrink-0" />
+                      <span className="text-xs text-foreground truncate">{resource.title}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[10px] text-accent font-bold">+{resource.upvotes}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {new Date(resource.uploaded_at).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </motion.div>
 
         {/* Medallas / Badges Block */}
@@ -448,6 +566,96 @@ export default function KarmaClient({ initialStats }: KarmaClientProps) {
                         : "¡Medalla desbloqueada con éxito!"}
                     </span>
                   </p>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Activity Detail Modal */}
+      <AnimatePresence>
+        {activeActivityTab && (
+          <motion.div
+            className="fixed inset-0 z-50 bg-background/70 backdrop-blur-md flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setActiveActivityTab(null)}
+          >
+            <motion.div
+              className="bg-card border border-border/40 w-full max-w-lg rounded-3xl p-6 shadow-2xl relative overflow-hidden flex flex-col max-h-[80vh]"
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setActiveActivityTab(null)}
+                className="absolute top-4 right-4 p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors focus:outline-none"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <h3 className="font-heading text-lg font-bold text-foreground mb-4">
+                {activeActivityTab === "posts" && "Mis Hilos en el Foro"}
+                {activeActivityTab === "replies" && "Mis Respuestas"}
+                {activeActivityTab === "resources" && "Mis Recursos Subidos"}
+              </h3>
+
+              <div className="flex-1 overflow-y-auto space-y-2">
+                {activeActivityTab === "posts" && activity.recentPosts.map((post) => (
+                  <Link
+                    key={post.id}
+                    href="/foro"
+                    className="block p-3 bg-muted/30 rounded-xl border border-border/10 hover:bg-muted/50 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-foreground truncate">{post.title}</span>
+                      <span className="text-[10px] text-accent font-bold shrink-0">+{post.upvotes}</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(post.created_at).toLocaleDateString("es-AR")}
+                    </span>
+                  </Link>
+                ))}
+
+                {activeActivityTab === "resources" && activity.recentResources.map((resource) => (
+                  <Link
+                    key={resource.id}
+                    href="/recursos"
+                    className="block p-3 bg-muted/30 rounded-xl border border-border/10 hover:bg-muted/50 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-foreground truncate">{resource.title}</span>
+                      <span className="text-[10px] text-accent font-bold shrink-0">+{resource.upvotes}</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(resource.uploaded_at).toLocaleDateString("es-AR")}
+                    </span>
+                  </Link>
+                ))}
+
+                {activeActivityTab === "replies" && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-xs">Tus respuestas aparecerán acá.</p>
+                  </div>
+                )}
+
+                {activeActivityTab === "posts" && activity.recentPosts.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-xs">Todavía no creaste ningún hilo.</p>
+                  </div>
+                )}
+
+                {activeActivityTab === "resources" && activity.recentResources.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Upload className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-xs">Todavía no subiste ningún recurso.</p>
+                  </div>
                 )}
               </div>
             </motion.div>
