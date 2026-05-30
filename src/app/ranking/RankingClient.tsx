@@ -12,6 +12,7 @@ import {
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { LeaderboardEntry } from "@/actions/karma";
 import Link from "next/link";
+import FormattedNumber from "@/components/ui/FormattedNumber";
 import Image from "next/image";
 
 interface RankingClientProps {
@@ -117,7 +118,7 @@ export default function RankingClient({ initialLeaderboard, currentUserId }: Ran
               <div>
                 <h3 className="text-sm font-black text-foreground">¡Tu posición en el Ranking de la UNLaR!</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Estás en el puesto <strong className="text-accent">#{currentUserRank}</strong> con <strong className="text-foreground">{currentUserEntry.points.toLocaleString()} puntos de Reputación</strong>.
+                  Estás en el puesto <strong className="text-accent">#{currentUserRank}</strong> con <strong className="text-foreground"><FormattedNumber value={currentUserEntry.points} /> puntos de Reputación</strong>.
                 </p>
               </div>
             </div>
@@ -242,10 +243,13 @@ export default function RankingClient({ initialLeaderboard, currentUserId }: Ran
                     </div>
 
                     <div className="space-y-1">
-                      <h4 className="text-xs font-black text-foreground truncate max-w-[140px]">
+                      <Link
+                        href={`/perfil/${student.id}`}
+                        className="text-xs font-black text-foreground truncate max-w-[140px] hover:text-accent transition-colors block"
+                      >
                         {student.name} {student.lastName}
                         {isMe && <span className="text-accent ml-1 font-bold">(Vos)</span>}
-                      </h4>
+                      </Link>
                       <span className="text-[10px] text-muted-foreground block truncate max-w-[150px]">
                         {student.careerName}
                       </span>
@@ -253,7 +257,7 @@ export default function RankingClient({ initialLeaderboard, currentUserId }: Ran
 
                     <div className="pt-4 border-t border-border/10 mt-4 w-full flex justify-between items-center text-[10px] font-bold">
                       <span className="text-muted-foreground">Medallas: <strong>{student.badgesCount}</strong></span>
-                      <span className="text-accent font-extrabold">{student.points.toLocaleString()} XP</span>
+                      <span className="text-accent font-extrabold"><FormattedNumber value={student.points} /> XP</span>
                     </div>
                   </div>
                 );
@@ -306,10 +310,13 @@ export default function RankingClient({ initialLeaderboard, currentUserId }: Ran
                         </div>
 
                         <div className="min-w-0">
-                          <h4 className="text-xs font-black text-foreground truncate max-w-[160px] sm:max-w-xs">
+                          <Link
+                            href={`/perfil/${student.id}`}
+                            className="text-xs font-black text-foreground truncate max-w-[160px] sm:max-w-xs hover:text-accent transition-colors block"
+                          >
                             {student.name} {student.lastName}
                             {isMe && <span className="text-accent ml-1 font-bold">(Vos)</span>}
-                          </h4>
+                          </Link>
                           <span className="text-[9px] text-muted-foreground truncate block max-w-[180px] sm:max-w-sm mt-0.5">
                             {student.careerName}
                           </span>
@@ -323,7 +330,7 @@ export default function RankingClient({ initialLeaderboard, currentUserId }: Ran
                         </div>
                         <div>
                            <span className="text-[10px] text-muted-foreground block leading-none">Reputación</span>
-                          <span className="text-xs font-extrabold text-accent">{student.points.toLocaleString()} XP</span>
+                          <span className="text-xs font-extrabold text-accent"><FormattedNumber value={student.points} /> XP</span>
                         </div>
                       </div>
                     </div>
