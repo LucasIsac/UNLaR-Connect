@@ -38,8 +38,7 @@ import { Select } from "@/components/ui/Select";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { 
   Video, 
-  Calendar, 
-  ToggleRight, 
+  Calendar,
   Users, 
   Search, 
   Clock, 
@@ -536,24 +535,15 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
           </div>
 
           {isTutor && (
-            <div className="flex items-center gap-2 bg-glass py-1.5 px-3 rounded-xl border border-border/40 shrink-0 select-none">
-              <div className="text-right">
-                <span className="text-[10px] text-muted-foreground block font-semibold uppercase tracking-wider">
-                  Creá una tutoría
-                </span>
-                <span className="text-xs font-bold block text-muted-foreground">
-                  Hasta 4 personas
-                </span>
-              </div>
-              <button
-                onClick={handleOpenLiveRoom}
-                disabled={isRequesting}
-                className="text-accent transition-all hover:scale-105"
-                title="Crear una tutoría en vivo"
-              >
-                <ToggleRight className="w-9 h-9 fill-accent text-background" />
-              </button>
-            </div>
+            <button
+              onClick={handleOpenLiveRoom}
+              disabled={isRequesting}
+              className="bg-accent hover:bg-accent/90 text-accent-foreground font-bold px-5 py-2.5 rounded-xl transition-all hover:scale-105 shadow-lg shadow-accent/20 flex items-center gap-2 shrink-0 disabled:opacity-50"
+              title="Crear una sala de tutoría en vivo"
+            >
+              <Video className="w-5 h-5" />
+              Crear sala
+            </button>
           )}
         </div>
 
