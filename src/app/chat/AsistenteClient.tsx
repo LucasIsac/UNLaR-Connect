@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import { 
   Bot,
   Send,
-  Paperclip,
   FileText,
   Presentation,
   PlusCircle,
@@ -434,13 +433,6 @@ export default function AsistenteClient() {
           <div className="max-w-3xl mx-auto relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-accent/15 to-secondary/10 rounded-full blur opacity-25 group-focus-within:opacity-40 transition duration-500 pointer-events-none" />
             <div className="relative bg-muted/95 border border-border rounded-full shadow-lg flex items-center p-1.5 pl-3.5 pr-2 focus-within:border-accent/50 transition-colors">
-              <button 
-                onClick={() => window.location.href = "/recursos"}
-                className="p-2 text-muted-foreground hover:text-accent transition-colors rounded-full shrink-0 hover:bg-card/40"
-                title="Subir documentos al banco de apuntes"
-              >
-                <Paperclip className="w-5 h-5" />
-              </button>
               <textarea
                 className="flex-1 bg-transparent border-none focus:ring-0 text-foreground resize-none py-1.5 px-2 max-h-28 overflow-y-auto text-sm placeholder-muted-foreground/50 scrollbar-none"
                 placeholder={selectedDocId ? "Hacé una pregunta sobre este apunte..." : "Preguntale a tus apuntes..."}
