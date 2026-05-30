@@ -25,7 +25,9 @@ export default function SessionChatModal({
   const [sending, setSending] = useState(false);
   const [inputText, setInputText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
+  const supabaseRef = useRef<ReturnType<typeof createClient>>();
+  if (!supabaseRef.current) supabaseRef.current = createClient();
+  const supabase = supabaseRef.current;
 
   useEffect(() => {
     loadMessages();

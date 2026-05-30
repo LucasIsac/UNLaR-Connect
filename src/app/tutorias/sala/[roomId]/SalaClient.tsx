@@ -6,6 +6,7 @@ import {
   createClient as createBrowserClient,
   unsubscribeRealtimeChannel,
 } from "@/lib/supabase/client";
+import Image from "next/image";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { 
   CallRoomExtended, 
@@ -426,10 +427,12 @@ export default function SalaClient({
 
           <div className="hidden sm:flex items-center gap-2">
             {peerUser?.avatar_url ? (
-              <img
+              <Image
                 src={peerUser.avatar_url}
                 alt={peerUser.name}
-                className="w-7 h-7 rounded-full object-cover border border-accent/20"
+                width={28}
+                height={28}
+                className="rounded-full object-cover border border-accent/20"
               />
             ) : (
               <div className="w-7 h-7 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-[10px] font-bold font-mono">
