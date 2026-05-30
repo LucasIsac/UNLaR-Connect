@@ -702,7 +702,7 @@ export default function RecursosPage() {
           </div>
 
           {/* Right sidebar column: Upload zone */}
-          <div className="lg:col-span-5 xl:col-span-4 space-y-6 lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:custom-scrollbar self-start pb-6">
+          <div className="lg:col-span-5 xl:col-span-4 space-y-6 lg:sticky lg:top-24 self-start pb-6">
 
             {/* Loading placeholder sidebars if true */}
             {loading ? (
