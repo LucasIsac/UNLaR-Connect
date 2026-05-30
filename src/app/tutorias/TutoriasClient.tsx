@@ -875,7 +875,6 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
                   <ScheduledTutorCard
                     key={tutor.id}
                     tutor={tutor}
-                    isOnline={!!onlineTutors[tutor.id]}
                     currentUserId={currentUser.id}
                     onRateTutor={(id, name) => setReviewTutorTarget({ id, name })}
                     onRequestTutoring={handleRequestTutoring}
