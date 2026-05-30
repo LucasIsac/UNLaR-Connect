@@ -681,6 +681,28 @@ export function useGroupWebRTC({
     [refreshLocalMediaMode, syncLocalTracksWithPeers]
   );
 
+  const sendReadyRef = useRef(sendReady);
+  const sendMediaStateRef = useRef(sendMediaState);
+  const negotiateKnownPeersRef = useRef(negotiateKnownPeers);
+  const createOfferRef = useRef(createOffer);
+  const ensurePeerConnectionRef = useRef(ensurePeerConnection);
+  const updateRemoteSignaledMediaStateRef = useRef(updateRemoteSignaledMediaState);
+  const drainIceRef = useRef(drainIce);
+  const syncLocalTracksWithPeersRef = useRef(syncLocalTracksWithPeers);
+  const sendSignalRef = useRef(sendSignal);
+
+  useEffect(() => {
+    sendReadyRef.current = sendReady;
+    sendMediaStateRef.current = sendMediaState;
+    negotiateKnownPeersRef.current = negotiateKnownPeers;
+    createOfferRef.current = createOffer;
+    ensurePeerConnectionRef.current = ensurePeerConnection;
+    updateRemoteSignaledMediaStateRef.current = updateRemoteSignaledMediaState;
+    drainIceRef.current = drainIce;
+    syncLocalTracksWithPeersRef.current = syncLocalTracksWithPeers;
+    sendSignalRef.current = sendSignal;
+  });
+
   useEffect(() => {
     activeRef.current = true;
 
@@ -719,9 +741,9 @@ export function useGroupWebRTC({
 
       localStreamRef.current = stream;
       setLocalStream(stream);
-      await syncLocalTracksWithPeers(stream);
-      sendMediaState();
-      negotiateKnownPeers();
+      await syncLocalTracksWithPeersRef.current(stream);
+      sendMediaStateRef.current();
+      negotiateKnownPeersRef.current();
     }
 
     void initMedia();
@@ -741,32 +763,32 @@ export function useGroupWebRTC({
         if (!shouldHandlePayload(payload)) return;
         const peerId = payload.senderId;
         const hadPeerConnection = peerConnectionsRef.current.has(peerId);
-        const pc = ensurePeerConnection(peerId);
-        updateRemoteSignaledMediaState(peerId, payload);
+        const pc = ensurePeerConnectionRef.current(peerId);
+        updateRemoteSignaledMediaStateRef.current(peerId, payload);
 
         if (
           shouldCreateOffer(currentUserId, peerId) &&
           (!hadPeerConnection || needsNegotiationRef.current.has(peerId) || !pc.remoteDescription)
         ) {
-          await createOffer(peerId, pc);
+          await createOfferRef.current(peerId, pc);
         }
       })
       .on("broadcast", { event: "media-state" }, ({ payload }: { payload: unknown }) => {
         if (!shouldHandlePayload(payload)) return;
-        updateRemoteSignaledMediaState(payload.senderId, payload);
+        updateRemoteSignaledMediaStateRef.current(payload.senderId, payload);
       })
       .on("broadcast", { event: "offer" }, async ({ payload }: { payload: unknown }) => {
         if (!shouldHandlePayload(payload) || !("sdp" in payload) || !("offerId" in payload)) return;
 
         const peerId = payload.senderId;
         console.log(`[WebRTC Debug] Received offer from ${peerId} (Offer ID: ${payload.offerId})`);
-        const pc = ensurePeerConnection(peerId);
+        const pc = ensurePeerConnectionRef.current(peerId);
 
         try {
           const cachedAnswer = cachedAnswersRef.current.get(payload.offerId);
           if (cachedAnswer) {
             console.log(`[WebRTC Debug] Sending cached answer for offer ${payload.offerId} to ${peerId}`);
-            await sendSignal("answer", cachedAnswer);
+            await sendSignalRef.current("answer", cachedAnswer);
             return;
           }
 
@@ -793,9 +815,9 @@ export function useGroupWebRTC({
 
           cachedAnswersRef.current.set(payload.offerId, answerPayload);
           console.log(`[WebRTC Debug] Sending answer for offer ${payload.offerId} to ${peerId}`);
-          await sendSignal("answer", answerPayload);
-          await drainIce(peerId, pc);
-          sendMediaState(peerId);
+          await sendSignalRef.current("answer", answerPayload);
+          await drainIceRef.current(peerId, pc);
+          sendMediaStateRef.current(peerId);
         } catch (error) {
           console.error("[WebRTC Debug] Failed to handle group WebRTC offer:", error);
         }
@@ -820,12 +842,12 @@ export function useGroupWebRTC({
           await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
           currentOfferIdRef.current.delete(peerId);
           negotiationAttemptsRef.current.delete(peerId);
-          await drainIce(peerId, pc);
-          sendMediaState(peerId);
+          await drainIceRef.current(peerId, pc);
+          sendMediaStateRef.current(peerId);
 
           if (needsNegotiationRef.current.has(peerId) && getSignalingState(pc) === "stable") {
             console.log(`[WebRTC Debug] Re-negotiation needed with peer ${peerId}`);
-            void createOffer(peerId, pc);
+            void createOfferRef.current(peerId, pc);
           }
         } catch (error) {
           console.error("[WebRTC Debug] Failed to handle group WebRTC answer:", error);
@@ -836,7 +858,7 @@ export function useGroupWebRTC({
 
         const peerId = payload.senderId;
         console.log(`[WebRTC Debug] Received ICE candidate from ${peerId}`);
-        const pc = ensurePeerConnection(peerId);
+        const pc = ensurePeerConnectionRef.current(peerId);
 
         try {
           if (pc.remoteDescription) {
@@ -857,9 +879,9 @@ export function useGroupWebRTC({
         if (status === "SUBSCRIBED") {
           console.log(`[WebRTC Debug] Signaling channel SUBSCRIBED for room ${roomId}`);
           channelReadyRef.current = true;
-          sendReady();
-          sendMediaState();
-          negotiateKnownPeers();
+          sendReadyRef.current();
+          sendMediaStateRef.current();
+          negotiateKnownPeersRef.current();
 
           if (readyIntervalRef.current) clearInterval(readyIntervalRef.current);
           readyIntervalRef.current = setInterval(() => {
@@ -876,8 +898,8 @@ export function useGroupWebRTC({
                 }
               } else {
                 console.log("[WebRTC Debug] Retrying ready/media broadcast to ensure sync.");
-                sendReady();
-                sendMediaState();
+                sendReadyRef.current();
+                sendMediaStateRef.current();
               }
             }
           }, 1500);
@@ -933,20 +955,7 @@ export function useGroupWebRTC({
         unsubscribeRealtimeChannel(channelRef.current);
       }
     };
-  }, [
-    createOffer,
-    currentUserId,
-    drainIce,
-    ensurePeerConnection,
-    roomId,
-    negotiateKnownPeers,
-    sendMediaState,
-    sendReady,
-    sendSignal,
-    supabase,
-    syncLocalTracksWithPeers,
-    updateRemoteSignaledMediaState,
-  ]);
+  }, [roomId, currentUserId, supabase]);
 
   useEffect(() => {
     if (!localStreamRef.current || !channelReadyRef.current) return;

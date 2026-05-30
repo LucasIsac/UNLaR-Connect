@@ -193,6 +193,14 @@ export default function SalaClient({
   const [visibleMediaInfo, setVisibleMediaInfo] = useState<string | null>(null);
   const [callDuration, setCallDuration] = useState(0);
 
+  const showChatRef = useRef(showChat);
+  const activeTabRef = useRef(activeTab);
+
+  useEffect(() => {
+    showChatRef.current = showChat;
+    activeTabRef.current = activeTab;
+  }, [showChat, activeTab]);
+
   const activeParticipants = useMemo(
     () =>
       participants
@@ -261,7 +269,7 @@ export default function SalaClient({
           if (res.success && res.data) {
             setMessages(res.data);
             const latest = res.data[res.data.length - 1];
-            if (latest && latest.sender_id !== currentUserId && (!showChat || activeTab !== "chat")) {
+            if (latest && latest.sender_id !== currentUserId && (!showChatRef.current || activeTabRef.current !== "chat")) {
               setUnreadCount((count) => count + 1);
             }
           }
@@ -272,7 +280,7 @@ export default function SalaClient({
     return () => {
       unsubscribeRealtimeChannel(channel);
     };
-  }, [activeTab, currentUserId, room.id, showChat, supabase]);
+  }, [currentUserId, room.id, supabase]);
 
   useEffect(() => {
     void refreshParticipants();
