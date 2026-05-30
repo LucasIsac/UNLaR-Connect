@@ -317,6 +317,20 @@ export function useGroupWebRTC({
 
       if (makingOfferRef.current.has(peerId) || pc.signalingState !== "stable") {
         console.log(`[WebRTC Debug] Cannot create offer to ${peerId}: offer in progress or signaling state is ${pc.signalingState}`);
+        
+        // If we are already in have-local-offer, re-broadcast our existing local SDP offer
+        // to make sure the newly arrived/connected peer receives it and can respond.
+        if (pc.signalingState === "have-local-offer" && pc.localDescription) {
+          console.log(`[WebRTC Debug] Already in have-local-offer. Re-broadcasting existing local SDP offer to ${peerId}`);
+          void sendSignal("offer", {
+            roomId,
+            senderId: currentUserId,
+            targetId: peerId,
+            offerId: currentOfferIdRef.current.get(peerId) || "",
+            sdp: pc.localDescription.toJSON(),
+          });
+        }
+
         needsNegotiationRef.current.add(peerId);
         scheduleNegotiationRetry(peerId);
         return;
@@ -439,6 +453,7 @@ export function useGroupWebRTC({
         if (pc.connectionState === "connected") {
           console.log(`[WebRTC Debug] WebRTC connection established successfully with ${peerId}!`);
           negotiationAttemptsRef.current.delete(peerId);
+          needsNegotiationRef.current.delete(peerId);
 
           // Clear ready retry interval once all active connections are stable/connected
           const states = Array.from(peerConnectionsRef.current.values()).map((c) => c.connectionState);
@@ -842,6 +857,7 @@ export function useGroupWebRTC({
           await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
           currentOfferIdRef.current.delete(peerId);
           negotiationAttemptsRef.current.delete(peerId);
+          needsNegotiationRef.current.delete(peerId);
           await drainIceRef.current(peerId, pc);
           sendMediaStateRef.current(peerId);
 
