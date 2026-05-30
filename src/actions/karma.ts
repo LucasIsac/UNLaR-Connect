@@ -293,3 +293,82 @@ export async function simulateKarmaAporte(
     return { success: false, newlyUnlocked: [], error: error.message || "Hubo un error al procesar el aporte." };
   }
 }
+
+// ==========================================
+// READ: Fetch user activity summary
+// ==========================================
+
+export interface UserActivitySummary {
+  postsCount: number;
+  repliesCount: number;
+  resourcesCount: number;
+  upvotesReceived: number;
+  recentPosts: { id: string; title: string; created_at: string; upvotes: number }[];
+  recentResources: { id: string; title: string; uploaded_at: string; upvotes: number }[];
+}
+
+export async function fetchUserActivity(): Promise<UserActivitySummary> {
+  try {
+    const session = await getVerifiedSession();
+    if (!session) return { postsCount: 0, repliesCount: 0, resourcesCount: 0, upvotesReceived: 0, recentPosts: [], recentResources: [] };
+
+    const supabase = createServerClient();
+    const userId = session.userId;
+
+    // Count posts
+    const { count: postsCount } = await supabase
+      .from("posts")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
+
+    // Count replies
+    const { count: repliesCount } = await supabase
+      .from("post_replies")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
+
+    // Count resources
+    const { count: resourcesCount } = await supabase
+      .from("documents")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
+
+    // Get recent posts
+    const { data: recentPosts } = await supabase
+      .from("posts")
+      .select("id, title, created_at, upvotes")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    // Get recent resources
+    const { data: recentResources } = await supabase
+      .from("documents")
+      .select("id, title, uploaded_at, upvotes")
+      .eq("user_id", userId)
+      .order("uploaded_at", { ascending: false })
+      .limit(5);
+
+    return {
+      postsCount: postsCount || 0,
+      repliesCount: repliesCount || 0,
+      resourcesCount: resourcesCount || 0,
+      upvotesReceived: 0,
+      recentPosts: (recentPosts || []).map((p: any) => ({
+        id: p.id,
+        title: p.title,
+        created_at: p.created_at,
+        upvotes: p.upvotes || 0,
+      })),
+      recentResources: (recentResources || []).map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        uploaded_at: r.uploaded_at,
+        upvotes: r.upvotes || 0,
+      })),
+    };
+  } catch (error) {
+    console.error("Error fetching user activity:", error);
+    return { postsCount: 0, repliesCount: 0, resourcesCount: 0, upvotesReceived: 0, recentPosts: [], recentResources: [] };
+  }
+}

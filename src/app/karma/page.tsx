@@ -1,4 +1,4 @@
-import { fetchKarmaData } from "@/actions/karma";
+import { fetchKarmaData, fetchUserActivity } from "@/actions/karma";
 import KarmaClient from "./KarmaClient";
 
 export const metadata = {
@@ -7,8 +7,11 @@ export const metadata = {
 };
 
 export default async function KarmaPage() {
-  const stats = await fetchKarmaData();
+  const [stats, activity] = await Promise.all([
+    fetchKarmaData(),
+    fetchUserActivity(),
+  ]);
 
-  return <KarmaClient initialStats={stats} />;
+  return <KarmaClient initialStats={stats} initialActivity={activity} />;
 }
 
