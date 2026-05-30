@@ -42,7 +42,9 @@ export default function TutorCard({
 
   // Safe rating fallback
   const rating = tutor.tutor_rating ? tutor.tutor_rating.toFixed(1) : "0.0";
-  const reviews = tutor.total_reviews ?? 0;
+  const participantCount = tutor.participant_count ?? 0;
+  const maxParticipants = tutor.max_participants ?? 4;
+  const isFull = participantCount >= maxParticipants;
 
   // Handler for instant consultation
   const handleCallRequest = () => {
@@ -83,7 +85,7 @@ export default function TutorCard({
                 <span className="font-bold ml-1">{rating}</span>
               </div>
               <span className="text-muted-foreground">
-                ({reviews} {reviews === 1 ? "reseña" : "reseñas"})
+                ({participantCount}/{maxParticipants} en sala)
               </span>
               
               {currentUserId !== tutor.id && (
@@ -116,11 +118,11 @@ export default function TutorCard({
       {/* Action button */}
       <button
         onClick={handleCallRequest}
-        disabled={isRequesting}
+        disabled={isRequesting || isFull}
         className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold h-11 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-accent/10 hover:shadow-accent/20 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed group"
       >
         <Video className="w-4 h-4 group-hover:scale-110 transition-transform" />
-        <span>{isRequesting ? "Llamando..." : "Pedir ayuda en vivo"}</span>
+        <span>{isRequesting ? "Solicitando..." : isFull ? "Sala completa" : "Solicitar acceso"}</span>
       </button>
     </div>
   );

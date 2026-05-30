@@ -29,7 +29,7 @@ export default async function SalaPage({ params }: SalaPageProps) {
   const isTutor = room.tutor_id === session.userId;
 
   return (
-    <main className="min-h-screen bg-background p-4 md:p-6 flex flex-col justify-between">
+    <main className="h-[100dvh] overflow-hidden bg-background p-4 md:p-6">
       <SalaClient
         room={room}
         isTutor={isTutor}
