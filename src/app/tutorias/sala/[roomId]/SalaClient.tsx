@@ -618,7 +618,7 @@ export default function SalaClient({
                   onSendMessage={handleSendMessage}
                 />
               ) : (
-                <ResourcesPanel subjectId={room.subject_id} />
+                <ResourcesPanel subjectId={room.subject_id} subjectName={room.subject?.name} />
               )}
             </div>
           </div>
