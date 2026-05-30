@@ -518,7 +518,7 @@ export default function RecursosPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
           
           {/* Left / Center Content: Resource list and tabs */}
-          <div className="space-y-4 lg:pr-[400px]">
+          <div className="space-y-4 lg:col-span-12 lg:pr-[400px]">
             
             {/* Navigation Tabs and Grid Layout Switcher */}
             <div className="flex items-center gap-4 border-b border-border/10 pb-2 mb-4 overflow-x-auto select-none">
