@@ -6,7 +6,7 @@ This guide defines the engineering workflow and design specifications for implem
 
 ## 1. The Design Token (The Golden Standard)
 
-To implement the premium translucent glassmorphism used in the navbar's **Notification Center**, always combine the following Tailwind CSS classes. This ensures a consistent backdrop, high-contrast borders, shadow depth, and responsive dark/light support:
+To implement a premium translucent glassmorphism on floating popups, dropdown cards, and overlay panels, always combine the following Tailwind CSS classes. This ensures a consistent backdrop, high-contrast borders, shadow depth, and responsive dark/light support:
 
 ```html
 bg-background/60 backdrop-blur-2xl border border-border/40 dark:border-white/10 shadow-2xl
@@ -38,10 +38,10 @@ Move the popover or dropdown container *outside* of the blurry container in the 
 // ❌ WRONG: Dropdown is inside a blurry header
 return (
   <header className="bg-background/50 backdrop-blur-xl">
-    <button onClick={toggleDropdown}>Bell</button>
+    <button onClick={toggleDropdown}>Trigger</button>
     {isOpen && (
       <div className="absolute bg-background/60 backdrop-blur-2xl">
-        Notifications...
+        Menu content...
       </div>
     )}
   </header>
@@ -51,11 +51,11 @@ return (
 return (
   <>
     <header className="bg-background/50 backdrop-blur-xl">
-      <button onClick={toggleDropdown}>Bell</button>
+      <button onClick={toggleDropdown}>Trigger</button>
     </header>
     {isOpen && (
       <div className="fixed top-16 right-8 bg-background/60 backdrop-blur-2xl border dark:border-white/10 shadow-2xl z-50">
-        Notifications...
+        Menu content...
       </div>
     )}
   </>
