@@ -87,6 +87,21 @@ function VideoTile({
   const videoRef = useRef<HTMLVideoElement>(null);
   const displayName = getDisplayName(participant, isCurrentUser);
   const roleLabel = participant.is_host ? "Tutor anfitrión" : "Estudiante";
+  const statusText = (() => {
+    if (stream) {
+      if (!hasVideo && isCameraOff && isMuted) return "Sin cámara ni micrófono";
+      if (!hasVideo && isCameraOff) return hasAudio ? "Audio conectado" : "Cámara apagada";
+      if (hasAudio) return "Audio conectado";
+      return "En la sala";
+    }
+
+    if (isCameraOff && isMuted) return "Sin cámara ni micrófono";
+    if (isCameraOff) return "Cámara apagada";
+    if (isMuted) return "Micrófono apagado";
+    if (connectionState === "connecting") return "Conectando...";
+    if (connectionState === "new") return "Esperando conexión...";
+    return `RTC: ${connectionState}`;
+  })();
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -121,15 +136,7 @@ function VideoTile({
             {displayName}
           </h4>
           <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-            {stream
-              ? isCameraOff
-                ? "Cámara apagada"
-                : hasAudio
-                ? "Audio conectado"
-                : "En la sala"
-              : connectionState === "new"
-              ? "Esperando conexión..."
-              : `RTC: ${connectionState}`}
+            {statusText}
           </p>
         </div>
       )}
@@ -512,8 +519,8 @@ export default function SalaClient({
                   hasVideo={hasVideo}
                   hasAudio={hasAudio}
                   connectionState={isCurrentUser ? "connected" : remoteState?.connectionState ?? "new"}
-                  isMuted={isCurrentUser ? isMuted : false}
-                  isCameraOff={isCurrentUser ? isCameraOff : false}
+                  isMuted={isCurrentUser ? isMuted : remoteState?.audioEnabled === false}
+                  isCameraOff={isCurrentUser ? isCameraOff : remoteState?.videoEnabled === false}
                 />
               );
             })}

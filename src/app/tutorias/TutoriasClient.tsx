@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import {
@@ -158,28 +158,26 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
     loadInitialData();
   }, []);
 
-  useEffect(() => {
-    async function loadOpenRooms() {
-      setLoadingTutors(true);
+  const refreshOpenRooms = useCallback(
+    async (showLoading = false) => {
+      if (showLoading) setLoadingTutors(true);
+
       const roomsRes = await fetchOpenLiveTutoringRooms(selectedSubjectId ?? undefined);
       if (roomsRes.success && roomsRes.data) {
         setOpenLiveRooms(roomsRes.data);
       }
-      setLoadingTutors(false);
-    }
 
-    void loadOpenRooms();
-  }, [selectedSubjectId]);
+      if (showLoading) setLoadingTutors(false);
+    },
+    [selectedSubjectId]
+  );
+
+  useEffect(() => {
+    void refreshOpenRooms(true);
+  }, [refreshOpenRooms]);
 
   // ==================== REALTIME SUBSCRIPTIONS ====================
   useEffect(() => {
-    async function refreshOpenRooms() {
-      const roomsRes = await fetchOpenLiveTutoringRooms(selectedSubjectId ?? undefined);
-      if (roomsRes.success && roomsRes.data) {
-        setOpenLiveRooms(roomsRes.data);
-      }
-    }
-
     const channel = supabase
       .channel("live_tutoring_rooms")
       .on(
@@ -212,7 +210,28 @@ export default function TutoriasClient({ currentUser, initialHeaderData }: Tutor
     return () => {
       unsubscribeRealtimeChannel(channel);
     };
-  }, [currentUser.id, selectedSubjectId, supabase]);
+  }, [currentUser.id, refreshOpenRooms, supabase]);
+
+  useEffect(() => {
+    if (activeTab !== "live") return;
+
+    const interval = setInterval(() => {
+      void refreshOpenRooms();
+    }, 4000);
+
+    const handleFocus = () => {
+      void refreshOpenRooms();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
+  }, [activeTab, refreshOpenRooms]);
 
   // ==================== LIVE TAB HANDLERS ====================
   const handleOpenLiveRoom = async () => {
