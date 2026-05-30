@@ -614,7 +614,7 @@ export default function RecursosPage() {
                         layout
                         key={rsc.id}
                         onClick={() => setSelectedResource(rsc)}
-                        className="bg-glass rounded-2xl p-5 flex flex-col hover:-translate-y-1 transition-all duration-300 group cursor-pointer hover:shadow-[0_0_20px_rgba(var(--accent-rgb),0.1)] relative border border-primary/5 hover:border-accent/30 overflow-hidden"
+                        className="bg-glass rounded-2xl p-6 flex flex-col hover:-translate-y-1 transition-all duration-300 group cursor-pointer hover:shadow-[0_0_20px_rgba(var(--accent-rgb),0.1)] relative border border-primary/5 hover:border-accent/30 overflow-hidden"
                       >
                         <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full blur-[40px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
                         <div className="flex justify-between items-start mb-3 relative z-10">
