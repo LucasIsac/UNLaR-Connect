@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Star, BookOpen, Calendar, MessageSquare } from "lucide-react";
 import { TutorProfileForMatching } from "@/actions/tutoring-scheduled";
 
@@ -53,10 +54,12 @@ export default function ScheduledTutorCard({
         <div className="flex items-start gap-4 mb-4">
           <div className="relative shrink-0">
             {tutor.avatar_url ? (
-              <img
+              <Image
                 src={tutor.avatar_url}
                 alt={`${tutor.name} ${tutor.last_name}`}
-                className="w-14 h-14 rounded-full object-cover border-2 border-accent/20"
+                width={56}
+                height={56}
+                className="rounded-full object-cover border-2 border-accent/20"
               />
             ) : (
               <div className="w-14 h-14 rounded-full bg-accent/10 border-2 border-accent/20 flex items-center justify-center text-accent font-bold text-lg">

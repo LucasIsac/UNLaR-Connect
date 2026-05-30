@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Star, BookOpen, Video } from "lucide-react";
 import { AvailableTutor } from "@/actions/consultas";
 
@@ -59,10 +60,12 @@ export default function TutorCard({
         {/* Header/Info section */}
         <div className="flex items-start gap-4 mb-4">
           {tutor.avatar_url ? (
-            <img
+            <Image
               src={tutor.avatar_url}
               alt={`${tutor.name} ${tutor.last_name}`}
-              className="w-12 h-12 rounded-full object-cover border-2 border-accent/20"
+              width={48}
+              height={48}
+              className="rounded-full object-cover border-2 border-accent/20"
             />
           ) : (
             <div className="w-12 h-12 rounded-full bg-accent/10 border-2 border-accent/20 flex items-center justify-center text-accent font-bold text-sm">
