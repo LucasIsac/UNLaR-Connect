@@ -191,6 +191,7 @@ export default function SalaClient({
   const [showChat, setShowChat] = useState(false);
   const [activeTab, setActiveTab] = useState<"chat" | "resources">("chat");
   const [unreadCount, setUnreadCount] = useState(0);
+  const [resourcesKey, setResourcesKey] = useState(0);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [callExitNotice, setCallExitNotice] = useState<CallExitNotice | null>(null);
   const [visibleMediaInfo, setVisibleMediaInfo] = useState<string | null>(null);
@@ -435,6 +436,9 @@ export default function SalaClient({
   };
 
   const handleTabChange = (tab: "chat" | "resources") => {
+    if (tab === "resources") {
+      setResourcesKey((prev) => prev + 1);
+    }
     setActiveTab(tab);
     if (tab === "chat") {
       setUnreadCount(0);
@@ -618,7 +622,7 @@ export default function SalaClient({
                   onSendMessage={handleSendMessage}
                 />
               ) : (
-                <ResourcesPanel subjectId={room.subject_id} />
+                <ResourcesPanel key={resourcesKey} subjectId={room.subject_id} subjectName={room.subject?.name} />
               )}
             </div>
           </div>
