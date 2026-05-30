@@ -24,12 +24,38 @@ async function generateIcons() {
     }
 
     // Also generate favicon
-    const faviconPath = path.join(__dirname, '..', 'public', 'favicon.ico');
+    const publicFaviconIcoPath = path.join(__dirname, '..', 'public', 'favicon.ico');
+    const appFaviconIcoPath = path.join(__dirname, '..', 'src', 'app', 'favicon.ico');
+    const appIconPngPath = path.join(__dirname, '..', 'src', 'app', 'icon.png');
+    const publicFaviconPngPath = path.join(__dirname, '..', 'public', 'favicon.png');
+
+    // 1. Generate public/favicon.ico
     await sharp(svgBuffer)
       .resize(32, 32)
       .png()
-      .toFile(faviconPath.replace('.ico', '.png'));
-    console.log('Generated: favicon.png');
+      .toFile(publicFaviconIcoPath);
+    console.log('Generated: public/favicon.ico');
+
+    // 2. Generate src/app/favicon.ico (overwriting Vercel logo)
+    await sharp(svgBuffer)
+      .resize(32, 32)
+      .png()
+      .toFile(appFaviconIcoPath);
+    console.log('Generated: src/app/favicon.ico');
+
+    // 3. Generate src/app/icon.png
+    await sharp(svgBuffer)
+      .resize(32, 32)
+      .png()
+      .toFile(appIconPngPath);
+    console.log('Generated: src/app/icon.png');
+
+    // 4. Generate public/favicon.png
+    await sharp(svgBuffer)
+      .resize(32, 32)
+      .png()
+      .toFile(publicFaviconPngPath);
+    console.log('Generated: public/favicon.png');
 
     console.log('\nAll icons generated successfully!');
   } catch (error) {
