@@ -128,7 +128,7 @@ export default function ForumMock({ isDark }: { isDark: boolean }) {
               <motion.div
                 key={thread.title}
                 layout
-                className="rounded-2xl p-4 bg-card/40 border border-border/20 flex flex-col md:flex-row md:items-center justify-between gap-3 group hover:border-secondary/30 hover:bg-card/60 transition-all duration-300 shadow-sm"
+                className="rounded-2xl p-4 bg-card/40 border border-border/20 flex flex-col md:flex-row md:items-center justify-between gap-3 group hover:border-secondary/30 hover:bg-card/60 transition-all duration-300 shadow-sm shrink-0"
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}

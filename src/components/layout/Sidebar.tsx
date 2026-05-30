@@ -157,7 +157,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   // Traditional full menu drawer with closing bounds.
   // ==========================================
   const mobileSidebarContent = (
-    <div className="flex flex-col h-full bg-card/75 dark:bg-card/30 backdrop-blur-xl border-r border-border/40 p-6">
+    <div className="flex flex-col h-full bg-background/60 backdrop-blur-2xl border-r border-border/40 dark:border-white/5 p-6">
       {/* Brand Logo & Department */}
       <div className="flex items-center justify-between pb-6 border-b border-border/40 mb-6">
         <Link href="/dashboard" className="flex items-center gap-3">
@@ -236,7 +236,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
     <>
       {/* Desktop Sidebar (Under Header top-16 h-calc, collapsed to 80px, hover to 256px) */}
-      <aside className="fixed left-0 top-16 h-[calc(100vh-64px)] z-30 hidden md:block transition-all duration-300 ease-in-out w-20 hover:w-64 group/sidebar bg-card/75 dark:bg-card/30 backdrop-blur-xl border-r border-border/40 overflow-hidden shadow-sm">
+      <aside className="fixed left-0 top-16 h-[calc(100vh-64px)] z-30 hidden md:block transition-all duration-300 ease-in-out w-20 hover:w-64 group/sidebar bg-background/60 backdrop-blur-2xl border-r border-border/40 dark:border-white/5 overflow-hidden shadow-sm">
         {desktopSidebarContent}
       </aside>
 
