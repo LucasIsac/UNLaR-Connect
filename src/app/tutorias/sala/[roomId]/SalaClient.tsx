@@ -109,7 +109,7 @@ function VideoTile({
   useEffect(() => {
     if (!videoRef.current) return;
 
-    if (!stream || !hasVideo) {
+    if (!stream || !hasVideo || isCameraOff) {
       videoRef.current.srcObject = null;
       return;
     }
@@ -118,11 +118,11 @@ function VideoTile({
     void videoRef.current.play().catch(() => {
       // The element is muted/playsInline where needed, so autoplay races can be ignored.
     });
-  }, [stream, hasVideo]);
+  }, [stream, hasVideo, isCameraOff]);
 
   return (
     <div className="relative h-full min-h-0 rounded-xl overflow-hidden border border-border/20 bg-muted/20 shadow-xl">
-      {stream && hasVideo ? (
+      {stream && hasVideo && !isCameraOff ? (
         <video
           ref={videoRef}
           autoPlay
