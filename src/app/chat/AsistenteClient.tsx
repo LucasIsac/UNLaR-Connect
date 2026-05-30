@@ -13,11 +13,13 @@ import {
   ThumbsUp,
   ThumbsDown,
   Filter,
+  X,
 } from 'lucide-react';
 import { sendChatMessageAction } from '@/actions/chat';
 import { fetchResources, ResourceExtended } from '@/actions/recursos';
 import { ingestDocumentAction } from '@/actions/ingest';
 import { Select } from '@/components/ui/Select';
+import { motion, AnimatePresence } from 'framer-motion';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -166,6 +168,7 @@ export default function AsistenteClient() {
 
   const [feedback, setFeedback] = useState<Record<number, 'like' | 'dislike' | null>>({});
   const [copiedStates, setCopiedStates] = useState<Record<number, boolean>>({});
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Load document list from resources bank on mount
@@ -323,14 +326,23 @@ export default function AsistenteClient() {
                 : 'General (Todos los apuntes)'}
             </span>
           </div>
-          {selectedDocId && (
-            <button 
-              onClick={() => setSelectedDocId(undefined)}
-              className="text-accent hover:underline font-medium shrink-0 ml-3"
+          <div className="flex items-center gap-2">
+            {selectedDocId && (
+              <button 
+                onClick={() => setSelectedDocId(undefined)}
+                className="text-accent hover:underline font-medium shrink-0 ml-1 mr-2"
+              >
+                Desactivar
+              </button>
+            )}
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/10 border border-accent/20 text-accent font-bold text-xs hover:bg-accent/15 transition-all focus:outline-none"
             >
-              Desactivar
+              <Filter className="w-3.5 h-3.5" />
+              <span>Apuntes ({filteredDocuments.length})</span>
             </button>
-          )}
+          </div>
         </div>
 
         {/* Chat area */}
@@ -576,6 +588,151 @@ export default function AsistenteClient() {
           </button>
         </div>
       </aside>
+
+      {/* Mobile Context Sidebar Drawer */}
+      <AnimatePresence>
+        {isMobileSidebarOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden flex justify-end">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileSidebarOpen(false)}
+              className="absolute inset-0 bg-background/60 backdrop-blur-sm"
+            />
+            <motion.aside
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="relative w-80 max-w-[90%] h-full bg-background/60 backdrop-blur-2xl border-l border-border/40 dark:border-white/5 p-6 flex flex-col z-10 shadow-2xl"
+            >
+              {/* Close Button inside Drawer */}
+              <button
+                onClick={() => setIsMobileSidebarOpen(false)}
+                className="absolute top-4 right-4 p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors focus:outline-none"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="pb-3 border-b border-border/20 flex items-center justify-between mt-2 select-none shrink-0">
+                <h3 className="text-xs font-black text-cream-bone uppercase tracking-wider">
+                  Contexto del Chat
+                </h3>
+                {selectedDocId && (
+                  <button 
+                    onClick={() => {
+                      setSelectedDocId(undefined);
+                      setIsMobileSidebarOpen(false);
+                    }}
+                    className="text-[10px] text-accent font-semibold hover:underline"
+                  >
+                    Desactivar
+                  </button>
+                )}
+              </div>
+
+              {/* Dynamic Context Filters Bar inside Drawer */}
+              <div className="py-4 border-b border-border/20 space-y-2 select-none text-[10px] text-muted-foreground shrink-0">
+                <div className="flex items-center gap-1 mb-1 font-semibold text-foreground uppercase tracking-wider text-[9px] text-muted-foreground/80">
+                  <Filter className="w-3 h-3" />
+                  <span>Filtros de Contexto</span>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <span>Materia:</span>
+                  <Select 
+                    value={filterSubject}
+                    onChange={(val) => setFilterSubject(val as string)}
+                    options={subjectOptions}
+                    className="bg-card/65 border border-border/40 rounded-xl px-3.5 py-2.5 text-xs flex items-center justify-between w-full"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <span>Eje Temático:</span>
+                  <Select 
+                    value={filterTopic}
+                    onChange={(val) => setFilterTopic(val as string)}
+                    options={topicOptions}
+                    className="bg-card/65 border border-border/40 rounded-xl px-3.5 py-2.5 text-xs flex items-center justify-between w-full"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <span>Formato:</span>
+                  <Select 
+                    value={filterType}
+                    onChange={(val) => setFilterType(val as string)}
+                    options={typeOptions}
+                    className="bg-card/65 border border-border/40 rounded-xl px-3.5 py-2.5 text-xs flex items-center justify-between w-full"
+                  />
+                </div>
+              </div>
+
+              {/* Scrollable Document List inside Drawer */}
+              <div className="py-4 space-y-3 overflow-y-auto custom-scrollbar flex-1">
+                {isLoadingDocs ? (
+                  <div className="text-center py-8 text-xs text-muted-foreground/60 select-none">
+                    Cargando apuntes...
+                  </div>
+                ) : filteredDocuments.length === 0 ? (
+                  <div className="text-center py-8 text-xs text-muted-foreground/50 select-none">
+                    No hay apuntes.
+                  </div>
+                ) : (
+                  filteredDocuments.map((doc) => {
+                    const active = selectedDocId === doc.id;
+                    return (
+                      <div
+                        key={doc.id}
+                        onClick={() => {
+                          handleSelectDoc(doc.id);
+                          setIsMobileSidebarOpen(false);
+                        }}
+                        className={`bg-muted/40 border rounded-lg p-3.5 relative overflow-hidden transition-colors cursor-pointer ${
+                          active
+                            ? 'border-accent/25 hover:border-accent/50 bg-muted/95'
+                            : 'border-border/50 hover:border-border opacity-70 hover:opacity-100'
+                        }`}
+                      >
+                        {active && (
+                          <div className="absolute left-0 top-0 w-1 h-full bg-accent" />
+                        )}
+                        <div className="flex items-start gap-3">
+                          <div className="w-9 h-9 rounded bg-card flex items-center justify-center shrink-0 text-secondary">
+                            {doc.document_type === 'pdf' ? (
+                              <FileText className="w-4 h-4" />
+                            ) : (
+                              <Presentation className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-medium text-foreground line-clamp-1">
+                              {doc.title}
+                            </h4>
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                              {doc.category}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+
+                <button 
+                  onClick={() => window.location.href = "/recursos"}
+                  className="w-full py-2.5 border border-dashed border-border rounded-lg text-muted-foreground hover:text-accent hover:border-accent/40 transition-colors flex flex-col items-center justify-center gap-1.5 text-center mt-2"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span className="text-[11px] font-semibold">Subir apunte</span>
+                </button>
+              </div>
+            </motion.aside>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
