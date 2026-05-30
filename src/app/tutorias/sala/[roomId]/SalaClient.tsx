@@ -119,57 +119,63 @@ function VideoTile({
       // The element is muted/playsInline where needed, so autoplay races can be ignored.
     });
   }, [stream, hasVideo, isCameraOff]);
-
   return (
-    <div className="relative h-full min-h-0 rounded-xl overflow-hidden border border-border/20 bg-muted/20 shadow-xl">
-      {stream && hasVideo && !isCameraOff ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={isCurrentUser}
-          className={`absolute inset-0 w-full h-full object-cover ${isCurrentUser ? "-scale-x-100" : ""}`}
-        />
-      ) : (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-muted/20">
-          <div className="relative w-20 h-20 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center text-accent font-heading font-black text-xl shadow-lg shadow-accent/10">
-            {showLoader ? <Loader2 className="w-8 h-8 animate-spin" /> : getInitials(participant)}
+    <div className="w-full h-full flex items-center justify-center min-h-0 min-w-0">
+      <div className="relative w-full h-full sm:w-auto sm:h-auto flex items-center justify-center max-w-full max-h-full rounded-lg sm:rounded-xl overflow-hidden border border-border/20 bg-muted/20 shadow-xl">
+        {/* 16:9 spacer — hidden on mobile so tiles can shrink freely */}
+        <svg viewBox="0 0 16 9" className="hidden sm:block w-full h-auto max-h-full pointer-events-none invisible" />
+        
+        <div className="absolute inset-0 w-full h-full">
+          {stream && hasVideo && !isCameraOff ? (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted={isCurrentUser}
+              className={`absolute inset-0 w-full h-full object-cover ${isCurrentUser ? "-scale-x-100" : ""}`}
+            />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2 sm:p-6 bg-muted/20">
+              <div className="relative w-10 h-10 sm:w-20 sm:h-20 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center text-accent font-heading font-black text-sm sm:text-xl shadow-lg shadow-accent/10">
+                {showLoader ? <Loader2 className="w-5 h-5 sm:w-8 sm:h-8 animate-spin" /> : getInitials(participant)}
+              </div>
+              <h4 className="mt-1 sm:mt-4 font-heading font-bold text-[10px] sm:text-sm text-foreground">
+                {displayName}
+              </h4>
+              <p className="mt-0.5 sm:mt-1 text-[8px] sm:text-xs text-muted-foreground leading-relaxed">
+                {statusText}
+              </p>
+            </div>
+          )}
+
+          <div className="absolute left-1 right-1 bottom-1 sm:left-3 sm:right-3 sm:bottom-3 flex items-center justify-between gap-1 sm:gap-2">
+            <div className="min-w-0 rounded bg-background/80 border border-border/20 px-1.5 py-0.5 sm:px-3 sm:py-2 backdrop-blur-md shadow-lg">
+              <span className="block truncate text-[8px] sm:text-xs font-bold text-foreground">
+                {displayName}
+              </span>
+              <span className="block truncate text-[7px] sm:text-[10px] text-muted-foreground">
+                {roleLabel}
+              </span>
+            </div>
+            <div
+              className={`w-1.5 h-1.5 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 border border-background ${
+                connectionState === "connected" || isCurrentUser
+                  ? "bg-emerald-500"
+                  : connectionState === "connecting"
+                  ? "bg-accent animate-pulse"
+                  : "bg-muted-foreground"
+              }`}
+              title={connectionState}
+            />
           </div>
-          <h4 className="mt-4 font-heading font-bold text-sm text-foreground">
-            {displayName}
-          </h4>
-          <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-            {statusText}
-          </p>
-        </div>
-      )}
 
-      <div className="absolute left-3 right-3 bottom-3 flex items-center justify-between gap-2">
-        <div className="min-w-0 rounded-lg bg-background/80 border border-border/20 px-3 py-2 backdrop-blur-md shadow-lg">
-          <span className="block truncate text-xs font-bold text-foreground">
-            {displayName}
-          </span>
-          <span className="block truncate text-[10px] text-muted-foreground mt-0.5">
-            {roleLabel}
-          </span>
+          {isMuted && (
+            <span className="absolute top-1 right-1 sm:top-3 sm:right-3 rounded-full bg-destructive/15 border border-destructive/25 px-1 py-0.5 sm:px-2 sm:py-1 text-[7px] sm:text-[10px] font-bold text-destructive">
+              Mic off
+            </span>
+          )}
         </div>
-        <div
-          className={`w-2.5 h-2.5 rounded-full shrink-0 border border-background ${
-            connectionState === "connected" || isCurrentUser
-              ? "bg-emerald-500"
-              : connectionState === "connecting"
-              ? "bg-accent animate-pulse"
-              : "bg-muted-foreground"
-          }`}
-          title={connectionState}
-        />
       </div>
-
-      {isMuted && (
-        <span className="absolute top-3 right-3 rounded-full bg-destructive/15 border border-destructive/25 px-2 py-1 text-[10px] font-bold text-destructive">
-          Mic off
-        </span>
-      )}
     </div>
   );
 }
@@ -192,7 +198,6 @@ export default function SalaClient({
   const [activeTab, setActiveTab] = useState<"chat" | "resources">("chat");
   const [unreadCount, setUnreadCount] = useState(0);
   const [resourcesKey, setResourcesKey] = useState(0);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [callExitNotice, setCallExitNotice] = useState<CallExitNotice | null>(null);
   const [visibleMediaInfo, setVisibleMediaInfo] = useState<string | null>(null);
   const [callDuration, setCallDuration] = useState(0);
@@ -239,7 +244,7 @@ export default function SalaClient({
     roomId: room.id,
     currentUserId,
     participants: activeParticipants,
-    onFailed: (errorMsg) => setConnectionError(errorMsg),
+    onFailed: (errorMsg) => console.error("[WebRTC] Connection failed:", errorMsg),
   });
 
   useEffect(() => {
@@ -460,7 +465,7 @@ export default function SalaClient({
       : "grid-cols-2";
 
   return (
-    <div className="h-full min-h-0 grid grid-rows-[auto_minmax(0,1fr)_auto] gap-4 relative">
+    <div className="h-full min-h-0 grid grid-rows-[auto_minmax(0,1fr)_auto] gap-1.5 sm:gap-4 relative">
       {callExitNotice && (
         <div className="fixed inset-0 z-[80] bg-background/80 backdrop-blur-xl flex items-center justify-center p-4 animate-fade-in">
           <div className="w-full max-w-sm rounded-xl border border-border/40 bg-glass shadow-2xl p-6 text-center space-y-5">
@@ -485,7 +490,7 @@ export default function SalaClient({
         </div>
       )}
 
-      <div className="bg-glass px-4 py-2 sm:px-6 sm:py-3 rounded-xl border border-border/20 flex flex-row items-center justify-between gap-3 shadow-lg z-10 backdrop-blur-xl shrink-0 w-full">
+      <div className="bg-glass px-2.5 py-1.5 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl border border-border/20 flex flex-row items-center justify-between gap-2 sm:gap-3 shadow-lg z-10 backdrop-blur-xl shrink-0 w-full">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-accent animate-pulse shrink-0" />
           <div className="min-w-0">
@@ -511,11 +516,11 @@ export default function SalaClient({
         </div>
       </div>
 
-      <div className="relative flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
-        <div className={`relative grid grid-rows-[minmax(0,1fr)_auto_auto] min-h-0 bg-obsidian rounded-xl overflow-hidden border border-border/20 shadow-2xl p-3 transition-all ${
+      <div className="relative flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-2 sm:gap-6 overflow-hidden">
+        <div className={`relative grid grid-rows-[minmax(0,1fr)_auto_auto] min-h-0 bg-obsidian rounded-lg sm:rounded-xl overflow-hidden border border-border/20 shadow-2xl p-1.5 sm:p-3 transition-all ${
           showChat ? "lg:col-span-2" : "lg:col-span-3"
         }`}>
-          <div className={`grid ${gridClass} auto-rows-fr gap-3 h-full min-h-0 overflow-hidden`}>
+          <div className={`grid auto-rows-fr gap-1.5 sm:gap-3 h-full min-h-0 overflow-hidden place-content-center place-items-center ${gridClass} sm:grid-cols-[repeat(auto-fit,minmax(320px,1fr))]`}>
             {activeParticipants.map((participant) => {
               const isCurrentUser = participant.user_id === currentUserId;
               const remoteState: RemoteMediaState | undefined = remoteMedia[participant.user_id];
@@ -552,19 +557,7 @@ export default function SalaClient({
             </div>
           )}
 
-          {connectionError && (
-            <div className="mt-3 bg-destructive/15 text-destructive border border-destructive/25 p-3.5 rounded-xl flex items-start gap-3 shadow-2xl backdrop-blur-md shrink-0">
-              <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <h5 className="font-heading font-black text-sm uppercase tracking-wider leading-none">
-                  Falla de conexión
-                </h5>
-                <p className="text-xs mt-1 leading-relaxed">{connectionError}</p>
-              </div>
-            </div>
-          )}
-
-          {visibleMediaInfo && !connectionError && (
+          {visibleMediaInfo && (
             <div className="mt-3 bg-card/90 text-foreground border border-border/40 p-3.5 rounded-xl flex items-start gap-3 shadow-2xl backdrop-blur-md animate-fade-in shrink-0">
               <Info className="w-5 h-5 shrink-0 mt-0.5 text-accent" />
               <div className="flex-1 min-w-0">
