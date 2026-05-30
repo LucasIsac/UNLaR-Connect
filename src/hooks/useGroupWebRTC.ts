@@ -167,6 +167,21 @@ export function useGroupWebRTC({
     onFailedRef.current = onFailed;
   }, [onFailed]);
 
+  const signalingQueueRef = useRef<Map<string, Promise<unknown>>>(new Map());
+
+  const queueTask = useCallback((peerId: string, task: () => Promise<unknown>) => {
+    const current = signalingQueueRef.current.get(peerId) ?? Promise.resolve();
+    const next = current.then(async () => {
+      try {
+        await task();
+      } catch (err) {
+        console.error(`[WebRTC Debug] Error in queued task for ${peerId}:`, err);
+      }
+    });
+    signalingQueueRef.current.set(peerId, next);
+    return next;
+  }, []);
+
   const sendSignal = useCallback(async (event: SignalEvent, payload: SignalPayload) => {
     if (!channelRef.current || !channelReadyRef.current) {
       return false;
@@ -774,122 +789,134 @@ export function useGroupWebRTC({
     };
 
     channel
-      .on("broadcast", { event: "participant-ready" }, async ({ payload }: { payload: unknown }) => {
+      .on("broadcast", { event: "participant-ready" }, ({ payload }: { payload: unknown }) => {
         if (!shouldHandlePayload(payload)) return;
         const peerId = payload.senderId;
-        const hadPeerConnection = peerConnectionsRef.current.has(peerId);
-        const pc = ensurePeerConnectionRef.current(peerId);
-        updateRemoteSignaledMediaStateRef.current(peerId, payload);
+        void queueTask(peerId, async () => {
+          const hadPeerConnection = peerConnectionsRef.current.has(peerId);
+          const pc = ensurePeerConnectionRef.current(peerId);
+          updateRemoteSignaledMediaStateRef.current(peerId, payload);
 
-        if (
-          shouldCreateOffer(currentUserId, peerId) &&
-          (!hadPeerConnection || needsNegotiationRef.current.has(peerId) || !pc.remoteDescription)
-        ) {
-          await createOfferRef.current(peerId, pc);
-        }
+          const remoteNeedsNegotiation = typeof payload === "object" && payload !== null && "needsNegotiation" in payload
+            ? Boolean((payload as { needsNegotiation?: boolean }).needsNegotiation)
+            : false;
+
+          if (
+            shouldCreateOffer(currentUserId, peerId) &&
+            (!hadPeerConnection ||
+              needsNegotiationRef.current.has(peerId) ||
+              remoteNeedsNegotiation ||
+              !pc.remoteDescription)
+          ) {
+            await createOfferRef.current(peerId, pc);
+          }
+        });
       })
       .on("broadcast", { event: "media-state" }, ({ payload }: { payload: unknown }) => {
         if (!shouldHandlePayload(payload)) return;
         updateRemoteSignaledMediaStateRef.current(payload.senderId, payload);
       })
-      .on("broadcast", { event: "offer" }, async ({ payload }: { payload: unknown }) => {
+      .on("broadcast", { event: "offer" }, ({ payload }: { payload: unknown }) => {
         if (!shouldHandlePayload(payload) || !("sdp" in payload) || !("offerId" in payload)) return;
-
         const peerId = payload.senderId;
-        console.log(`[WebRTC Debug] Received offer from ${peerId} (Offer ID: ${payload.offerId})`);
-        const pc = ensurePeerConnectionRef.current(peerId);
+        void queueTask(peerId, async () => {
+          console.log(`[WebRTC Debug] Received offer from ${peerId} (Offer ID: ${payload.offerId})`);
+          const pc = ensurePeerConnectionRef.current(peerId);
 
-        try {
-          const cachedAnswer = cachedAnswersRef.current.get(payload.offerId);
-          if (cachedAnswer) {
-            console.log(`[WebRTC Debug] Sending cached answer for offer ${payload.offerId} to ${peerId}`);
-            await sendSignalRef.current("answer", cachedAnswer);
-            return;
+          try {
+            const cachedAnswer = cachedAnswersRef.current.get(payload.offerId);
+            if (cachedAnswer) {
+              console.log(`[WebRTC Debug] Sending cached answer for offer ${payload.offerId} to ${peerId}`);
+              await sendSignalRef.current("answer", cachedAnswer);
+              return;
+            }
+
+            if (pc.signalingState !== "stable") {
+              console.log(`[WebRTC Debug] Signaling state is not stable (${pc.signalingState}). Ignoring offer from ${peerId}`);
+              return;
+            }
+            console.log(`[WebRTC Debug] Setting remote description for ${peerId}`);
+            await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+            console.log(`[WebRTC Debug] Creating answer for ${peerId}`);
+            const answer = await pc.createAnswer();
+            if (!activeRef.current || getSignalingState(pc) !== "have-remote-offer") return;
+            console.log(`[WebRTC Debug] Setting local description for ${peerId}`);
+            await pc.setLocalDescription(answer);
+            if (!activeRef.current || pc.signalingState !== "stable" || !pc.localDescription) return;
+
+            const answerPayload: CachedAnswerPayload = {
+              roomId,
+              senderId: currentUserId,
+              targetId: peerId,
+              offerId: payload.offerId,
+              sdp: pc.localDescription.toJSON(),
+            };
+
+            cachedAnswersRef.current.set(payload.offerId, answerPayload);
+            console.log(`[WebRTC Debug] Sending answer for offer ${payload.offerId} to ${peerId}`);
+            await sendSignalRef.current("answer", answerPayload);
+            await drainIceRef.current(peerId, pc);
+            sendMediaStateRef.current(peerId);
+          } catch (error) {
+            console.error("[WebRTC Debug] Failed to handle group WebRTC offer:", error);
           }
-
-          if (pc.signalingState !== "stable") {
-            console.log(`[WebRTC Debug] Signaling state is not stable (${pc.signalingState}). Ignoring offer from ${peerId}`);
-            return;
-          }
-          console.log(`[WebRTC Debug] Setting remote description for ${peerId}`);
-          await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-          console.log(`[WebRTC Debug] Creating answer for ${peerId}`);
-          const answer = await pc.createAnswer();
-          if (!activeRef.current || getSignalingState(pc) !== "have-remote-offer") return;
-          console.log(`[WebRTC Debug] Setting local description for ${peerId}`);
-          await pc.setLocalDescription(answer);
-          if (!activeRef.current || pc.signalingState !== "stable" || !pc.localDescription) return;
-
-          const answerPayload: CachedAnswerPayload = {
-            roomId,
-            senderId: currentUserId,
-            targetId: peerId,
-            offerId: payload.offerId,
-            sdp: pc.localDescription.toJSON(),
-          };
-
-          cachedAnswersRef.current.set(payload.offerId, answerPayload);
-          console.log(`[WebRTC Debug] Sending answer for offer ${payload.offerId} to ${peerId}`);
-          await sendSignalRef.current("answer", answerPayload);
-          await drainIceRef.current(peerId, pc);
-          sendMediaStateRef.current(peerId);
-        } catch (error) {
-          console.error("[WebRTC Debug] Failed to handle group WebRTC offer:", error);
-        }
+        });
       })
-      .on("broadcast", { event: "answer" }, async ({ payload }: { payload: unknown }) => {
+      .on("broadcast", { event: "answer" }, ({ payload }: { payload: unknown }) => {
         if (!shouldHandlePayload(payload) || !("sdp" in payload) || !("offerId" in payload)) return;
-
         const peerId = payload.senderId;
-        console.log(`[WebRTC Debug] Received answer from ${peerId} (Offer ID: ${payload.offerId})`);
-        const pc = peerConnectionsRef.current.get(peerId);
-        if (!pc || payload.offerId !== currentOfferIdRef.current.get(peerId)) {
-          console.log(`[WebRTC Debug] Answer ignored: no matching offer or different offerId for peer ${peerId}`);
-          return;
-        }
-
-        try {
-          if (pc.signalingState !== "have-local-offer") {
-            console.log(`[WebRTC Debug] Signaling state is not have-local-offer (${pc.signalingState}). Ignoring answer from ${peerId}`);
+        void queueTask(peerId, async () => {
+          console.log(`[WebRTC Debug] Received answer from ${peerId} (Offer ID: ${payload.offerId})`);
+          const pc = peerConnectionsRef.current.get(peerId);
+          if (!pc || payload.offerId !== currentOfferIdRef.current.get(peerId)) {
+            console.log(`[WebRTC Debug] Answer ignored: no matching offer or different offerId for peer ${peerId}`);
             return;
           }
-          console.log(`[WebRTC Debug] Setting remote description for ${peerId}`);
-          await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-          currentOfferIdRef.current.delete(peerId);
-          negotiationAttemptsRef.current.delete(peerId);
-          needsNegotiationRef.current.delete(peerId);
-          await drainIceRef.current(peerId, pc);
-          sendMediaStateRef.current(peerId);
 
-          if (needsNegotiationRef.current.has(peerId) && getSignalingState(pc) === "stable") {
-            console.log(`[WebRTC Debug] Re-negotiation needed with peer ${peerId}`);
-            void createOfferRef.current(peerId, pc);
+          try {
+            if (pc.signalingState !== "have-local-offer") {
+              console.log(`[WebRTC Debug] Signaling state is not have-local-offer (${pc.signalingState}). Ignoring answer from ${peerId}`);
+              return;
+            }
+            console.log(`[WebRTC Debug] Setting remote description for ${peerId}`);
+            await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+            currentOfferIdRef.current.delete(peerId);
+            negotiationAttemptsRef.current.delete(peerId);
+            needsNegotiationRef.current.delete(peerId);
+            await drainIceRef.current(peerId, pc);
+            sendMediaStateRef.current(peerId);
+
+            if (needsNegotiationRef.current.has(peerId) && getSignalingState(pc) === "stable") {
+              console.log(`[WebRTC Debug] Re-negotiation needed with peer ${peerId}`);
+              await createOfferRef.current(peerId, pc);
+            }
+          } catch (error) {
+            console.error("[WebRTC Debug] Failed to handle group WebRTC answer:", error);
           }
-        } catch (error) {
-          console.error("[WebRTC Debug] Failed to handle group WebRTC answer:", error);
-        }
+        });
       })
-      .on("broadcast", { event: "ice-candidate" }, async ({ payload }: { payload: unknown }) => {
+      .on("broadcast", { event: "ice-candidate" }, ({ payload }: { payload: unknown }) => {
         if (!shouldHandlePayload(payload) || !("candidate" in payload)) return;
-
         const peerId = payload.senderId;
-        console.log(`[WebRTC Debug] Received ICE candidate from ${peerId}`);
-        const pc = ensurePeerConnectionRef.current(peerId);
+        void queueTask(peerId, async () => {
+          console.log(`[WebRTC Debug] Received ICE candidate from ${peerId}`);
+          const pc = ensurePeerConnectionRef.current(peerId);
 
-        try {
-          if (pc.remoteDescription) {
-            console.log(`[WebRTC Debug] Adding remote ICE candidate directly for ${peerId}`);
-            await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-            return;
+          try {
+            if (pc.remoteDescription) {
+              console.log(`[WebRTC Debug] Adding remote ICE candidate directly for ${peerId}`);
+              await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+              return;
+            }
+
+            console.log(`[WebRTC Debug] Buffering remote ICE candidate for ${peerId}`);
+            const pending = pendingIceRef.current.get(peerId) ?? [];
+            pending.push(payload.candidate);
+            pendingIceRef.current.set(peerId, pending);
+          } catch (error) {
+            console.error("[WebRTC Debug] Failed to add group WebRTC ICE candidate:", error);
           }
-
-          console.log(`[WebRTC Debug] Buffering remote ICE candidate for ${peerId}`);
-          const pending = pendingIceRef.current.get(peerId) ?? [];
-          pending.push(payload.candidate);
-          pendingIceRef.current.set(peerId, pending);
-        } catch (error) {
-          console.error("[WebRTC Debug] Failed to add group WebRTC ICE candidate:", error);
-        }
+        });
       })
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
