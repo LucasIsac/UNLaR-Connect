@@ -515,10 +515,10 @@ export default function RecursosPage() {
         </div>
 
         {/* Main Columns Container */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+        <div className="relative">
           
           {/* Left / Center Content: Resource list and tabs */}
-          <div className="space-y-4 lg:col-span-7 xl:col-span-8">
+          <div className="space-y-4 lg:pr-[400px]">
             
             {/* Navigation Tabs and Grid Layout Switcher */}
             <div className="flex items-center gap-4 border-b border-border/10 pb-2 mb-4 overflow-x-auto select-none">
@@ -702,7 +702,7 @@ export default function RecursosPage() {
           </div>
 
           {/* Right sidebar column: Upload zone */}
-          <div className="lg:col-span-5 xl:col-span-4 space-y-6 lg:sticky lg:top-20 self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:custom-scrollbar pb-6">
+          <div className="hidden lg:block fixed right-8 top-24 w-[320px] xl:w-[360px] space-y-6 pb-6">
 
             {/* Loading placeholder sidebars if true */}
             {loading ? (
