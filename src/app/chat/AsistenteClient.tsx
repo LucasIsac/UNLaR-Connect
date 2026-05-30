@@ -319,7 +319,7 @@ export default function AsistenteClient() {
         <div className="py-3 border-b border-border/20 flex items-center justify-between text-xs shrink-0 select-none mb-2">
           <div className="flex items-center gap-2 min-w-0">
             <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${selectedDocId ? 'bg-accent animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]' : 'bg-muted-foreground/30'}`} />
-            <span className="text-muted-foreground font-medium whitespace-nowrap">Modo de consulta:</span>
+            <span className="text-muted-foreground font-medium whitespace-nowrap hidden sm:inline">Modo de consulta:</span>
             <span className="font-semibold text-foreground truncate">
               {selectedDocId 
                 ? `Apunte: "${documents.find(d => d.id === selectedDocId)?.title || 'Procesando...'}"` 
@@ -346,7 +346,7 @@ export default function AsistenteClient() {
         </div>
 
         {/* Chat area */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar py-4 px-0 space-y-6">
+        <div className="flex-1 overflow-y-auto custom-scrollbar py-4 px-4 sm:px-6 space-y-6">
           {messages.map((msg, i) => (
             <div
               key={i}

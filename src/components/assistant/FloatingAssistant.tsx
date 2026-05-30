@@ -297,8 +297,8 @@ export default function FloatingAssistant() {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Don't show on landing page or auth pages
-  const isHidden = pathname === "/" || pathname === "/login" || pathname === "/register" || pathname.startsWith("/auth");
+  // Don't show on landing page, auth pages or full chat page
+  const isHidden = pathname === "/" || pathname === "/login" || pathname === "/register" || pathname.startsWith("/auth") || pathname === "/chat";
 
   const context = PAGE_CONTEXT[pathname] || DEFAULT_CONTEXT;
   const quickResponses = QUICK_RESPONSES[pathname] || QUICK_RESPONSES["/"];
