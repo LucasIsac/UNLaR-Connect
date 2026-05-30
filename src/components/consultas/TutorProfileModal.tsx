@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { X, Star, BookOpen, Calendar, Mail, Phone, MessageSquare, ShieldAlert } from "lucide-react";
 import { TutorProfileForMatching } from "@/actions/tutoring-scheduled";
 
@@ -49,10 +50,12 @@ export default function TutorProfileModal({
         {/* Tutor Header Info */}
         <div className="flex flex-col items-center text-center mb-6">
           {tutor.avatar_url ? (
-            <img
+            <Image
               src={tutor.avatar_url}
               alt={`${tutor.name} ${tutor.last_name}`}
-              className="w-24 h-24 rounded-full object-cover border-4 border-accent/20 mb-3"
+              width={96}
+              height={96}
+              className="rounded-full object-cover border-4 border-accent/20 mb-3"
             />
           ) : (
             <div className="w-24 h-24 rounded-full bg-accent/10 border-4 border-accent/20 flex items-center justify-center text-accent font-black text-3xl mb-3">

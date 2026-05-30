@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { X, Calendar, CalendarDays, Clock, BookOpen, Loader2, CheckCircle, MessageSquare } from "lucide-react";
 import { TutorProfileForMatching, fetchTutorAvailabilityForDate, requestScheduledTutoring } from "@/actions/tutoring-scheduled";
 import { Select } from "@/components/ui/Select";
@@ -140,10 +141,12 @@ export default function RequestTutoringModal({
         {/* Tutor Info */}
         <div className="flex items-center gap-4 mb-6 p-4 bg-muted/20 rounded-xl border border-border/20">
           {tutor.avatar_url ? (
-            <img
+            <Image
               src={tutor.avatar_url}
               alt={`${tutor.name} ${tutor.last_name}`}
-              className="w-12 h-12 rounded-full object-cover border-2 border-accent/20"
+              width={48}
+              height={48}
+              className="rounded-full object-cover border-2 border-accent/20"
             />
           ) : (
             <div className="w-12 h-12 rounded-full bg-accent/10 border-2 border-accent/20 flex items-center justify-center text-accent font-bold">

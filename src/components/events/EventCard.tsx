@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import {
   Calendar,
   Clock,
@@ -84,10 +85,11 @@ export default function EventCard({ event, onRegister, onClick }: EventCardProps
       {/* Image / Gradient Header */}
       <div className="relative h-36 overflow-hidden">
         {event.image_url ? (
-          <img
+          <Image
             src={event.image_url}
             alt={event.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-accent/20 via-background to-terracotta-soft/10" />

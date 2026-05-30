@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { X, Calendar, Loader2, Upload, Image } from "lucide-react";
+import NextImage from "next/image";
+import { X, Calendar, Loader2, Upload, ImageIcon } from "lucide-react";
 import { createEvent, editEvent } from "@/actions/events";
 import { Select } from "@/components/ui/Select";
 import { createClient } from "@/lib/supabase/client";
@@ -251,10 +252,12 @@ export default function CreateEventModal({ isOpen, onClose, onCreated, editingEv
             />
             {imagePreview ? (
               <div className="relative">
-                <img
+                <NextImage
                   src={imagePreview}
                   alt="Preview"
-                  className="w-full h-32 object-cover rounded-xl border border-border/40"
+                  fill
+                  unoptimized
+                  className="object-cover rounded-xl border border-border/40"
                 />
                 <button
                   type="button"
@@ -278,7 +281,7 @@ export default function CreateEventModal({ isOpen, onClose, onCreated, editingEv
                   <Loader2 className="w-6 h-6 animate-spin" />
                 ) : (
                   <>
-                    <Image className="w-6 h-6" />
+                    <ImageIcon className="w-6 h-6" />
                     <span className="text-xs font-semibold">Elegí una imagen de portada</span>
                     <span className="text-[10px] opacity-60">JPG, PNG • Máx 5MB</span>
                   </>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
@@ -131,10 +132,12 @@ export default function InscribirClient({ event }: InscribirClientProps) {
         <div className="bg-glass rounded-2xl border border-border/10 p-5">
           <div className="flex items-start gap-4">
             {event.image_url && (
-              <img
+              <Image
                 src={event.image_url}
                 alt={event.title}
-                className="w-20 h-20 rounded-xl object-cover shrink-0"
+                width={80}
+                height={80}
+                className="rounded-xl object-cover shrink-0"
               />
             )}
             <div className="flex-1 min-w-0">

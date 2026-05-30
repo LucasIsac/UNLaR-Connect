@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   X,
@@ -95,10 +96,11 @@ export default function EventDetailModal({ event, isOpen, onClose }: EventDetail
         {/* Image Header */}
         {event.image_url && (
           <div className="relative h-48 overflow-hidden rounded-t-3xl">
-            <img
+            <Image
               src={event.image_url}
               alt={event.title}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
             <button

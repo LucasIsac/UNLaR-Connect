@@ -1,17 +1,18 @@
-import { ImgHTMLAttributes } from "react";
+import Image from "next/image";
 
-interface LogoProps extends ImgHTMLAttributes<HTMLImageElement> {
+interface LogoProps {
   className?: string;
+  alt?: string;
 }
 
-export default function Logo({ className, alt = "UNLaR-Connect", ...props }: LogoProps) {
+export default function Logo({ className, alt = "UNLaR-Connect" }: LogoProps) {
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <Image
       src="/logo.svg"
       alt={alt}
+      width={36}
+      height={36}
       className={className}
-      {...props}
     />
   );
 }
