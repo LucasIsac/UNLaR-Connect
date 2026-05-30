@@ -9,6 +9,8 @@ import {
 } from "@/actions/perfil";
 import ConfiguracionTutorClient from "./ConfiguracionTutorClient";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Configuración de Tutoría | UNLaR Connect",
   description: "Ajustá tus horarios, tarifas y materias para dar tutorías.",
