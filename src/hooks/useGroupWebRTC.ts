@@ -33,6 +33,7 @@ interface MediaStateData {
 
 interface ReadySignalPayload extends BaseSignalPayload, MediaStateData {
   readyAt: string;
+  needsNegotiation?: boolean;
 }
 
 interface MediaStateSignalPayload extends BaseSignalPayload, MediaStateData {
@@ -524,6 +525,7 @@ export function useGroupWebRTC({
       senderId: currentUserId,
       readyAt: new Date().toISOString(),
       ...getLocalMediaState(),
+      needsNegotiation: targetId ? needsNegotiationRef.current.has(targetId) : (needsNegotiationRef.current.size > 0),
     };
 
     if (targetId) {
@@ -796,7 +798,6 @@ export function useGroupWebRTC({
           const hadPeerConnection = peerConnectionsRef.current.has(peerId);
           const pc = ensurePeerConnectionRef.current(peerId);
           updateRemoteSignaledMediaStateRef.current(peerId, payload);
-
           const remoteNeedsNegotiation = typeof payload === "object" && payload !== null && "needsNegotiation" in payload
             ? Boolean((payload as { needsNegotiation?: boolean }).needsNegotiation)
             : false;
